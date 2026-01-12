@@ -100,8 +100,15 @@ In `extensions/specialized-subagents/index.ts`:
 1. Import the tool and guidance
 2. Add guidance to `SUBAGENT_GUIDANCES` array
 3. Register tool with `pi.registerTool(createXxxTool())`
+4. If the subagent requires API keys, add them to `checkApiKeys()`
 
 See the existing registration pattern in the file.
+
+## API Key Validation
+
+If your subagent requires external API keys, validate them at extension load time. This prevents the extension from loading if required keys are missing.
+
+Add your required keys to `checkApiKeys()` in `extensions/specialized-subagents/index.ts`. See the existing implementation for the pattern.
 
 ## Checklist
 
