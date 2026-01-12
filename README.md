@@ -15,6 +15,7 @@ Custom extensions for [Pi](https://github.com/mariozechner/pi-coding-agent), a c
 | [pi-ui](extensions/pi-ui/README.md) | Custom header and footer |
 | [preset](extensions/preset/README.md) | Named presets for model and subagent gateway |
 | [processes](extensions/processes/README.md) | Background process management |
+| [specialized-subagents](extensions/specialized-subagents/README.md) | Framework for spawning specialized subagents |
 
 ## Development
 
