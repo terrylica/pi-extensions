@@ -3,13 +3,30 @@
  */
 
 import type { ToolDefinition } from "@mariozechner/pi-coding-agent";
-import { fetchUrlTool } from "./fetch-url";
-import { githubTool } from "./github";
-import { searchTool } from "./search";
+import { githubCommitsTool } from "./github-commits";
+import { githubContentTool } from "./github-content";
+import { githubIssueTool } from "./github-issue";
+import { githubSearchTool } from "./github-search";
+import { webFetchTool } from "./web-fetch";
+import { webSearchTool } from "./web-search";
 
 /** Create scout tools array */
 export function createScoutTools(): ToolDefinition[] {
-  return [fetchUrlTool, searchTool, githubTool] as unknown as ToolDefinition[];
+  return [
+    webFetchTool,
+    webSearchTool,
+    githubContentTool,
+    githubSearchTool,
+    githubCommitsTool,
+    githubIssueTool,
+  ] as unknown as ToolDefinition[];
 }
 
-export { fetchUrlTool, githubTool, searchTool };
+export {
+  githubCommitsTool,
+  githubContentTool,
+  githubIssueTool,
+  githubSearchTool,
+  webFetchTool,
+  webSearchTool,
+};

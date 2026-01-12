@@ -104,6 +104,105 @@ export interface GitHubComment {
   updated_at: string;
 }
 
+/** GitHub code search result item */
+export interface GitHubCodeSearchItem {
+  name: string;
+  path: string;
+  sha: string;
+  html_url: string;
+  repository: {
+    full_name: string;
+    html_url: string;
+  };
+}
+
+/** GitHub code search response */
+export interface GitHubCodeSearchResponse {
+  total_count: number;
+  incomplete_results: boolean;
+  items: GitHubCodeSearchItem[];
+}
+
+/** GitHub commit author */
+export interface GitHubCommitAuthor {
+  name: string;
+  email: string;
+  date: string;
+}
+
+/** GitHub commit */
+export interface GitHubCommit {
+  sha: string;
+  html_url: string;
+  commit: {
+    message: string;
+    author: GitHubCommitAuthor;
+    committer: GitHubCommitAuthor;
+  };
+  author: GitHubUser | null;
+  committer: GitHubUser | null;
+}
+
+/** GitHub commit search result item */
+export interface GitHubCommitSearchItem {
+  sha: string;
+  html_url: string;
+  commit: {
+    message: string;
+    author: GitHubCommitAuthor;
+    committer: GitHubCommitAuthor;
+  };
+  author: GitHubUser | null;
+  repository: {
+    full_name: string;
+  };
+}
+
+/** GitHub commit search response */
+export interface GitHubCommitSearchResponse {
+  total_count: number;
+  incomplete_results: boolean;
+  items: GitHubCommitSearchItem[];
+}
+
+/** GitHub commit file (for diff) */
+export interface GitHubCommitFile {
+  sha: string;
+  filename: string;
+  status:
+    | "added"
+    | "removed"
+    | "modified"
+    | "renamed"
+    | "copied"
+    | "changed"
+    | "unchanged";
+  additions: number;
+  deletions: number;
+  changes: number;
+  patch?: string;
+  previous_filename?: string;
+}
+
+/** GitHub commit detail (with diff) */
+export interface GitHubCommitDetail {
+  sha: string;
+  html_url: string;
+  commit: {
+    message: string;
+    author: GitHubCommitAuthor;
+    committer: GitHubCommitAuthor;
+  };
+  author: GitHubUser | null;
+  committer: GitHubUser | null;
+  stats: {
+    additions: number;
+    deletions: number;
+    total: number;
+  };
+  files: GitHubCommitFile[];
+}
+
 /** Parsed GitHub URL */
 export interface ParsedGitHubUrl {
   owner: string;
@@ -153,12 +252,9 @@ export class GitHubClient {
   private token: string;
 
   constructor() {
-    const token =
-      process.env.GITHUB_TOKEN || process.env.LIBRARIAN_GITHUB_TOKEN;
+    const token = process.env.GITHUB_TOKEN;
     if (!token) {
-      throw new Error(
-        "GITHUB_TOKEN environment variable is not set. This is required for GitHub API access.",
-      );
+      throw new Error("GITHUB_TOKEN environment variable is not set.");
     }
     this.token = token;
   }
@@ -478,6 +574,199 @@ export class GitHubClient {
         }
       } catch {
         markdown += `_Failed to load comments._\n\n`;
+      }
+    }
+
+    return markdown;
+  }
+
+  /** Search code across GitHub */
+  async searchCode(
+    query: string,
+    repo?: string,
+    signal?: AbortSignal,
+  ): Promise<string> {
+    // Build search query
+    let q = query;
+    if (repo) {
+      q = `${query} repo:${repo}`;
+    }
+
+    const data = await this.get<GitHubCodeSearchResponse>(
+      "/search/code",
+      { q, per_page: "30" },
+      signal,
+    );
+
+    let markdown = `# Code Search Results\n\n`;
+    markdown += `**Query:** \`${query}\`\n`;
+    if (repo) {
+      markdown += `**Repository:** ${repo}\n`;
+    }
+    markdown += `**Total Results:** ${data.total_count}${data.incomplete_results ? " (incomplete)" : ""}\n\n`;
+
+    if (data.items.length === 0) {
+      markdown += `_No code matching the query was found._\n`;
+      return markdown;
+    }
+
+    markdown += `## Results\n\n`;
+
+    for (const item of data.items) {
+      markdown += `### ${item.path}\n\n`;
+      markdown += `- **Repository:** ${item.repository.full_name}\n`;
+      markdown += `- **URL:** ${item.html_url}\n\n`;
+    }
+
+    return markdown;
+  }
+
+  /** Search commits in a repository */
+  async searchCommits(
+    owner: string,
+    repo: string,
+    options?: { query?: string; author?: string; path?: string },
+    signal?: AbortSignal,
+  ): Promise<string> {
+    // If we have a query, use the search API
+    if (options?.query) {
+      let q = `${options.query} repo:${owner}/${repo}`;
+      if (options.author) {
+        q += ` author:${options.author}`;
+      }
+
+      const data = await this.get<GitHubCommitSearchResponse>(
+        "/search/commits",
+        { q, per_page: "30" },
+        signal,
+      );
+
+      let markdown = `# Commit Search Results\n\n`;
+      markdown += `**Repository:** ${owner}/${repo}\n`;
+      markdown += `**Query:** \`${options.query}\`\n`;
+      if (options.author) {
+        markdown += `**Author:** ${options.author}\n`;
+      }
+      markdown += `**Total Results:** ${data.total_count}${data.incomplete_results ? " (incomplete)" : ""}\n\n`;
+
+      if (data.items.length === 0) {
+        markdown += `_No commits matching the query were found._\n`;
+        return markdown;
+      }
+
+      markdown += `## Commits\n\n`;
+
+      for (const item of data.items) {
+        const shortSha = item.sha.substring(0, 7);
+        const message = item.commit.message.split("\n")[0]; // First line only
+        const date = item.commit.author.date.split("T")[0];
+        const author = item.author?.login || item.commit.author.name;
+
+        markdown += `- **${shortSha}** (${date}) - ${author}: ${message}\n`;
+      }
+
+      return markdown;
+    }
+
+    // Otherwise use the commits list API which supports path and author filtering
+    const params: Record<string, string> = { per_page: "30" };
+    if (options?.author) {
+      params.author = options.author;
+    }
+    if (options?.path) {
+      params.path = options.path;
+    }
+
+    const commits = await this.get<GitHubCommit[]>(
+      `/repos/${owner}/${repo}/commits`,
+      params,
+      signal,
+    );
+
+    let markdown = `# Commits\n\n`;
+    markdown += `**Repository:** ${owner}/${repo}\n`;
+    if (options?.author) {
+      markdown += `**Author:** ${options.author}\n`;
+    }
+    if (options?.path) {
+      markdown += `**Path:** ${options.path}\n`;
+    }
+    markdown += `\n`;
+
+    if (commits.length === 0) {
+      markdown += `_No commits found._\n`;
+      return markdown;
+    }
+
+    markdown += `## Commits\n\n`;
+
+    for (const commit of commits) {
+      const shortSha = commit.sha.substring(0, 7);
+      const message = commit.commit.message.split("\n")[0]; // First line only
+      const date = commit.commit.author.date.split("T")[0];
+      const author = commit.author?.login || commit.commit.author.name;
+
+      markdown += `- **${shortSha}** (${date}) - ${author}: ${message}\n`;
+    }
+
+    return markdown;
+  }
+
+  /** Get diff for a specific commit */
+  async getCommitDiff(
+    owner: string,
+    repo: string,
+    sha: string,
+    signal?: AbortSignal,
+  ): Promise<string> {
+    const commit = await this.get<GitHubCommitDetail>(
+      `/repos/${owner}/${repo}/commits/${sha}`,
+      undefined,
+      signal,
+    );
+
+    const shortSha = commit.sha.substring(0, 7);
+    const message = commit.commit.message;
+    const date = commit.commit.author.date;
+    const author = commit.author?.login || commit.commit.author.name;
+
+    let markdown = `# Commit ${shortSha}\n\n`;
+    markdown += `**SHA:** ${commit.sha}\n`;
+    markdown += `**Author:** ${author}\n`;
+    markdown += `**Date:** ${date}\n`;
+    markdown += `**URL:** ${commit.html_url}\n\n`;
+
+    markdown += `## Message\n\n`;
+    markdown += `${message}\n\n`;
+
+    markdown += `## Stats\n\n`;
+    markdown += `- **Additions:** +${commit.stats.additions}\n`;
+    markdown += `- **Deletions:** -${commit.stats.deletions}\n`;
+    markdown += `- **Total Changes:** ${commit.stats.total}\n`;
+    markdown += `- **Files Changed:** ${commit.files.length}\n\n`;
+
+    markdown += `## Files Changed\n\n`;
+
+    for (const file of commit.files) {
+      const statusIcon =
+        file.status === "added"
+          ? "➕"
+          : file.status === "removed"
+            ? "➖"
+            : file.status === "renamed"
+              ? "📝"
+              : "📄";
+
+      markdown += `### ${statusIcon} ${file.filename}\n\n`;
+
+      if (file.previous_filename) {
+        markdown += `_Renamed from: ${file.previous_filename}_\n\n`;
+      }
+
+      markdown += `**Status:** ${file.status} (+${file.additions} -${file.deletions})\n\n`;
+
+      if (file.patch) {
+        markdown += `\`\`\`diff\n${file.patch}\n\`\`\`\n\n`;
       }
     }
 

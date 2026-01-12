@@ -1,5 +1,5 @@
 /**
- * URL fetch tool using Exa contents API.
+ * Web fetch tool using Exa contents API.
  */
 
 import type { ToolDefinition } from "@mariozechner/pi-coding-agent";
@@ -89,9 +89,9 @@ function formatContentsResult(result: ExaContentsResponse): string {
   return markdown;
 }
 
-export const fetchUrlTool: ToolDefinition<typeof parameters> = {
-  name: "fetch_url",
-  label: "Fetch URL",
+export const webFetchTool: ToolDefinition<typeof parameters> = {
+  name: "web_fetch",
+  label: "Web Fetch",
   description: `Fetch the content of a URL and return it as markdown. Use this for general webpages, articles, documentation, etc.
 
 Provider: ${FETCH_PROVIDER}

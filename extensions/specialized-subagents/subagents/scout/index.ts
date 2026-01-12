@@ -29,31 +29,42 @@ import type { ScoutDetails, ScoutInput } from "./types";
 export const SCOUT_GUIDANCE = `
 ## Scout
 
-Use scout for web research and URL fetching. It can fetch URLs, search the web, and access GitHub content.
+Use scout for web research and GitHub codebase exploration. It can fetch URLs, search the web, and deeply explore GitHub repositories.
 
 **When to use:**
 - Fetching content from URLs (articles, documentation, webpages)
 - Searching the web for information
-- Fetching GitHub repos, files, issues, or pull requests
+- Exploring GitHub repositories (code, structure, commits, issues, PRs)
+- Understanding how open-source projects work
+- Finding implementations across codebases
+- Analyzing code evolution through commit history
 
 **When NOT to use:**
+- Local codebase search (use finder/lookout instead)
 - Testing API endpoints (use curl instead)
 - Making POST/PUT/DELETE requests
-- Downloading binary files
 
-**Inputs (at least one of url or query required):**
-- \`url\`: Specific URL to fetch (GitHub URLs auto-detected for better formatting)
-- \`query\`: Search query for online research
+**Inputs:**
+- \`url\`: Specific URL to fetch
+- \`query\`: Search query for web or GitHub research
+- \`repo\`: GitHub repository to focus on (owner/repo format)
 - \`prompt\`: Question to answer based on fetched content (omit for raw content)
+
+At least one of url, query, or repo is required.
 
 **Examples:**
 - Fetch a URL: \`{ url: "https://example.com/docs" }\`
-- Search the web: \`{ query: "typescript best practices 2025" }\`
-- Fetch + analyze: \`{ url: "...", prompt: "summarize the key points" }\`
-- Research + answer: \`{ query: "react server components", prompt: "explain the benefits" }\`
-- GitHub issue: \`{ url: "https://github.com/owner/repo/issues/123" }\`
+- Web search: \`{ query: "typescript best practices 2025" }\`
+- Explore repo: \`{ repo: "facebook/react", prompt: "how is useState implemented?" }\`
+- GitHub search: \`{ query: "useState implementation", repo: "facebook/react" }\`
+- Issue/PR: \`{ url: "https://github.com/owner/repo/issues/123" }\`
 
-**Important:** Prefer scout over \`curl\` when retrieving web content. Use \`curl\` only for testing endpoints or making API requests that require specific headers/methods.
+**GitHub capabilities:**
+- Read files and list directories
+- Search code across repositories
+- Search commits by message, author, or path
+- View commit diffs
+- Fetch issues and PRs with comments
 `;
 
 const parameters = Type.Object({
@@ -64,7 +75,12 @@ const parameters = Type.Object({
   ),
   query: Type.Optional(
     Type.String({
-      description: "Search query for online research",
+      description: "Search query for web or GitHub research",
+    }),
+  ),
+  repo: Type.Optional(
+    Type.String({
+      description: "GitHub repository to focus on (owner/repo format)",
     }),
   ),
   prompt: Type.Optional(
@@ -85,6 +101,10 @@ function buildUserMessage(input: ScoutInput): string {
 
   if (input.query) {
     parts.push(`Search query: ${input.query}`);
+  }
+
+  if (input.repo) {
+    parts.push(`GitHub repository to explore: ${input.repo}`);
   }
 
   if (input.prompt) {
@@ -117,19 +137,20 @@ export function createScoutTool(): ToolDefinition<
   return {
     name: "scout",
     label: "Scout",
-    description: `Web research assistant that fetches URLs and/or searches the web.
+    description: `Research assistant for web content and GitHub codebase exploration.
 
-Inputs (at least one of url or query required):
-- url: Specific URL to fetch (supports GitHub URLs including issues/PRs)
-- query: Search query for online research  
-- prompt: Question to answer based on fetched content (if omitted, returns raw content)
+Inputs (at least one of url, query, or repo required):
+- url: Specific URL to fetch
+- query: Search query for web or GitHub research
+- repo: GitHub repository to focus on (owner/repo format)
+- prompt: Question to answer based on content (if omitted, returns raw content)
 
 Use cases:
 - Fetch a URL: { url: "https://..." }
-- Search the web: { query: "how to..." }
-- Fetch + search: { url: "...", query: "..." }
-- Fetch + analyze: { url: "...", prompt: "summarize this" }
-- Research + answer: { query: "...", prompt: "what is the best..." }`,
+- Web search: { query: "how to..." }
+- Explore repo: { repo: "facebook/react", prompt: "how is useState implemented?" }
+- GitHub search: { query: "useState", repo: "facebook/react" }
+- Fetch issue/PR: { url: "https://github.com/owner/repo/issues/123" }`,
 
     parameters,
 
@@ -140,16 +161,17 @@ Use cases:
       ctx: ExtensionContext,
       signal?: AbortSignal,
     ) {
-      const { url, query, prompt } = args;
+      const { url, query, repo, prompt } = args;
 
-      // Validate: at least one of url or query required
-      if (!url && !query) {
-        const error = "At least one of 'url' or 'query' is required.";
+      // Validate: at least one of url, query, or repo required
+      if (!url && !query && !repo) {
+        const error = "At least one of 'url', 'query', or 'repo' is required.";
         return {
           content: [{ type: "text" as const, text: `Error: ${error}` }],
           details: {
             url,
             query,
+            repo,
             prompt,
             toolCalls: [],
             spinnerFrame: 0,
@@ -171,6 +193,7 @@ Use cases:
             details: {
               url,
               query,
+              repo,
               prompt,
               toolCalls: currentToolCalls,
               spinnerFrame,
@@ -204,6 +227,7 @@ Use cases:
               details: {
                 url,
                 query,
+                repo,
                 prompt,
                 toolCalls: currentToolCalls,
                 spinnerFrame,
@@ -220,6 +244,7 @@ Use cases:
               details: {
                 url,
                 query,
+                repo,
                 prompt,
                 toolCalls: currentToolCalls,
                 spinnerFrame,
@@ -234,6 +259,7 @@ Use cases:
             details: {
               url,
               query,
+              repo,
               prompt,
               toolCalls: currentToolCalls,
               spinnerFrame,
@@ -251,6 +277,7 @@ Use cases:
             details: {
               url,
               query,
+              repo,
               prompt,
               toolCalls: currentToolCalls,
               spinnerFrame,
@@ -274,6 +301,7 @@ Use cases:
             details: {
               url,
               query,
+              repo,
               prompt,
               toolCalls: currentToolCalls,
               spinnerFrame,
@@ -288,6 +316,7 @@ Use cases:
           details: {
             url,
             query,
+            repo,
             prompt,
             toolCalls: currentToolCalls,
             spinnerFrame,
@@ -325,6 +354,13 @@ Use cases:
       if (args.query) {
         container.addChild(
           new Text(`  ${theme.fg("muted", "Query: ")}${args.query}`, 0, 0),
+        );
+      }
+
+      // Repo (if provided)
+      if (args.repo) {
+        container.addChild(
+          new Text(`  ${theme.fg("muted", "Repo: ")}${args.repo}`, 0, 0),
         );
       }
 

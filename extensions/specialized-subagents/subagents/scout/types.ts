@@ -8,8 +8,10 @@ import type { SubagentToolCall, SubagentUsage } from "../../lib/types";
 export interface ScoutInput {
   /** URL to fetch content from */
   url?: string;
-  /** Search query for online research */
+  /** Search query for web or GitHub research */
   query?: string;
+  /** GitHub repository to focus on (owner/repo format) */
+  repo?: string;
   /** Question to answer based on fetched content */
   prompt?: string;
 }
@@ -20,6 +22,8 @@ export interface ScoutDetails {
   url?: string;
   /** Query input */
   query?: string;
+  /** Repository input */
+  repo?: string;
   /** Prompt input */
   prompt?: string;
   /** Tool calls made by the subagent */

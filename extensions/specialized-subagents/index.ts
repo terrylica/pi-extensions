@@ -5,13 +5,35 @@ import { createScoutTool, SCOUT_GUIDANCE } from "./subagents/scout";
  * Specialized Subagents Extension
  *
  * Provides specialized subagents with custom tools:
- * - scout: Web research and URL fetching (Exa + GitHub APIs)
+ * - scout: Web research and GitHub codebase exploration
  */
+
+/** Check required API keys, throw if missing */
+function checkApiKeys(): void {
+  const missing: string[] = [];
+
+  if (!process.env.EXA_API_KEY) {
+    missing.push("EXA_API_KEY");
+  }
+
+  if (!process.env.GITHUB_TOKEN) {
+    missing.push("GITHUB_TOKEN");
+  }
+
+  if (missing.length > 0) {
+    throw new Error(
+      `Missing required environment variables: ${missing.join(", ")}`,
+    );
+  }
+}
 
 // Collect all subagent guidances
 const SUBAGENT_GUIDANCES = [SCOUT_GUIDANCE];
 
 export default function (pi: ExtensionAPI) {
+  // Check API keys at load time - throws if missing
+  checkApiKeys();
+
   // Register tools
   pi.registerTool(createScoutTool());
 

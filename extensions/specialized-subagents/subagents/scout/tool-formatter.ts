@@ -13,9 +13,12 @@ export interface FormattedToolCall {
  * Format a scout tool call for display.
  *
  * Examples:
- * - fetch_url: "Fetch example.com"
- * - search: "Search 'typescript best practices'"
- * - github: "GitHub owner/repo" or "GitHub owner/repo#123"
+ * - web_fetch: "Fetch example.com/path"
+ * - web_search: "Search 'typescript best practices'"
+ * - github_content: "Content owner/repo/path"
+ * - github_search: "Search 'query'"
+ * - github_commits: "Commits owner/repo" or "Diff abc1234"
+ * - github_issue: "Issue owner/repo#123"
  */
 export function formatScoutToolCall(
   toolCall: SubagentToolCall,
@@ -23,7 +26,7 @@ export function formatScoutToolCall(
   const { toolName, args } = toolCall;
 
   switch (toolName) {
-    case "fetch_url": {
+    case "web_fetch": {
       const url = args.url as string | undefined;
       if (url) {
         try {
@@ -36,48 +39,83 @@ export function formatScoutToolCall(
       return { label: "Fetch" };
     }
 
-    case "search": {
+    case "web_search": {
       const query = args.query as string | undefined;
       return { label: "Search", detail: query ? `'${query}'` : undefined };
     }
 
-    case "github": {
-      const url = args.url as string | undefined;
-      if (url) {
+    case "github_content": {
+      const repo = args.repo as string | undefined;
+      const path = args.path as string | undefined;
+      if (repo) {
+        // Extract owner/repo from URL or use as-is
+        let repoName = repo;
         try {
-          const parsed = new URL(url);
+          const parsed = new URL(repo);
           const parts = parsed.pathname.split("/").filter(Boolean);
           if (parts.length >= 2) {
-            const owner = parts[0];
-            const repo = parts[1];
-            // Check for issue/PR
-            if (parts[2] === "issues" && parts[3]) {
-              return {
-                label: "GitHub",
-                detail: `${owner}/${repo}#${parts[3]}`,
-              };
-            }
-            if (parts[2] === "pull" && parts[3]) {
-              return {
-                label: "GitHub",
-                detail: `${owner}/${repo}#${parts[3]} (PR)`,
-              };
-            }
-            // Check for file path
-            if (parts[2] === "blob" && parts.length > 4) {
-              const filePath = parts.slice(4).join("/");
-              return {
-                label: "GitHub",
-                detail: `${owner}/${repo}/${filePath}`,
-              };
-            }
-            return { label: "GitHub", detail: `${owner}/${repo}` };
+            repoName = `${parts[0]}/${parts[1]}`;
           }
         } catch {
-          return { label: "GitHub", detail: url };
+          // Not a URL, use as-is
         }
+        const detail = path ? `${repoName}/${path}` : repoName;
+        return { label: "Content", detail };
       }
-      return { label: "GitHub" };
+      return { label: "Content" };
+    }
+
+    case "github_search": {
+      const query = args.query as string | undefined;
+      const repo = args.repo as string | undefined;
+      let detail = query ? `'${query}'` : undefined;
+      if (repo && detail) {
+        detail += ` in ${repo}`;
+      }
+      return { label: "Code Search", detail };
+    }
+
+    case "github_commits": {
+      const repo = args.repo as string | undefined;
+      const sha = args.sha as string | undefined;
+      if (sha) {
+        return { label: "Diff", detail: sha.slice(0, 7) };
+      }
+      if (repo) {
+        // Extract owner/repo from URL or use as-is
+        let repoName = repo;
+        try {
+          const parsed = new URL(repo);
+          const parts = parsed.pathname.split("/").filter(Boolean);
+          if (parts.length >= 2) {
+            repoName = `${parts[0]}/${parts[1]}`;
+          }
+        } catch {
+          // Not a URL, use as-is
+        }
+        return { label: "Commits", detail: repoName };
+      }
+      return { label: "Commits" };
+    }
+
+    case "github_issue": {
+      const repo = args.repo as string | undefined;
+      const number = args.number as number | undefined;
+      if (repo && number) {
+        // Extract owner/repo from URL or use as-is
+        let repoName = repo;
+        try {
+          const parsed = new URL(repo);
+          const parts = parsed.pathname.split("/").filter(Boolean);
+          if (parts.length >= 2) {
+            repoName = `${parts[0]}/${parts[1]}`;
+          }
+        } catch {
+          // Not a URL, use as-is
+        }
+        return { label: "Issue", detail: `${repoName}#${number}` };
+      }
+      return { label: "Issue" };
     }
 
     default:

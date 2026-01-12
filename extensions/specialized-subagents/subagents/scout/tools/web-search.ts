@@ -62,8 +62,8 @@ function formatSearchResults(response: ExaSearchResponse): string {
   return markdown;
 }
 
-export const searchTool: ToolDefinition<typeof parameters> = {
-  name: "search",
+export const webSearchTool: ToolDefinition<typeof parameters> = {
+  name: "web_search",
   label: "Web Search",
   description: `Search the web for information. Returns a list of relevant results with titles, URLs, and summaries.
 
