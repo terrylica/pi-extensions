@@ -15,7 +15,7 @@ import type {
 import { getMarkdownTheme, type Theme } from "@mariozechner/pi-coding-agent";
 import { Container, Markdown, Spacer, Text } from "@mariozechner/pi-tui";
 import { Type } from "@sinclair/typebox";
-import { executeSubagent } from "../../lib/executor";
+import { executeSubagent, resolveModel } from "../../lib";
 import type { SubagentToolCall } from "../../lib/types";
 import { getSpinnerFrame, INDICATOR } from "../../lib/ui/spinner";
 import { formatSubagentStats, pluralize } from "../../lib/ui/stats";
@@ -118,17 +118,6 @@ function buildUserMessage(input: ScoutInput): string {
   return parts.join("\n");
 }
 
-/** Resolve model from context registry */
-function resolveModel(ctx: ExtensionContext) {
-  const model = ctx.modelRegistry.find(MODEL.provider, MODEL.model);
-  if (!model) {
-    throw new Error(
-      `Model ${MODEL.provider}/${MODEL.model} not found. Check that the model ID is correct.`,
-    );
-  }
-  return model;
-}
-
 /** Create the scout tool definition for use in extensions */
 export function createScoutTool(): ToolDefinition<
   typeof parameters,
@@ -203,7 +192,7 @@ Use cases:
       }, 80);
 
       try {
-        const model = resolveModel(ctx);
+        const model = resolveModel(MODEL, ctx);
         const userMessage = buildUserMessage(args);
 
         const result = await executeSubagent(
@@ -333,7 +322,7 @@ Use cases:
       const container = new Container();
 
       // Title with model name
-      const modelName = `${MODEL.provider}/${MODEL.model}`;
+      const modelName = MODEL;
       container.addChild(
         new Text(
           theme.fg("toolTitle", theme.bold("Scout")) +

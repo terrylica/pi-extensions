@@ -26,9 +26,10 @@ export {
   type ParsedGitHubUrl,
   parseGitHubUrl,
 } from "./clients";
+// Constants
+export { PROVIDER_PRIORITY, type PriorityProvider } from "./constants";
 // Core executor
 export { executeSubagent, filterThinkingTags } from "./executor";
-
 // Logging
 export {
   createRunLogger,
@@ -37,6 +38,8 @@ export {
   type RunLogger,
   sanitizePath,
 } from "./logging";
+// Model resolution
+export { resolveModel } from "./model-resolver";
 // Types
 export type {
   OnTextUpdate,

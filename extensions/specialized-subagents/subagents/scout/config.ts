@@ -14,8 +14,5 @@ export const FETCH_PROVIDER: FetchProvider = "exa";
 /** Active search provider */
 export const SEARCH_PROVIDER: SearchProvider = "exa";
 
-/** Model configuration for scout */
-export const MODEL = {
-  provider: "opencode",
-  model: "claude-haiku-4-5",
-} as const;
+/** Model ID for scout subagent */
+export const MODEL = "claude-haiku-4-5";
