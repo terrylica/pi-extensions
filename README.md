@@ -15,6 +15,7 @@ Custom extensions for [Pi](https://github.com/mariozechner/pi-coding-agent), a c
 | [defaults](extensions/defaults/README.md) | Custom header, auto session naming | - |
 | [processes](extensions/processes/README.md) | Background process management | - |
 | [specialized-subagents](extensions/specialized-subagents/README.md) | Framework for spawning specialized subagents | [External services](extensions/specialized-subagents/README.md#requirements) |
+| [guardrails](extensions/guardrails/README.md) | Security hooks (brew block, env protection, dangerous command gate) | - |
 
 ## Development
 
