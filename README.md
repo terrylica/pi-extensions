@@ -11,6 +11,7 @@ Custom extensions for [Pi](https://github.com/mariozechner/pi-coding-agent), a c
 |-----------|-------------|--------------|
 | [debug](extensions/debug/README.md) | Debugging utilities (session path clipboard) | - |
 | [meta](extensions/meta/README.md) | Pi introspection tools (version, docs, changelog) | - |
+| [mac-app](extensions/mac-app/README.md) | macOS UI automation via Accessibility | AXorcist CLI, Accessibility permissions |
 | [neovim](extensions/neovim/README.md) | Bidirectional Neovim integration (editor context, file reload, LSP diagnostics) | - |
 | [defaults](extensions/defaults/README.md) | Custom header, auto session naming | - |
 | [processes](extensions/processes/README.md) | Background process management | - |
