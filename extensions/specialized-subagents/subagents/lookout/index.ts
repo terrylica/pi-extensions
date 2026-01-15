@@ -163,12 +163,15 @@ Example: { "query": "where do we handle authentication" }`,
           },
         );
 
+        const finalToolCalls =
+          result.toolCalls.length > 0 ? result.toolCalls : currentToolCalls;
+
         if (result.aborted) {
           return {
             content: [{ type: "text" as const, text: "Aborted" }],
             details: {
               query,
-              toolCalls: currentToolCalls,
+              toolCalls: finalToolCalls,
               spinnerFrame,
               aborted: true,
               usage: result.usage,
@@ -183,7 +186,7 @@ Example: { "query": "where do we handle authentication" }`,
             ],
             details: {
               query,
-              toolCalls: currentToolCalls,
+              toolCalls: finalToolCalls,
               spinnerFrame,
               error: result.error,
               usage: result.usage,
@@ -192,11 +195,11 @@ Example: { "query": "where do we handle authentication" }`,
         }
 
         // Check if all tool calls failed
-        const errorCount = currentToolCalls.filter(
+        const errorCount = finalToolCalls.filter(
           (tc) => tc.status === "error",
         ).length;
         const allFailed =
-          currentToolCalls.length > 0 && errorCount === currentToolCalls.length;
+          finalToolCalls.length > 0 && errorCount === finalToolCalls.length;
 
         if (allFailed) {
           const error = "All tool calls failed";
@@ -204,7 +207,7 @@ Example: { "query": "where do we handle authentication" }`,
             content: [{ type: "text" as const, text: `Error: ${error}` }],
             details: {
               query,
-              toolCalls: currentToolCalls,
+              toolCalls: finalToolCalls,
               spinnerFrame,
               error,
               usage: result.usage,
@@ -216,7 +219,7 @@ Example: { "query": "where do we handle authentication" }`,
           content: [{ type: "text" as const, text: result.content }],
           details: {
             query,
-            toolCalls: currentToolCalls,
+            toolCalls: finalToolCalls,
             spinnerFrame,
             response: result.content,
             usage: result.usage,

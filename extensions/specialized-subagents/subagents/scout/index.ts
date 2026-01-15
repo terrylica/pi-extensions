@@ -242,6 +242,9 @@ Use cases:
           },
         );
 
+        const finalToolCalls =
+          result.toolCalls.length > 0 ? result.toolCalls : currentToolCalls;
+
         if (result.aborted) {
           return {
             content: [{ type: "text" as const, text: "Aborted" }],
@@ -250,7 +253,7 @@ Use cases:
               query,
               repo,
               prompt,
-              toolCalls: currentToolCalls,
+              toolCalls: finalToolCalls,
               spinnerFrame,
               aborted: true,
               usage: result.usage,
@@ -268,7 +271,7 @@ Use cases:
               query,
               repo,
               prompt,
-              toolCalls: currentToolCalls,
+              toolCalls: finalToolCalls,
               spinnerFrame,
               error: result.error,
               usage: result.usage,
@@ -277,11 +280,11 @@ Use cases:
         }
 
         // Check if all tool calls failed
-        const errorCount = currentToolCalls.filter(
+        const errorCount = finalToolCalls.filter(
           (tc) => tc.status === "error",
         ).length;
         const allFailed =
-          currentToolCalls.length > 0 && errorCount === currentToolCalls.length;
+          finalToolCalls.length > 0 && errorCount === finalToolCalls.length;
 
         if (allFailed) {
           const error = "All tool calls failed";
@@ -292,7 +295,7 @@ Use cases:
               query,
               repo,
               prompt,
-              toolCalls: currentToolCalls,
+              toolCalls: finalToolCalls,
               spinnerFrame,
               error,
               usage: result.usage,
@@ -307,7 +310,7 @@ Use cases:
             query,
             repo,
             prompt,
-            toolCalls: currentToolCalls,
+            toolCalls: finalToolCalls,
             spinnerFrame,
             response: result.content,
             usage: result.usage,
