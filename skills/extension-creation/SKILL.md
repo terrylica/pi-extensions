@@ -174,7 +174,7 @@ export function setupCleanupHook(pi: ExtensionAPI, manager: Manager) {
 }
 ```
 
-Available events: `session_start`, `session_shutdown`
+Available events: check Pi docs for the current event list.
 
 ## Command Registration (Interactive TUI)
 
