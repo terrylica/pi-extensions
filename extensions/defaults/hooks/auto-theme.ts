@@ -1,3 +1,5 @@
+import { exec } from "node:child_process";
+import { promisify } from "node:util";
 import type {
   ExtensionAPI,
   ExtensionContext,
@@ -26,8 +28,6 @@ export function setupAutoThemeHook(pi: ExtensionAPI) {
   // macOS system appearance detection
   async function isDarkMode(): Promise<boolean> {
     try {
-      const { exec } = await import("node:child_process");
-      const { promisify } = await import("node:util");
       const execAsync = promisify(exec);
 
       const { stdout } = await execAsync(
