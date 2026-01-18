@@ -14,6 +14,7 @@ Custom extensions for [Pi](https://github.com/mariozechner/pi-coding-agent), a c
 | [mac-app](extensions/mac-app/README.md) | macOS UI automation via Accessibility | AXorcist CLI, Accessibility permissions |
 | [neovim](extensions/neovim/README.md) | Bidirectional Neovim integration (editor context, file reload, LSP diagnostics) | - |
 | [defaults](extensions/defaults/README.md) | Custom header, auto session naming | - |
+| [the-dumb-zone](extensions/the-dumb-zone/README.md) | Warning overlay for specific agent phrases | - |
 | [processes](extensions/processes/README.md) | Background process management | - |
 | [usage](extensions/usage/README.md) | Usage dashboard (rate limits and session stats) | anthropic and/or openai-codex auth |
 | [planning](extensions/planning/README.md) | Save and execute implementation plans | - |
