@@ -4,6 +4,14 @@ Sensible defaults and quality-of-life improvements for Pi.
 
 ## Features
 
+### Directory-aware read
+
+Overrides the built-in `read` tool to handle directories gracefully. When the agent calls `read` on a directory path, it returns a directory listing (via the native `ls` tool) instead of failing with an `EISDIR` error.
+
+- Files: delegated to native `read` (truncation, image handling, etc.)
+- Directories: delegated to native `ls` (sorted entries, truncation)
+- Non-existent paths: error from underlying tool
+
 ### Auto theme (macOS)
 
 Automatically syncs Pi's theme with macOS system appearance (dark/light mode).
