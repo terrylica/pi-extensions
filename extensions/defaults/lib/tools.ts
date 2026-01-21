@@ -42,7 +42,12 @@ export function setupTools(pi: ExtensionAPI): void {
       }
 
       // Fall back to native read behavior for files (or let it error naturally)
-      return nativeRead.execute(toolCallId, params as any, signal, onUpdate);
+      return nativeRead.execute(
+        toolCallId,
+        params as { path: string; offset?: number; limit?: number },
+        signal,
+        onUpdate,
+      );
     },
   });
 }

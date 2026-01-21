@@ -5,9 +5,9 @@
  * No external dependencies - uses simple YAML frontmatter parsing.
  */
 
-import { existsSync, statSync } from "fs";
-import { basename, join } from "path";
-import { parseArgs } from "util";
+import { existsSync, statSync } from "node:fs";
+import { basename, join } from "node:path";
+import { parseArgs } from "node:util";
 
 interface Frontmatter {
   name?: string;

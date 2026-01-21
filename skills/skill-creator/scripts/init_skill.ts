@@ -5,9 +5,9 @@
  * No external dependencies.
  */
 
-import { chmodSync, existsSync, mkdirSync, writeFileSync } from "fs";
-import { join } from "path";
-import { parseArgs } from "util";
+import { chmodSync, existsSync, mkdirSync, writeFileSync } from "node:fs";
+import { join } from "node:path";
+import { parseArgs } from "node:util";
 
 function normalizeName(name: string): string {
   // Replace underscores, spaces, and camelCase boundaries with hyphens
