@@ -1,10 +1,10 @@
+import { CenteredLoader, createBoxRenderer } from "@aliou/tui-utils";
 import type {
   AuthStorage,
   ExtensionAPI,
   Theme,
 } from "@mariozechner/pi-coding-agent";
 import {
-  CancellableLoader,
   type Component,
   matchesKey,
   type TUI,
@@ -288,43 +288,31 @@ class UsageComponent implements Component {
     const HEADER_LINES = 4;
     const FOOTER_LINES = 3;
 
+    const box = createBoxRenderer(width, this.colors.dim, {
+      leadingSpace: true,
+    });
     const lines: string[] = [];
-    const innerWidth = Math.max(0, width - 4);
-    const border = (value: string) => this.colors.dim(value);
 
-    const padLine = (line: string) => {
-      const visLen = visibleWidth(line);
-      const padding = Math.max(0, width - visLen);
-      return line + " ".repeat(padding);
-    };
-
-    const boxLine = (content: string) => {
-      const contentLen = visibleWidth(content);
-      const padding = Math.max(0, innerWidth - contentLen);
-      return `${border(" │")} ${content}${" ".repeat(padding)}${border("│")}`;
-    };
-
-    const title = ` ${this.colors.accent(this.colors.bold("Usage"))} `;
-    const titleLen = visibleWidth(title);
-    const dashesTotal = Math.max(0, width - 3 - titleLen);
-    const leftDashes = Math.floor(dashesTotal / 2);
-    const rightDashes = dashesTotal - leftDashes;
+    // Title
     lines.push(
-      padLine(
-        border(` ╭${"─".repeat(leftDashes)}`) +
-          title +
-          border(`${"─".repeat(rightDashes)}╮`),
+      box.padLine(
+        box.topWithTitle("Usage", (s: string) =>
+          this.colors.accent(this.colors.bold(s)),
+        ),
       ),
     );
 
-    lines.push(padLine(boxLine("")));
-    lines.push(padLine(boxLine(this.renderTabs())));
-    lines.push(padLine(boxLine("")));
+    lines.push(box.padLine(box.empty()));
+    lines.push(box.padLine(box.row(this.renderTabs())));
+    lines.push(box.padLine(box.empty()));
 
     const contentLines =
       this.activeTab === "session"
-        ? this.renderSessionTab(innerWidth)
-        : this.renderStatsTab(this.getStatsForTab(this.activeTab), innerWidth);
+        ? this.renderSessionTab(box.innerWidth)
+        : this.renderStatsTab(
+            this.getStatsForTab(this.activeTab),
+            box.innerWidth,
+          );
 
     const availableLines = Math.max(
       0,
@@ -341,19 +329,21 @@ class UsageComponent implements Component {
     );
 
     for (const line of visibleLines) {
-      lines.push(padLine(boxLine(line)));
+      lines.push(box.padLine(box.row(line)));
     }
 
     let renderedLines = visibleLines.length;
     while (renderedLines < availableLines) {
-      lines.push(padLine(boxLine("")));
+      lines.push(box.padLine(box.empty()));
       renderedLines++;
     }
 
     const canScroll = contentLines.length > availableLines;
-    lines.push(padLine(boxLine("")));
-    lines.push(padLine(boxLine(this.renderFooter(innerWidth, canScroll))));
-    lines.push(padLine(border(` ╰${"─".repeat(Math.max(0, width - 3))}╯`)));
+    lines.push(box.padLine(box.empty()));
+    lines.push(
+      box.padLine(box.row(this.renderFooter(box.innerWidth, canScroll))),
+    );
+    lines.push(box.padLine(box.bottom()));
 
     return lines;
   }
@@ -590,7 +580,7 @@ class UsageComponent implements Component {
 }
 
 class UsageContainer implements Component {
-  private loader: CancellableLoader;
+  private loader: CenteredLoader;
   private component: UsageComponent | null = null;
 
   constructor(
@@ -600,12 +590,9 @@ class UsageContainer implements Component {
     done: () => void,
   ) {
     const colors = createAnsiTheme(theme);
-    this.loader = new CancellableLoader(
-      tui,
-      (text) => colors.accent(text),
-      (text) => colors.dim(text),
-      "Loading usage...",
-    );
+    this.loader = new CenteredLoader(tui, theme, "Loading usage...", {
+      boxWidth: 44,
+    });
     this.loader.onAbort = () => done();
     this.loader.start();
 

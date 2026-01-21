@@ -7,6 +7,9 @@
     "format": "biome check --write .",
     "typecheck": "tsc --build"
   },
+  "dependencies": {
+    "@aliou/tui-utils": "workspace:*"
+  },
   "devDependencies": {
     "@biomejs/biome": "^2.0.0",
     "@mariozechner/pi-agent-core": "0.49.1",

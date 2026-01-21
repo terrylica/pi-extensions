@@ -1,5 +1,6 @@
+import { createThemedBoxRenderer } from "@aliou/tui-utils";
 import type { ExtensionContext, Theme } from "@mariozechner/pi-coding-agent";
-import { truncateToWidth, visibleWidth } from "@mariozechner/pi-tui";
+import { truncateToWidth } from "@mariozechner/pi-tui";
 import { DUMB_ZONE_MESSAGE, OVERLAY_COOLDOWN_MS } from "./constants";
 
 // ============================================================================
@@ -106,33 +107,24 @@ class DumbZoneOverlay {
   }
 
   render(width: number): string[] {
-    const innerWidth = Math.max(1, width - 2);
-    const border = this.theme.fg("border", "│");
-    const top = this.theme.fg("border", `┌${"─".repeat(innerWidth)}┐`);
-    const bottom = this.theme.fg("border", `└${"─".repeat(innerWidth)}┘`);
+    const box = createThemedBoxRenderer(width, this.theme);
 
-    // Title line
-    const title = truncateToWidth(DUMB_ZONE_MESSAGE, innerWidth, "");
+    // Center the title
+    const title = truncateToWidth(DUMB_ZONE_MESSAGE, box.innerWidth, "");
     const styledTitle = this.theme.fg("error", this.theme.bold(title));
-    const titleWidth = visibleWidth(title);
-    const titlePadding = Math.max(0, innerWidth - titleWidth);
-    const titleLeftPad = Math.floor(titlePadding / 2);
-    const titleRightPad = titlePadding - titleLeftPad;
-    const titleLine = `${border}${" ".repeat(titleLeftPad)}${styledTitle}${" ".repeat(titleRightPad)}${border}`;
 
-    // Empty line
-    const emptyLine = `${border}${" ".repeat(innerWidth)}${border}`;
-
-    // Details line
-    const detailsText = truncateToWidth(this.details, innerWidth, "");
+    // Center the details
+    const detailsText = truncateToWidth(this.details, box.innerWidth, "");
     const styledDetails = this.theme.fg("warning", detailsText);
-    const detailsWidth = visibleWidth(detailsText);
-    const detailsPadding = Math.max(0, innerWidth - detailsWidth);
-    const detailsLeftPad = Math.floor(detailsPadding / 2);
-    const detailsRightPad = detailsPadding - detailsLeftPad;
-    const detailsLine = `${border}${" ".repeat(detailsLeftPad)}${styledDetails}${" ".repeat(detailsRightPad)}${border}`;
 
-    return [top, titleLine, emptyLine, detailsLine, emptyLine, bottom];
+    return [
+      box.top(),
+      box.centeredRow(styledTitle),
+      box.empty(),
+      box.centeredRow(styledDetails),
+      box.empty(),
+      box.bottom(),
+    ];
   }
 
   invalidate(): void {}

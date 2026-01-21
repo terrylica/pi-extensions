@@ -12,6 +12,10 @@ overrides:
 importers:
 
   .:
+    dependencies:
+      '@aliou/tui-utils':
+        specifier: workspace:*
+        version: link:packages/tui-utils
     devDependencies:
       '@biomejs/biome':
         specifier: ^2.0.0
@@ -39,6 +43,15 @@ importers:
         version: 5.9.3
 
   packages/tsconfig: {}
+
+  packages/tui-utils:
+    dependencies:
+      '@mariozechner/pi-coding-agent':
+        specifier: '*'
+        version: 0.49.1(ws@8.19.0)(zod@3.25.76)
+      '@mariozechner/pi-tui':
+        specifier: 0.49.1
+        version: 0.49.1
 
 packages:
 
