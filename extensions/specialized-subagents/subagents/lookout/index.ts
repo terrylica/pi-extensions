@@ -49,12 +49,23 @@ Use the \`lookout\` tool to find code by functionality or concept in the local c
 \`\`\`json
 { "query": "Where is the database connection pool configured?" }
 \`\`\`
+
+**Custom directory:** Pass \`cwd\` to search a specific directory instead of the current project:
+\`\`\`json
+{ "query": "auth implementation", "cwd": "/path/to/other/project" }
+\`\`\`
 `;
 
 const parameters = Type.Object({
   query: Type.String({
     description: "Search query describing what to find in the codebase",
   }),
+  cwd: Type.Optional(
+    Type.String({
+      description:
+        "Working directory to search in (defaults to current project directory)",
+    }),
+  ),
 });
 
 /** Create the lookout tool definition for use in extensions */
@@ -80,7 +91,7 @@ Example: { "query": "where do we handle authentication" }`,
       ctx: ExtensionContext,
       signal?: AbortSignal,
     ) {
-      const { query } = args;
+      const { query, cwd: customCwd } = args;
 
       // Validate: query is required
       if (!query) {
@@ -95,6 +106,9 @@ Example: { "query": "where do we handle authentication" }`,
           },
         };
       }
+
+      // Use custom cwd if provided, otherwise use context cwd
+      const workingDir = customCwd ?? ctx.cwd;
 
       let currentToolCalls: SubagentToolCall[] = [];
       let spinnerFrame = 0;
@@ -118,16 +132,16 @@ Example: { "query": "where do we handle authentication" }`,
       try {
         const model = resolveModel(MODEL, ctx);
 
-        // Replace {cwd} in system prompt
-        const systemPrompt = LOOKOUT_SYSTEM_PROMPT.replace("{cwd}", ctx.cwd);
+        // Replace {cwd} in system prompt with working directory
+        const systemPrompt = LOOKOUT_SYSTEM_PROMPT.replace("{cwd}", workingDir);
 
         const result = await executeSubagent(
           {
             name: "lookout",
             model,
             systemPrompt,
-            tools: createReadOnlyTools(ctx.cwd), // grep, find, read, ls
-            customTools: createLookoutTools(), // semantic_search
+            tools: createReadOnlyTools(workingDir), // grep, find, read, ls
+            customTools: createLookoutTools(workingDir), // semantic_search
             thinkingLevel: "off",
             logging: {
               enabled: true,
@@ -247,6 +261,13 @@ Example: { "query": "where do we handle authentication" }`,
       if (args.query) {
         container.addChild(
           new Text(`  ${theme.fg("muted", "Query: ")}${args.query}`, 0, 0),
+        );
+      }
+
+      // Custom working directory
+      if (args.cwd) {
+        container.addChild(
+          new Text(`  ${theme.fg("muted", "Directory: ")}${args.cwd}`, 0, 0),
         );
       }
 

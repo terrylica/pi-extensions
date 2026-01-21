@@ -221,10 +221,9 @@ async function runOsgrepSearch(
   });
 }
 
-export function createSemanticSearchTool(): ToolDefinition<
-  typeof parameters,
-  undefined
-> {
+export function createSemanticSearchTool(
+  cwd: string,
+): ToolDefinition<typeof parameters, undefined> {
   return {
     name: "semantic_search",
     label: "Semantic Search",
@@ -237,12 +236,12 @@ Query with natural language questions, not keywords. More words = better results
 Returns file paths, line ranges, roles (ORCHESTRATION = logic, DEFINITION = types), and relevance scores.`,
     parameters,
 
-    async execute(_toolCallId, args, onUpdate, ctx, signal) {
+    async execute(_toolCallId, args, onUpdate, _ctx, signal) {
       const { query, maxResults = 10 } = args as SemanticSearchParams;
 
       try {
         // Pre-flight check: does index exist?
-        if (needsIndexing(ctx.cwd)) {
+        if (needsIndexing(cwd)) {
           // Update UI to show indexing status
           onUpdate?.({
             content: [{ type: "text", text: "Indexing repository..." }],
@@ -251,7 +250,7 @@ Returns file paths, line ranges, roles (ORCHESTRATION = logic, DEFINITION = type
 
           // Run indexing with progress streaming
           await runOsgrepIndex(
-            ctx.cwd,
+            cwd,
             (progress) => {
               const message =
                 progress.status === "complete"
@@ -270,12 +269,7 @@ Returns file paths, line ranges, roles (ORCHESTRATION = logic, DEFINITION = type
         }
 
         // Run the actual search
-        const output = await runOsgrepSearch(
-          ctx.cwd,
-          query,
-          maxResults,
-          signal,
-        );
+        const output = await runOsgrepSearch(cwd, query, maxResults, signal);
 
         return {
           content: [{ type: "text" as const, text: output }],

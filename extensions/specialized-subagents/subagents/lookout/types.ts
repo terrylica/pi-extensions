@@ -8,6 +8,8 @@ import type { SubagentToolCall, SubagentUsage } from "../../lib/types";
 export interface LookoutInput {
   /** Search query describing what to find */
   query: string;
+  /** Optional working directory (defaults to current project cwd) */
+  cwd?: string;
 }
 
 /** Details structure for lookout tool rendering */
