@@ -1,5 +1,19 @@
 # Usage Extension
 
+Monitor API rate limits and usage statistics.
+
+## Rate Limit Warnings
+
+Automatic notifications when rate limit usage exceeds 60%:
+
+- **On session start**: Shows warnings for any windows above threshold
+- **During usage**: Shows once when a window first crosses the threshold
+- **On model change**: Resets tracking and shows warnings for new provider
+
+Warnings appear as notifications with severity based on usage level (warning at 60%, error at 80%).
+
+## `/usage` Command
+
 The `/usage` command shows current rate limits and historical usage statistics across four tabs.
 
 ## Tabs

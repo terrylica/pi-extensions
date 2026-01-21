@@ -14,6 +14,16 @@ const WARNING_THRESHOLD = 60;
 type ProviderKey = "anthropic" | "openai-codex";
 
 /**
+ * Tracks which windows have already shown warnings this session.
+ * Key format: "provider:label" (e.g., "anthropic:Daily tokens")
+ */
+const warnedWindows = new Set<string>();
+
+function getWindowKey(provider: string, label: string): string {
+  return `${provider}:${label}`;
+}
+
+/**
  * Maps a model provider to the rate limit provider key.
  */
 // biome-ignore lint/suspicious/noExplicitAny: Model type requires any for generic API
@@ -44,13 +54,33 @@ async function fetchProviderRateLimits(
 }
 
 /**
- * Finds windows that exceed the warning threshold.
+ * Finds windows that exceed the warning threshold and haven't been warned yet.
  */
-function findHighUsageWindows(limits: ProviderRateLimits): RateLimitWindow[] {
+function findNewHighUsageWindows(
+  limits: ProviderRateLimits,
+  skipAlreadyWarned: boolean,
+): RateLimitWindow[] {
   if (limits.error || !limits.windows.length) return [];
-  return limits.windows.filter(
-    (window) => window.usedPercent >= WARNING_THRESHOLD,
-  );
+  return limits.windows.filter((window) => {
+    if (window.usedPercent < WARNING_THRESHOLD) return false;
+    if (skipAlreadyWarned) {
+      const key = getWindowKey(limits.provider, window.label);
+      if (warnedWindows.has(key)) return false;
+    }
+    return true;
+  });
+}
+
+/**
+ * Marks windows as warned so they won't trigger again.
+ */
+function markWindowsAsWarned(
+  provider: string,
+  windows: RateLimitWindow[],
+): void {
+  for (const window of windows) {
+    warnedWindows.add(getWindowKey(provider, window.label));
+  }
 }
 
 /**
@@ -70,11 +100,15 @@ function formatWarningMessage(
 /**
  * Checks rate limits and shows a warning if above threshold.
  * This is fire-and-forget - does not block the caller.
+ *
+ * @param skipAlreadyWarned - If true, only warn for windows that haven't been warned yet.
+ *                            If false, warn for all high usage windows (used on session start).
  */
 async function checkAndWarnRateLimits(
   ctx: ExtensionContext,
   // biome-ignore lint/suspicious/noExplicitAny: Model type requires any for generic API
   model: Model<any> | undefined,
+  skipAlreadyWarned: boolean,
 ): Promise<void> {
   if (!ctx.hasUI) return;
 
@@ -90,8 +124,11 @@ async function checkAndWarnRateLimits(
     // Verify model hasn't changed during the async check
     if (ctx.model !== model) return;
 
-    const highUsageWindows = findHighUsageWindows(limits);
+    const highUsageWindows = findNewHighUsageWindows(limits, skipAlreadyWarned);
     if (highUsageWindows.length === 0) return;
+
+    // Mark these windows as warned before showing notification
+    markWindowsAsWarned(limits.provider, highUsageWindows);
 
     const message = formatWarningMessage(limits.provider, highUsageWindows);
 
@@ -105,31 +142,37 @@ async function checkAndWarnRateLimits(
 
 /**
  * Fire-and-forget wrapper that ensures the check is non-blocking.
+ *
+ * @param skipAlreadyWarned - If true, only warn for windows that haven't been warned yet.
  */
 function triggerRateLimitCheck(
   ctx: ExtensionContext,
   // biome-ignore lint/suspicious/noExplicitAny: Model type requires any for generic API
   model: Model<any> | undefined,
+  skipAlreadyWarned: boolean,
 ): void {
   // Do not await - this is intentionally fire-and-forget
-  checkAndWarnRateLimits(ctx, model).catch(() => {
+  checkAndWarnRateLimits(ctx, model, skipAlreadyWarned).catch(() => {
     // Ignore errors
   });
 }
 
 export function setupRateLimitWarningHooks(pi: ExtensionAPI): void {
-  // Check on session start (when pi starts or new session)
+  // Check on session start - reset warned windows and show all high usage
   pi.on("session_start", async (_event, ctx) => {
-    triggerRateLimitCheck(ctx, ctx.model);
+    warnedWindows.clear();
+    triggerRateLimitCheck(ctx, ctx.model, false);
   });
 
-  // Check after agent turn completes (when streaming is done)
+  // Check after agent turn - only warn for newly crossed thresholds
   pi.on("agent_end", async (_event, ctx) => {
-    triggerRateLimitCheck(ctx, ctx.model);
+    triggerRateLimitCheck(ctx, ctx.model, true);
   });
 
-  // Check when model changes
+  // Check when model changes - reset for new provider, show all high usage
   pi.on("model_select", async (event, ctx) => {
-    triggerRateLimitCheck(ctx, event.model);
+    // Clear warnings since we're switching providers
+    warnedWindows.clear();
+    triggerRateLimitCheck(ctx, event.model, false);
   });
 }
