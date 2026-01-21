@@ -178,10 +178,12 @@ Available events: check Pi docs for the current event list.
 
 ## Command Registration (Interactive TUI)
 
+Register commands immediately in the setup function, not inside event handlers. Check for UI availability inside the handler.
+
 ```typescript
 // extensions/<name>/commands/index.ts
 import type { ExtensionAPI, Theme } from "@mariozechner/pi-coding-agent";
-import { type Component, matchesKey, visibleWidth } from "@mariozechner/pi-tui";
+import { type Component, matchesKey } from "@mariozechner/pi-tui";
 
 class MyComponent implements Component {
   constructor(
@@ -206,17 +208,15 @@ class MyComponent implements Component {
 }
 
 export function setupXxxCommands(pi: ExtensionAPI) {
-  pi.on("session_start", async (_event, ctx) => {
-    if (!ctx.hasUI) return;
+  pi.registerCommand("mycommand", {
+    description: "Description for /mycommand",
+    handler: async (_args, ctx) => {
+      if (!ctx.hasUI) return; // Check UI availability in handler
 
-    pi.registerCommand("mycommand", {
-      description: "Description for /mycommand",
-      handler: async (_args, ctx) => {
-        await ctx.ui.custom((tui, theme, _keybindings, done) => {
-          return new MyComponent(tui, theme, () => done(undefined));
-        });
-      },
-    });
+      await ctx.ui.custom((tui, theme, _keybindings, done) => {
+        return new MyComponent(tui, theme, () => done(undefined));
+      });
+    },
   });
 }
 ```

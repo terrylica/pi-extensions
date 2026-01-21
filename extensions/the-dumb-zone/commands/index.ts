@@ -184,49 +184,45 @@ class DumbZoneStatusOverlay {
 // ============================================================================
 
 export function setupDumbZoneCommands(pi: ExtensionAPI): void {
-  pi.on("session_start", async (_event, ctx) => {
-    if (!ctx.hasUI) return;
+  pi.registerCommand("dumb-zone-status", {
+    description: "Show current dumb zone proximity status",
+    handler: async (_args, ctx) => {
+      if (!ctx.hasUI) return;
 
-    pi.registerCommand("dumb-zone-status", {
-      description: "Show current dumb zone proximity status",
-      handler: async (_args, ctx) => {
-        const utilization = getContextUtilization(ctx);
-        const compacted = hasCompacted(ctx);
+      const utilization = getContextUtilization(ctx);
+      const compacted = hasCompacted(ctx);
 
-        const data: StatusData = {
-          utilization,
-          warningThreshold: getEffectiveThreshold(
-            CONTEXT_THRESHOLDS.WARNING,
-            compacted,
-          ),
-          dangerThreshold: getEffectiveThreshold(
-            CONTEXT_THRESHOLDS.DANGER,
-            compacted,
-          ),
-          criticalThreshold: getEffectiveThreshold(
-            CONTEXT_THRESHOLDS.CRITICAL,
-            compacted,
-          ),
+      const data: StatusData = {
+        utilization,
+        warningThreshold: getEffectiveThreshold(
+          CONTEXT_THRESHOLDS.WARNING,
           compacted,
-        };
+        ),
+        dangerThreshold: getEffectiveThreshold(
+          CONTEXT_THRESHOLDS.DANGER,
+          compacted,
+        ),
+        criticalThreshold: getEffectiveThreshold(
+          CONTEXT_THRESHOLDS.CRITICAL,
+          compacted,
+        ),
+        compacted,
+      };
 
-        await ctx.ui.custom<void>(
-          (_tui, theme, _keybindings, done) => {
-            return new DumbZoneStatusOverlay(theme, data, () =>
-              done(undefined),
-            );
+      await ctx.ui.custom<void>(
+        (_tui, theme, _keybindings, done) => {
+          return new DumbZoneStatusOverlay(theme, data, () => done(undefined));
+        },
+        {
+          overlay: true,
+          overlayOptions: {
+            width: "60%",
+            minWidth: 50,
+            maxHeight: 12,
+            anchor: "center",
           },
-          {
-            overlay: true,
-            overlayOptions: {
-              width: "60%",
-              minWidth: 50,
-              maxHeight: 12,
-              anchor: "center",
-            },
-          },
-        );
-      },
-    });
+        },
+      );
+    },
   });
 }
