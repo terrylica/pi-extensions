@@ -9,7 +9,10 @@ import { fetchCodexRateLimits } from "../providers/codex";
 import type { ProviderRateLimits, RateLimitWindow } from "../types";
 import { formatResetTime } from "../utils";
 
-const WARNING_THRESHOLD = 60;
+const WARNING_THRESHOLD = 80;
+const ERROR_THRESHOLD = 90;
+const CRITICAL_THRESHOLD = 100;
+const MIN_PACE_PERCENT = 5;
 
 type ProviderKey = "anthropic" | "openai-codex";
 
@@ -21,6 +24,60 @@ const warnedWindows = new Set<string>();
 
 function getWindowKey(provider: string, label: string): string {
   return `${provider}:${label}`;
+}
+
+type WindowProjection = {
+  window: RateLimitWindow;
+  projectedPercent: number;
+};
+
+function inferWindowSeconds(label: string): number | null {
+  const lower = label.toLowerCase();
+  if (lower.includes("5-hour") || lower.includes("5h")) {
+    return 5 * 60 * 60;
+  }
+  if (
+    lower.includes("7-day") ||
+    lower.includes("week") ||
+    lower.includes("weekly")
+  ) {
+    return 7 * 24 * 60 * 60;
+  }
+  const hourMatch = lower.match(/(\d+)\s*h/);
+  if (hourMatch?.[1]) return Number(hourMatch[1]) * 60 * 60;
+  const dayMatch = lower.match(/(\d+)\s*d/);
+  if (dayMatch?.[1]) return Number(dayMatch[1]) * 24 * 60 * 60;
+  return null;
+}
+
+function getPacePercent(window: RateLimitWindow): number | null {
+  const windowSeconds =
+    window.windowSeconds ?? inferWindowSeconds(window.label);
+  if (!windowSeconds || !window.resetsAt) return null;
+  const totalMs = windowSeconds * 1000;
+  if (!Number.isFinite(totalMs) || totalMs <= 0) return null;
+  const remainingMs = window.resetsAt.getTime() - Date.now();
+  const elapsedMs = totalMs - remainingMs;
+  const percent = (elapsedMs / totalMs) * 100;
+  return Math.max(0, Math.min(100, percent));
+}
+
+function getProjectedPercent(
+  usedPercent: number,
+  pacePercent?: number | null,
+): number {
+  if (pacePercent === null || pacePercent === undefined) return usedPercent;
+  const effectivePace = Math.max(MIN_PACE_PERCENT, pacePercent);
+  return Math.max(0, (usedPercent / effectivePace) * 100);
+}
+
+function getProjectionStatus(
+  projectedPercent: number,
+): "critical" | "high" | "warning" | null {
+  if (projectedPercent >= CRITICAL_THRESHOLD) return "critical";
+  if (projectedPercent >= ERROR_THRESHOLD) return "high";
+  if (projectedPercent >= WARNING_THRESHOLD) return "warning";
+  return null;
 }
 
 /**
@@ -54,20 +111,25 @@ async function fetchProviderRateLimits(
 }
 
 /**
- * Finds windows that exceed the warning threshold and haven't been warned yet.
+ * Finds windows that exceed the projection threshold and haven't been warned yet.
  */
 function findNewHighUsageWindows(
   limits: ProviderRateLimits,
   skipAlreadyWarned: boolean,
-): RateLimitWindow[] {
+): WindowProjection[] {
   if (limits.error || !limits.windows.length) return [];
-  return limits.windows.filter((window) => {
-    if (window.usedPercent < WARNING_THRESHOLD) return false;
+  return limits.windows.flatMap((window) => {
+    const pacePercent = getPacePercent(window);
+    const projectedPercent = getProjectedPercent(
+      window.usedPercent,
+      pacePercent,
+    );
+    if (projectedPercent < WARNING_THRESHOLD) return [];
     if (skipAlreadyWarned) {
       const key = getWindowKey(limits.provider, window.label);
-      if (warnedWindows.has(key)) return false;
+      if (warnedWindows.has(key)) return [];
     }
-    return true;
+    return [{ window, projectedPercent }];
   });
 }
 
@@ -76,10 +138,10 @@ function findNewHighUsageWindows(
  */
 function markWindowsAsWarned(
   provider: string,
-  windows: RateLimitWindow[],
+  windows: WindowProjection[],
 ): void {
-  for (const window of windows) {
-    warnedWindows.add(getWindowKey(provider, window.label));
+  for (const entry of windows) {
+    warnedWindows.add(getWindowKey(provider, entry.window.label));
   }
 }
 
@@ -88,11 +150,13 @@ function markWindowsAsWarned(
  */
 function formatWarningMessage(
   provider: string,
-  windows: RateLimitWindow[],
+  windows: WindowProjection[],
 ): string {
-  const lines = windows.map((w) => {
-    const reset = formatResetTime(w.resetsAt);
-    return `- ${w.label}: ${Math.round(w.usedPercent)}%, resets ${reset}`;
+  const lines = windows.map(({ window, projectedPercent }) => {
+    const reset = formatResetTime(window.resetsAt);
+    const status = getProjectionStatus(projectedPercent);
+    const statusLabel = status ? ` (${status})` : "";
+    return `- ${window.label}: ${Math.round(window.usedPercent)}% used, projected ${Math.round(projectedPercent)}%${statusLabel}, resets ${reset}`;
   });
   return `${provider} rate limit warning:\n${lines.join("\n")}`;
 }
@@ -132,8 +196,10 @@ async function checkAndWarnRateLimits(
 
     const message = formatWarningMessage(limits.provider, highUsageWindows);
 
-    // Determine severity: error if any window is >= 80%, warning otherwise
-    const hasHighUsage = highUsageWindows.some((w) => w.usedPercent >= 80);
+    // Determine severity based on projected usage
+    const hasHighUsage = highUsageWindows.some(
+      (entry) => entry.projectedPercent >= ERROR_THRESHOLD,
+    );
     ctx.ui.notify(message, hasHighUsage ? "error" : "warning");
   } catch {
     // Silently ignore errors - this is non-blocking and should not impact the user

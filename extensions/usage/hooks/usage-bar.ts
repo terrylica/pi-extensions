@@ -164,6 +164,17 @@ function formatTimeRemaining(date: Date | null): string {
   return `${minutes}m`;
 }
 
+const MIN_PACE_PERCENT = 5;
+
+function getProjectedPercent(
+  usedPercent: number,
+  pacePercent?: number | null,
+): number {
+  if (pacePercent === null || pacePercent === undefined) return usedPercent;
+  const effectivePace = Math.max(MIN_PACE_PERCENT, pacePercent);
+  return Math.max(0, (usedPercent / effectivePace) * 100);
+}
+
 /**
  * Creates a compact progress bar with theme colors.
  */
@@ -178,10 +189,12 @@ function createProgressBar(
   const filledChar = "━";
   const emptyChar = "─";
 
-  // Color based on usage level
+  const projected = getProjectedPercent(clamped, pacePercent);
+
+  // Color based on projected usage level
   let fillColor: "success" | "warning" | "error" = "success";
-  if (clamped >= 80) fillColor = "error";
-  else if (clamped >= 60) fillColor = "warning";
+  if (projected >= 90) fillColor = "error";
+  else if (projected >= 80) fillColor = "warning";
 
   const markerChar = "│";
   const markerIndex =

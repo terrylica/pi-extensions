@@ -216,6 +216,8 @@ function createAnsiTheme(theme: Theme): AnsiTheme {
   };
 }
 
+const MIN_PACE_PERCENT = 5;
+
 function inferWindowSeconds(label: string): number | null {
   const lower = label.toLowerCase();
   if (lower.includes("5-hour") || lower.includes("5h")) {
@@ -245,6 +247,15 @@ function getPacePercent(window: RateLimitWindow): number | null {
   const elapsedMs = totalMs - remainingMs;
   const percent = (elapsedMs / totalMs) * 100;
   return Math.max(0, Math.min(100, percent));
+}
+
+function getProjectedPercent(
+  usedPercent: number,
+  pacePercent?: number | null,
+): number {
+  if (pacePercent === null || pacePercent === undefined) return usedPercent;
+  const effectivePace = Math.max(MIN_PACE_PERCENT, pacePercent);
+  return Math.max(0, (usedPercent / effectivePace) * 100);
 }
 
 function formatDurationMs(durationMs: number): string {
@@ -560,9 +571,10 @@ class UsageComponent implements Component {
 
     let fillColor: keyof AnsiTheme = "accent";
     if (colorMode === "usage") {
+      const projected = getProjectedPercent(clamped, pacePercent);
       fillColor = "green";
-      if (clamped >= 80) fillColor = "red";
-      else if (clamped >= 60) fillColor = "yellow";
+      if (projected >= 90) fillColor = "red";
+      else if (projected >= 80) fillColor = "yellow";
     }
 
     const parts: string[] = [];
