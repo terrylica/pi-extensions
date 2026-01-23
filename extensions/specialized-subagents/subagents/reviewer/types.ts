@@ -12,6 +12,8 @@ export interface ReviewerInput {
   focus?: string;
   /** Optional context about the change intent */
   context?: string;
+  /** Optional skill names to provide specialized context */
+  skills?: string[];
 }
 
 /** Details structure for reviewer tool rendering */
@@ -22,6 +24,12 @@ export interface ReviewerDetails {
   focus?: string;
   /** Optional context */
   context?: string;
+  /** Requested skill names (from input) */
+  skills?: string[];
+  /** Number of skills successfully resolved */
+  skillsResolved?: number;
+  /** Skill names that were not found */
+  skillsNotFound?: string[];
   /** Tool calls made by the subagent */
   toolCalls: SubagentToolCall[];
   /** Current spinner frame for animation */

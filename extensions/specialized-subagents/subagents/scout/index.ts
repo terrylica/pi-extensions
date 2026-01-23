@@ -9,13 +9,14 @@ import type {
   AgentToolResult,
   AgentToolUpdateCallback,
   ExtensionContext,
+  Skill,
   ToolDefinition,
   ToolRenderResultOptions,
 } from "@mariozechner/pi-coding-agent";
 import { getMarkdownTheme, type Theme } from "@mariozechner/pi-coding-agent";
 import { Container, Markdown, Spacer, Text } from "@mariozechner/pi-tui";
 import { Type } from "@sinclair/typebox";
-import { executeSubagent, resolveModel } from "../../lib";
+import { executeSubagent, resolveModel, resolveSkillsByName } from "../../lib";
 import type { SubagentToolCall } from "../../lib/types";
 import { getSpinnerFrame, INDICATOR } from "../../lib/ui/spinner";
 import { formatSubagentStats, pluralize } from "../../lib/ui/stats";
@@ -95,6 +96,12 @@ const parameters = Type.Object({
         "What to analyze or answer based on the fetched content. If not provided, returns raw content.",
     }),
   ),
+  skills: Type.Optional(
+    Type.Array(Type.String(), {
+      description:
+        "Skill names to provide specialized context (e.g., 'ios-26', 'drizzle-orm')",
+    }),
+  ),
 });
 
 /** Build the user message for the subagent based on inputs */
@@ -145,7 +152,9 @@ Use cases:
 - Web search: { query: "how to..." }
 - Explore repo: { repo: "facebook/react", prompt: "how is useState implemented?" }
 - GitHub search: { query: "useState", repo: "facebook/react" }
-- Fetch issue/PR: { url: "https://github.com/owner/repo/issues/123" }`,
+- Fetch issue/PR: { url: "https://github.com/owner/repo/issues/123" }
+
+Pass relevant skills (e.g., 'ios-26', 'drizzle-orm') to provide specialized context for the task.`,
 
     parameters,
 
@@ -156,7 +165,17 @@ Use cases:
       ctx: ExtensionContext,
       signal?: AbortSignal,
     ) {
-      const { url, query, repo, prompt } = args;
+      const { url, query, repo, prompt, skills: skillNames } = args;
+
+      // Resolve skills if provided
+      let resolvedSkills: Skill[] = [];
+      let notFoundSkills: string[] = [];
+
+      if (skillNames && skillNames.length > 0) {
+        const result = resolveSkillsByName(skillNames, ctx.cwd);
+        resolvedSkills = result.skills;
+        notFoundSkills = result.notFound;
+      }
 
       // Validate: at least one of url, query, or repo required
       if (!url && !query && !repo) {
@@ -168,6 +187,10 @@ Use cases:
             query,
             repo,
             prompt,
+            skills: skillNames,
+            skillsResolved: resolvedSkills.length,
+            skillsNotFound:
+              notFoundSkills.length > 0 ? notFoundSkills : undefined,
             toolCalls: [],
             spinnerFrame: 0,
             error,
@@ -190,6 +213,10 @@ Use cases:
               query,
               repo,
               prompt,
+              skills: skillNames,
+              skillsResolved: resolvedSkills.length,
+              skillsNotFound:
+                notFoundSkills.length > 0 ? notFoundSkills : undefined,
               toolCalls: currentToolCalls,
               spinnerFrame,
             },
@@ -199,13 +226,19 @@ Use cases:
 
       try {
         const model = resolveModel(MODEL, ctx);
-        const userMessage = buildUserMessage(args);
+        let userMessage = buildUserMessage(args);
+
+        // Append warning if skills not found
+        if (notFoundSkills.length > 0) {
+          userMessage += `\n\n**Note:** The following skills were not found and could not be loaded: ${notFoundSkills.join(", ")}`;
+        }
 
         const result = await executeSubagent(
           {
             name: "scout",
             model,
             systemPrompt: SCOUT_SYSTEM_PROMPT,
+            skills: resolvedSkills,
             customTools: createScoutTools(),
             thinkingLevel: "off",
             logging: {
@@ -224,6 +257,10 @@ Use cases:
                 query,
                 repo,
                 prompt,
+                skills: skillNames,
+                skillsResolved: resolvedSkills.length,
+                skillsNotFound:
+                  notFoundSkills.length > 0 ? notFoundSkills : undefined,
                 toolCalls: currentToolCalls,
                 spinnerFrame,
                 response: accumulated,
@@ -241,6 +278,10 @@ Use cases:
                 query,
                 repo,
                 prompt,
+                skills: skillNames,
+                skillsResolved: resolvedSkills.length,
+                skillsNotFound:
+                  notFoundSkills.length > 0 ? notFoundSkills : undefined,
                 toolCalls: currentToolCalls,
                 spinnerFrame,
               },
@@ -259,6 +300,10 @@ Use cases:
               query,
               repo,
               prompt,
+              skills: skillNames,
+              skillsResolved: resolvedSkills.length,
+              skillsNotFound:
+                notFoundSkills.length > 0 ? notFoundSkills : undefined,
               toolCalls: finalToolCalls,
               spinnerFrame,
               aborted: true,
@@ -277,6 +322,10 @@ Use cases:
               query,
               repo,
               prompt,
+              skills: skillNames,
+              skillsResolved: resolvedSkills.length,
+              skillsNotFound:
+                notFoundSkills.length > 0 ? notFoundSkills : undefined,
               toolCalls: finalToolCalls,
               spinnerFrame,
               error: result.error,
@@ -301,6 +350,10 @@ Use cases:
               query,
               repo,
               prompt,
+              skills: skillNames,
+              skillsResolved: resolvedSkills.length,
+              skillsNotFound:
+                notFoundSkills.length > 0 ? notFoundSkills : undefined,
               toolCalls: finalToolCalls,
               spinnerFrame,
               error,
@@ -316,6 +369,10 @@ Use cases:
             query,
             repo,
             prompt,
+            skills: skillNames,
+            skillsResolved: resolvedSkills.length,
+            skillsNotFound:
+              notFoundSkills.length > 0 ? notFoundSkills : undefined,
             toolCalls: finalToolCalls,
             spinnerFrame,
             response: result.content,
@@ -366,6 +423,17 @@ Use cases:
       if (args.prompt) {
         container.addChild(
           new Text(`  ${theme.fg("muted", "Prompt: ")}${args.prompt}`, 0, 0),
+        );
+      }
+
+      // Show skills if provided
+      if (args.skills && args.skills.length > 0) {
+        container.addChild(
+          new Text(
+            `  ${theme.fg("muted", "Skills: ")}${args.skills.join(", ")}`,
+            0,
+            0,
+          ),
         );
       }
 

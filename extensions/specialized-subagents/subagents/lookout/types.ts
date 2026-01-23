@@ -10,12 +10,20 @@ export interface LookoutInput {
   query: string;
   /** Optional working directory (defaults to current project cwd) */
   cwd?: string;
+  /** Optional skill names to provide specialized context */
+  skills?: string[];
 }
 
 /** Details structure for lookout tool rendering */
 export interface LookoutDetails {
   /** The search query */
   query: string;
+  /** Requested skill names (from input) */
+  skills?: string[];
+  /** Number of skills successfully resolved */
+  skillsResolved?: number;
+  /** Skill names that were not found */
+  skillsNotFound?: string[];
   /** Tool calls made by the subagent */
   toolCalls: SubagentToolCall[];
   /** Current spinner frame for animation */

@@ -28,6 +28,7 @@ extensions/specialized-subagents/subagents/<name>/
 ### types.ts
 
 - `XxxInput`: Parameters the parent agent provides
+  - Include `skills?: string[]` for optional skill passthrough
 - `XxxDetails`: State for UI rendering, must include:
   - `toolCalls: SubagentToolCall[]`
   - `spinnerFrame: number`
@@ -35,6 +36,9 @@ extensions/specialized-subagents/subagents/<name>/
   - `aborted?: boolean`
   - `error?: string`
   - `usage?: SubagentUsage`
+  - `skills?: string[]` - Requested skill names (from input)
+  - `skillsResolved?: number` - Number of skills successfully resolved
+  - `skillsNotFound?: string[]` - Skill names that were not found
 
 ### config.ts
 
@@ -75,13 +79,32 @@ Exports:
 
 ## Execute Function
 
-1. Validate inputs, return error in details if invalid
-2. Set up spinner interval (80ms), clear in `finally`
-3. Call `executeSubagent()` with `onTextUpdate` and `onToolUpdate` callbacks
-4. Handle abort/error states
-5. Use final tool calls from `result.toolCalls` for failure checks
-6. Check if all tool calls failed → return error
-7. Return `usage` from result
+1. Resolve skills if provided:
+   ```typescript
+   const { skills: skillNames } = args;
+   let resolvedSkills: Skill[] = [];
+   let notFoundSkills: string[] = [];
+   if (skillNames && skillNames.length > 0) {
+     const result = resolveSkillsByName(skillNames, ctx.cwd);
+     resolvedSkills = result.skills;
+     notFoundSkills = result.notFound;
+   }
+   ```
+2. Validate inputs, return error in details if invalid (include skill info)
+3. Set up spinner interval (80ms), clear in `finally`
+4. Build user message, append warning if skills not found:
+   ```typescript
+   if (notFoundSkills.length > 0) {
+     userMessage += `\n\n**Note:** The following skills were not found and could not be loaded: ${notFoundSkills.join(", ")}`;
+   }
+   ```
+5. Call `executeSubagent()` with:
+   - `skills: resolvedSkills` in config
+   - `onTextUpdate` and `onToolUpdate` callbacks that include skill info in details
+6. Handle abort/error states (include skill info in all return paths)
+7. Use final tool calls from `result.toolCalls` for failure checks
+8. Check if all tool calls failed → return error
+9. Return `usage` from result (include skill info)
 
 ## renderResult States
 
@@ -115,17 +138,27 @@ Add your required keys to `checkApiKeys()` in `extensions/specialized-subagents/
 
 1. Create directory: `subagents/<name>/`
 2. Create `types.ts` with Input and Details interfaces
+   - Add `skills?: string[]` to Input interface
+   - Add `skills?`, `skillsResolved?`, `skillsNotFound?` to Details interface
 3. Create `config.ts` with model configuration
 4. Create `system-prompt.ts` with subagent instructions
 5. Create `tools/` directory with subagent's tools
 6. Create `tool-formatter.ts` for display formatting
 7. Create `index.ts` with createXxxTool, executeXxx, XXX_GUIDANCE
+   - Import `resolveSkillsByName` and `Skill` type from lib
+   - Add `skills` parameter to TypeBox schema
+   - Update tool description to mention skill support
+   - Resolve skills in execute function
+   - Pass `skills: resolvedSkills` to executeSubagent
+   - Include skill info in all details returns
+   - Show skills in renderCall if provided
 8. Register in `extensions/specialized-subagents/index.ts`
 9. Run `pnpm typecheck`
 
 ## Key Points
 
-- **Details interface**: Must include `toolCalls`, `spinnerFrame`, `response`, `aborted`, `error`, `usage`
+- **Details interface**: Must include `toolCalls`, `spinnerFrame`, `response`, `aborted`, `error`, `usage`, and skill tracking fields
+- **Skills support**: All subagents should support optional `skills` parameter for specialized context
 - **Cost tracking**: Tools must return `cost` in details for aggregation
 - **Spinner**: 80ms interval, clear in finally block
 - **Extensions disabled**: Subagents don't run user extensions (`extensions: []`)
@@ -133,6 +166,8 @@ Add your required keys to `checkApiKeys()` in `extensions/specialized-subagents/
 - **All failed**: Show error indicator only when ALL tools failed (partial success = success indicator)
 - **Final tool calls**: Use `result.toolCalls` if present to decide failure state
 - **Mark tool as failed**: When all internal tools fail, return error so parent agent sees failure
+- **Skill resolution**: Use `resolveSkillsByName()` from lib to convert skill names to Skill objects
+- **Skill warnings**: Append warning to user message if skills not found (don't fail the request)
 
 ## Notifications
 

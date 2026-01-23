@@ -11,13 +11,14 @@ import type {
   AgentToolResult,
   AgentToolUpdateCallback,
   ExtensionContext,
+  Skill,
   ToolDefinition,
   ToolRenderResultOptions,
 } from "@mariozechner/pi-coding-agent";
 import { getMarkdownTheme, type Theme } from "@mariozechner/pi-coding-agent";
 import { Container, Markdown, Spacer, Text } from "@mariozechner/pi-tui";
 import { Type } from "@sinclair/typebox";
-import { executeSubagent, resolveModel } from "../../lib";
+import { executeSubagent, resolveModel, resolveSkillsByName } from "../../lib";
 import { formatSubagentStats } from "../../lib/ui/stats";
 import { MODEL } from "./config";
 import { ORACLE_SYSTEM_PROMPT } from "./system-prompt";
@@ -60,6 +61,12 @@ const parameters = Type.Object({
   context: Type.Optional(Type.String({ description: "Background info" })),
   files: Type.Optional(
     Type.Array(Type.String(), { description: "Files to examine" }),
+  ),
+  skills: Type.Optional(
+    Type.Array(Type.String(), {
+      description:
+        "Skill names to provide specialized context (e.g., 'ios-26', 'drizzle-orm')",
+    }),
   ),
 });
 
@@ -117,7 +124,9 @@ WHEN TO USE:
 WHEN NOT TO USE:
 - Simple file reading (use read)
 - Codebase searches (use lookout)
-- Basic code modifications (do it yourself or use task)`,
+- Basic code modifications (do it yourself or use task)
+
+Pass relevant skills (e.g., 'ios-26', 'drizzle-orm') to provide specialized context for the task.`,
 
     parameters,
 
@@ -128,7 +137,17 @@ WHEN NOT TO USE:
       ctx: ExtensionContext,
       signal?: AbortSignal,
     ) {
-      const { task, context, files } = args;
+      const { task, context, files, skills: skillNames } = args;
+
+      // Resolve skills if provided
+      let resolvedSkills: Skill[] = [];
+      let notFoundSkills: string[] = [];
+
+      if (skillNames && skillNames.length > 0) {
+        const result = resolveSkillsByName(skillNames, ctx.cwd);
+        resolvedSkills = result.skills;
+        notFoundSkills = result.notFound;
+      }
 
       let spinnerFrame = 0;
 
@@ -141,6 +160,10 @@ WHEN NOT TO USE:
             task,
             context,
             files,
+            skills: skillNames,
+            skillsResolved: resolvedSkills.length,
+            skillsNotFound:
+              notFoundSkills.length > 0 ? notFoundSkills : undefined,
             toolCalls: [],
             spinnerFrame,
           },
@@ -155,13 +178,19 @@ WHEN NOT TO USE:
         }
 
         const model = resolveModel(MODEL, ctx);
-        const userMessage = buildUserMessage(args, filesContent);
+        let userMessage = buildUserMessage(args, filesContent);
+
+        // Append warning if skills not found
+        if (notFoundSkills.length > 0) {
+          userMessage += `\n\n**Note:** The following skills were not found and could not be loaded: ${notFoundSkills.join(", ")}`;
+        }
 
         const result = await executeSubagent(
           {
             name: "oracle",
             model,
             systemPrompt: ORACLE_SYSTEM_PROMPT,
+            skills: resolvedSkills,
             customTools: createOracleTools(),
             thinkingLevel: "low",
             logging: {
@@ -179,6 +208,10 @@ WHEN NOT TO USE:
                 task,
                 context,
                 files,
+                skills: skillNames,
+                skillsResolved: resolvedSkills.length,
+                skillsNotFound:
+                  notFoundSkills.length > 0 ? notFoundSkills : undefined,
                 toolCalls: [],
                 spinnerFrame,
                 response: accumulated,
@@ -195,6 +228,10 @@ WHEN NOT TO USE:
               task,
               context,
               files,
+              skills: skillNames,
+              skillsResolved: resolvedSkills.length,
+              skillsNotFound:
+                notFoundSkills.length > 0 ? notFoundSkills : undefined,
               toolCalls: [],
               spinnerFrame,
               aborted: true,
@@ -214,6 +251,10 @@ WHEN NOT TO USE:
             task,
             context,
             files,
+            skills: skillNames,
+            skillsResolved: resolvedSkills.length,
+            skillsNotFound:
+              notFoundSkills.length > 0 ? notFoundSkills : undefined,
             toolCalls: [],
             spinnerFrame,
             response: result.content,
@@ -255,6 +296,17 @@ WHEN NOT TO USE:
         container.addChild(
           new Text(
             `  ${theme.fg("muted", "Files: ")}${args.files.length} file${args.files.length > 1 ? "s" : ""}`,
+            0,
+            0,
+          ),
+        );
+      }
+
+      // Show skills if provided
+      if (args.skills && args.skills.length > 0) {
+        container.addChild(
+          new Text(
+            `  ${theme.fg("muted", "Skills: ")}${args.skills.join(", ")}`,
             0,
             0,
           ),

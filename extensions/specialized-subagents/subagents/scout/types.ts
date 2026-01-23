@@ -14,6 +14,8 @@ export interface ScoutInput {
   repo?: string;
   /** Question to answer based on fetched content */
   prompt?: string;
+  /** Optional skill names to provide specialized context */
+  skills?: string[];
 }
 
 /** Details structure for scout tool rendering */
@@ -26,6 +28,12 @@ export interface ScoutDetails {
   repo?: string;
   /** Prompt input */
   prompt?: string;
+  /** Requested skill names (from input) */
+  skills?: string[];
+  /** Number of skills successfully resolved */
+  skillsResolved?: number;
+  /** Skill names that were not found */
+  skillsNotFound?: string[];
   /** Tool calls made by the subagent */
   toolCalls: SubagentToolCall[];
   /** Current spinner frame for animation */

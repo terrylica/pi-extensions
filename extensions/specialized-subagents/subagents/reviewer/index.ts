@@ -6,6 +6,7 @@ import type {
   AgentToolResult,
   AgentToolUpdateCallback,
   ExtensionContext,
+  Skill,
   ToolDefinition,
   ToolRenderResultOptions,
 } from "@mariozechner/pi-coding-agent";
@@ -17,7 +18,7 @@ import {
 } from "@mariozechner/pi-coding-agent";
 import { Container, Markdown, Spacer, Text } from "@mariozechner/pi-tui";
 import { Type } from "@sinclair/typebox";
-import { executeSubagent, resolveModel } from "../../lib";
+import { executeSubagent, resolveModel, resolveSkillsByName } from "../../lib";
 import type { SubagentToolCall } from "../../lib/types";
 import { getSpinnerFrame, INDICATOR } from "../../lib/ui/spinner";
 import { formatSubagentStats, pluralize } from "../../lib/ui/stats";
@@ -62,6 +63,12 @@ const parameters = Type.Object({
       description: "What the change is trying to achieve",
     }),
   ),
+  skills: Type.Optional(
+    Type.Array(Type.String(), {
+      description:
+        "Skill names to provide specialized context (e.g., 'ios-26', 'drizzle-orm')",
+    }),
+  ),
 });
 
 /** Build the user message for the subagent based on inputs */
@@ -94,7 +101,9 @@ export function createReviewerTool(): ToolDefinition<
 Inputs:
 - diff: Freeform description of what to review (e.g., staged changes, last commit, changes in src/auth/)
 - focus: Optional focus area (security, performance, style, general)
-- context: Optional description of the change intent`,
+- context: Optional description of the change intent
+
+Pass relevant skills (e.g., 'ios-26', 'drizzle-orm') to provide specialized context for the task.`,
 
     parameters,
 
@@ -105,7 +114,17 @@ Inputs:
       ctx: ExtensionContext,
       signal?: AbortSignal,
     ) {
-      const { diff, focus, context } = args;
+      const { diff, focus, context, skills: skillNames } = args;
+
+      // Resolve skills if provided
+      let resolvedSkills: Skill[] = [];
+      let notFoundSkills: string[] = [];
+
+      if (skillNames && skillNames.length > 0) {
+        const result = resolveSkillsByName(skillNames, ctx.cwd);
+        resolvedSkills = result.skills;
+        notFoundSkills = result.notFound;
+      }
 
       // Validate: diff is required
       if (!diff) {
@@ -116,6 +135,10 @@ Inputs:
             diff: "",
             focus,
             context,
+            skills: skillNames,
+            skillsResolved: resolvedSkills.length,
+            skillsNotFound:
+              notFoundSkills.length > 0 ? notFoundSkills : undefined,
             toolCalls: [],
             spinnerFrame: 0,
             error,
@@ -137,6 +160,10 @@ Inputs:
               diff,
               focus,
               context,
+              skills: skillNames,
+              skillsResolved: resolvedSkills.length,
+              skillsNotFound:
+                notFoundSkills.length > 0 ? notFoundSkills : undefined,
               toolCalls: currentToolCalls,
               spinnerFrame,
             },
@@ -146,7 +173,12 @@ Inputs:
 
       try {
         const model = resolveModel(MODEL, ctx);
-        const userMessage = buildUserMessage(args);
+        let userMessage = buildUserMessage(args);
+
+        // Append warning if skills not found
+        if (notFoundSkills.length > 0) {
+          userMessage += `\n\n**Note:** The following skills were not found and could not be loaded: ${notFoundSkills.join(", ")}`;
+        }
 
         const bashTool = createBashTool(ctx.cwd) as ReturnType<
           typeof createReadOnlyTools
@@ -158,6 +190,7 @@ Inputs:
             name: "reviewer",
             model,
             systemPrompt: REVIEWER_SYSTEM_PROMPT,
+            skills: resolvedSkills,
             tools,
             customTools: createReviewerTools(),
             thinkingLevel: "low",
@@ -176,6 +209,10 @@ Inputs:
                 diff,
                 focus,
                 context,
+                skills: skillNames,
+                skillsResolved: resolvedSkills.length,
+                skillsNotFound:
+                  notFoundSkills.length > 0 ? notFoundSkills : undefined,
                 toolCalls: currentToolCalls,
                 spinnerFrame,
                 response: accumulated,
@@ -192,6 +229,10 @@ Inputs:
                 diff,
                 focus,
                 context,
+                skills: skillNames,
+                skillsResolved: resolvedSkills.length,
+                skillsNotFound:
+                  notFoundSkills.length > 0 ? notFoundSkills : undefined,
                 toolCalls: currentToolCalls,
                 spinnerFrame,
               },
@@ -209,6 +250,10 @@ Inputs:
               diff,
               focus,
               context,
+              skills: skillNames,
+              skillsResolved: resolvedSkills.length,
+              skillsNotFound:
+                notFoundSkills.length > 0 ? notFoundSkills : undefined,
               toolCalls: finalToolCalls,
               spinnerFrame,
               aborted: true,
@@ -226,6 +271,10 @@ Inputs:
               diff,
               focus,
               context,
+              skills: skillNames,
+              skillsResolved: resolvedSkills.length,
+              skillsNotFound:
+                notFoundSkills.length > 0 ? notFoundSkills : undefined,
               toolCalls: finalToolCalls,
               spinnerFrame,
               error: result.error,
@@ -249,6 +298,10 @@ Inputs:
               diff,
               focus,
               context,
+              skills: skillNames,
+              skillsResolved: resolvedSkills.length,
+              skillsNotFound:
+                notFoundSkills.length > 0 ? notFoundSkills : undefined,
               toolCalls: finalToolCalls,
               spinnerFrame,
               error,
@@ -263,6 +316,10 @@ Inputs:
             diff,
             focus,
             context,
+            skills: skillNames,
+            skillsResolved: resolvedSkills.length,
+            skillsNotFound:
+              notFoundSkills.length > 0 ? notFoundSkills : undefined,
             toolCalls: finalToolCalls,
             spinnerFrame,
             response: result.content,
@@ -315,6 +372,17 @@ Inputs:
             : args.context;
         container.addChild(
           new Text(`  ${theme.fg("muted", "Context: ")}${preview}`, 0, 0),
+        );
+      }
+
+      // Show skills if provided
+      if (args.skills && args.skills.length > 0) {
+        container.addChild(
+          new Text(
+            `  ${theme.fg("muted", "Skills: ")}${args.skills.join(", ")}`,
+            0,
+            0,
+          ),
         );
       }
 
