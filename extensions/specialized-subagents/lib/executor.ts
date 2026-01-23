@@ -199,14 +199,28 @@ export async function executeSubagent(
 
   // Handle abort signal
   if (signal) {
-    signal.addEventListener(
-      "abort",
-      () => {
-        session.abort();
-        aborted = true;
-      },
-      { once: true },
-    );
+    if (signal.aborted) {
+      // Already aborted before we started - return immediately
+      unsubscribe();
+      session.dispose();
+      await logger?.close().catch(() => {});
+      return {
+        content: "",
+        aborted: true,
+        toolCalls: [],
+        runId,
+        usage,
+      };
+    } else {
+      signal.addEventListener(
+        "abort",
+        () => {
+          session.abort();
+          aborted = true;
+        },
+        { once: true },
+      );
+    }
   }
 
   let error: string | undefined;
