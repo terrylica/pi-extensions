@@ -118,6 +118,27 @@ export function formatScoutToolCall(
       return { label: "Issue" };
     }
 
+    case "list_user_repos": {
+      const username = args.username as string | undefined;
+      const language = args.language as string | undefined;
+      const namePrefix = args.namePrefix as string | undefined;
+      if (username) {
+        let detail = `@${username}`;
+        const filters: string[] = [];
+        if (language) {
+          filters.push(language);
+        }
+        if (namePrefix) {
+          filters.push(`${namePrefix}*`);
+        }
+        if (filters.length > 0) {
+          detail += ` (${filters.join(", ")})`;
+        }
+        return { label: "List Repos", detail };
+      }
+      return { label: "List Repos" };
+    }
+
     default:
       return { label: toolName };
   }

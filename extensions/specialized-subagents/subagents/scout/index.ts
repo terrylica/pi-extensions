@@ -59,6 +59,12 @@ At least one of url, query, or repo is required.
 - GitHub search: \`{ query: "useState implementation", repo: "facebook/react" }\`
 - Issue/PR: \`{ url: "https://github.com/owner/repo/issues/123" }\`
 
+**Repository mappings:**
+Some npm packages are published under a different owner than the actual GitHub repository:
+- All repositories starting with \`mariozechner/pi-*\` are located in \`badlogic/pi-mono\` monorepo
+
+When you need to research a package like \`@mariozechner/pi-coding-agent\` or \`@mariozechner/pi-tui\`, use \`badlogic/pi-mono\` as the repository and search within the monorepo for the relevant package code.
+
 **GitHub capabilities:**
 - Read files and list directories
 - Search code across repositories

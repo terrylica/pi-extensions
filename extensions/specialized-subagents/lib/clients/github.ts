@@ -623,6 +623,78 @@ export class GitHubClient {
     return markdown;
   }
 
+  /** List repositories for a user */
+  async listUserRepos(
+    username: string,
+    options?: {
+      language?: string;
+      namePrefix?: string;
+      sort?: string;
+      order?: string;
+      per_page?: number;
+      page?: number;
+    },
+    signal?: AbortSignal,
+  ): Promise<string> {
+    // Build search query
+    let q = `user:${username}`;
+    if (options?.language) {
+      q += ` language:${options.language}`;
+    }
+    if (options?.namePrefix) {
+      q += ` ${options.namePrefix} in:name`;
+    }
+
+    const params: Record<string, string> = {
+      q,
+      per_page: String(options?.per_page ?? 30),
+      page: String(options?.page ?? 1),
+    };
+    if (options?.sort) {
+      params.sort = options.sort;
+    }
+    if (options?.order) {
+      params.order = options.order;
+    }
+
+    const data = await this.get<{
+      total_count: number;
+      incomplete_results: boolean;
+      items: GitHubRepository[];
+    }>("/search/repositories", params, signal);
+
+    let markdown = `# Repositories for @${username}\n\n`;
+    markdown += `**Total Results:** ${data.total_count}${data.incomplete_results ? " (incomplete)" : ""}\n\n`;
+
+    if (data.items.length === 0) {
+      markdown += `_No repositories found._\n`;
+      return markdown;
+    }
+
+    markdown += `## Repositories\n\n`;
+
+    for (const repo of data.items) {
+      markdown += `### [${repo.full_name}](${`https://github.com/${repo.full_name}`})\n\n`;
+      markdown += `- **Stars:** ${repo.stargazers_count}\n`;
+      markdown += `- **Forks:** ${repo.forks_count}\n`;
+      if (repo.language) {
+        markdown += `- **Language:** ${repo.language}\n`;
+      }
+      if (repo.license) {
+        markdown += `- **License:** ${repo.license.name}\n`;
+      }
+      if (repo.description) {
+        markdown += `- **Description:** ${repo.description}\n`;
+      }
+      if (repo.topics.length > 0) {
+        markdown += `- **Topics:** ${repo.topics.join(", ")}\n`;
+      }
+      markdown += `\n`;
+    }
+
+    return markdown;
+  }
+
   /** Search commits in a repository */
   async searchCommits(
     owner: string,

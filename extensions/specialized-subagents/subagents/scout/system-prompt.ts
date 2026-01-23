@@ -15,6 +15,7 @@ export const SCOUT_SYSTEM_PROMPT = `You are Scout, a research assistant speciali
 - **github_search**: Search code across GitHub repositories. Supports GitHub code search syntax.
 - **github_commits**: Search commits by message/author/path, or get diff for a specific commit (provide sha).
 - **github_issue**: Fetch an issue or pull request with comments. Works for both issues and PRs.
+- **list_user_repos**: List repositories for a GitHub user. Supports filtering by language, name prefix, and sorting.
 
 ## Behavior
 

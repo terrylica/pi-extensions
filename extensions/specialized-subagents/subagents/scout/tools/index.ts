@@ -8,6 +8,7 @@ import { githubCommitsTool } from "./github-commits";
 import { githubContentTool } from "./github-content";
 import { githubIssueTool } from "./github-issue";
 import { githubSearchTool } from "./github-search";
+import { listUserReposTool } from "./list-user-repos";
 import { webSearchTool } from "./web-search";
 
 /** Create scout tools array */
@@ -19,6 +20,7 @@ export function createScoutTools(): ToolDefinition[] {
     githubSearchTool,
     githubCommitsTool,
     githubIssueTool,
+    listUserReposTool,
   ] as unknown as ToolDefinition[];
 }
 
@@ -27,6 +29,7 @@ export {
   githubContentTool,
   githubIssueTool,
   githubSearchTool,
+  listUserReposTool,
   webFetchTool,
   webSearchTool,
 };
