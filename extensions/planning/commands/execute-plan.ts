@@ -10,6 +10,7 @@
 import {
   DynamicBorder,
   type ExtensionAPI,
+  type ExtensionCommandContext,
 } from "@mariozechner/pi-coding-agent";
 import { Container, Text } from "@mariozechner/pi-tui";
 import { selectPlan } from "../lib/plan-selector";
@@ -19,6 +20,14 @@ import {
   readPlan,
   updatePlanStatus,
 } from "../lib/plan-utils";
+
+/**
+ * Check if the current session has any messages (not counting the header).
+ */
+function hasSessionMessages(ctx: ExtensionCommandContext): boolean {
+  const entries = ctx.sessionManager.getEntries();
+  return entries.some((e) => e.type === "message");
+}
 
 const EXECUTE_PLAN_PROMPT = `Execute the following implementation plan. Follow the Implementation Order section step by step.
 
@@ -65,9 +74,6 @@ export function setupExecutePlanCommand(pi: ExtensionAPI) {
       }
 
       const planTitle = plan.title?.trim() || plan.slug || plan.filename;
-      if (planTitle) {
-        pi.setSessionName(planTitle);
-      }
 
       // Check dependencies
       const depCheck = checkDependencies(plan, plans);
@@ -82,6 +88,33 @@ export function setupExecutePlanCommand(pi: ExtensionAPI) {
           ctx.ui.notify("Cancelled", "info");
           return;
         }
+      }
+
+      // Check if session has messages and ask user where to execute
+      if (hasSessionMessages(ctx)) {
+        const choice = await ctx.ui.select(
+          "Session has existing messages. Where should the plan execute?",
+          ["Execute in current session", "Create new linked session"],
+        );
+
+        if (choice === undefined) {
+          // User cancelled
+          return;
+        }
+
+        if (choice === "Create new linked session") {
+          const parentSession = ctx.sessionManager.getSessionFile();
+          const result = await ctx.newSession({ parentSession });
+          if (result.cancelled) {
+            ctx.ui.notify("New session creation was cancelled", "info");
+            return;
+          }
+        }
+      }
+
+      // Set session name (after potential new session creation)
+      if (planTitle) {
+        pi.setSessionName(planTitle);
       }
 
       // Update status to in-progress
