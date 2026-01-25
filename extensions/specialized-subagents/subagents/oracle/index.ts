@@ -18,7 +18,13 @@ import type {
 import { getMarkdownTheme, type Theme } from "@mariozechner/pi-coding-agent";
 import { Container, Markdown, Spacer, Text } from "@mariozechner/pi-tui";
 import { Type } from "@sinclair/typebox";
-import { executeSubagent, resolveModel, resolveSkillsByName } from "../../lib";
+import { SubagentFooter } from "../../components";
+import {
+  detectModelFamily,
+  executeSubagent,
+  resolveModel,
+  resolveSkillsByName,
+} from "../../lib";
 import { formatSubagentStats } from "../../lib/ui/stats";
 import { MODEL } from "./config";
 import { ORACLE_SYSTEM_PROMPT } from "./system-prompt";
@@ -149,6 +155,9 @@ Pass relevant skills (e.g., 'ios-26', 'drizzle-orm') to provide specialized cont
         notFoundSkills = result.notFound;
       }
 
+      const familyUnknown = detectModelFamily(MODEL) === "unknown";
+      let resolvedModel: { provider: string; id: string } | undefined;
+
       let spinnerFrame = 0;
 
       // Set up spinner animation interval
@@ -166,18 +175,40 @@ Pass relevant skills (e.g., 'ios-26', 'drizzle-orm') to provide specialized cont
               notFoundSkills.length > 0 ? notFoundSkills : undefined,
             toolCalls: [],
             spinnerFrame,
+            resolvedModel,
+            familyUnknown,
           },
         });
       }, 80);
 
       try {
+        const model = resolveModel(MODEL, ctx);
+        resolvedModel = { provider: model.provider, id: model.id };
+
+        // Publish resolved provider/model as early as possible for footer rendering.
+        onUpdate?.({
+          content: [{ type: "text", text: "" }],
+          details: {
+            task,
+            context,
+            files,
+            skills: skillNames,
+            skillsResolved: resolvedSkills.length,
+            skillsNotFound:
+              notFoundSkills.length > 0 ? notFoundSkills : undefined,
+            toolCalls: [],
+            spinnerFrame,
+            resolvedModel,
+            familyUnknown,
+          },
+        });
+
         // Format files if provided
         let filesContent: string | undefined;
         if (files && files.length > 0) {
           filesContent = await formatFilesForContext(files, ctx.cwd);
         }
 
-        const model = resolveModel(MODEL, ctx);
         let userMessage = buildUserMessage(args, filesContent);
 
         // Append warning if skills not found
@@ -215,6 +246,8 @@ Pass relevant skills (e.g., 'ios-26', 'drizzle-orm') to provide specialized cont
                 toolCalls: [],
                 spinnerFrame,
                 response: accumulated,
+                resolvedModel,
+                familyUnknown,
               },
             });
           },
@@ -236,6 +269,8 @@ Pass relevant skills (e.g., 'ios-26', 'drizzle-orm') to provide specialized cont
               spinnerFrame,
               aborted: true,
               usage: result.usage,
+              resolvedModel,
+              familyUnknown,
             },
           };
         }
@@ -259,6 +294,8 @@ Pass relevant skills (e.g., 'ios-26', 'drizzle-orm') to provide specialized cont
             spinnerFrame,
             response: result.content,
             usage: result.usage,
+            resolvedModel,
+            familyUnknown,
           },
         };
       } finally {
@@ -269,14 +306,8 @@ Pass relevant skills (e.g., 'ios-26', 'drizzle-orm') to provide specialized cont
     renderCall(args, theme) {
       const container = new Container();
 
-      // Title with model name
       container.addChild(
-        new Text(
-          theme.fg("toolTitle", theme.bold("Oracle")) +
-            theme.fg("muted", ` (${MODEL})`),
-          0,
-          0,
-        ),
+        new Text(theme.fg("toolTitle", theme.bold("Oracle")), 0, 0),
       );
 
       // Task preview (truncated to ~80 chars)
@@ -339,21 +370,50 @@ Pass relevant skills (e.g., 'ios-26', 'drizzle-orm') to provide specialized cont
         return new Text("", 0, 0);
       }
 
-      const { response, aborted, error, usage } = details;
+      const {
+        response,
+        aborted,
+        error,
+        usage,
+        toolCalls,
+        resolvedModel,
+        familyUnknown,
+      } = details;
+
+      const footer = new SubagentFooter(theme, {
+        resolvedModel,
+        usage,
+        toolCalls,
+        familyUnknown,
+      });
 
       // Aborted state
       if (aborted) {
-        return new Text(theme.fg("warning", "Aborted"), 0, 0);
+        const container = new Container();
+        container.addChild(new Text(theme.fg("warning", "Aborted"), 0, 0));
+        container.addChild(footer);
+        return container;
       }
 
       // Error state
       if (error) {
-        return new Text(theme.fg("error", `Error: ${error}`), 0, 0);
+        const container = new Container();
+        container.addChild(
+          new Text(theme.fg("error", `Error: ${error}`), 0, 0),
+        );
+        container.addChild(footer);
+        return container;
       }
 
       // Running state (isPartial = true)
       if (isPartial) {
-        return new Text(theme.fg("muted", "Consulting the Oracle..."), 0, 0);
+        const container = new Container();
+        container.addChild(
+          new Text(theme.fg("muted", "Consulting the Oracle..."), 0, 0),
+        );
+        container.addChild(new Spacer(1));
+        container.addChild(footer);
+        return container;
       }
 
       // Stats line for footer
@@ -365,11 +425,16 @@ Pass relevant skills (e.g., 'ios-26', 'drizzle-orm') to provide specialized cont
 
       // Done state - collapsed: just show completion info
       if (!expanded) {
-        return new Text(
-          theme.fg("success", "✓ ") + theme.fg("muted", statsText),
-          0,
-          0,
+        const container = new Container();
+        container.addChild(
+          new Text(
+            theme.fg("success", "✓ ") + theme.fg("muted", statsText),
+            0,
+            0,
+          ),
         );
+        container.addChild(footer);
+        return container;
       }
 
       // Done state - expanded: show full response
@@ -419,7 +484,7 @@ Pass relevant skills (e.g., 'ios-26', 'drizzle-orm') to provide specialized cont
 
       // Footer
       container.addChild(new Spacer(1));
-      container.addChild(new Text(theme.fg("muted", statsText), 0, 0));
+      container.addChild(footer);
 
       return container;
     },

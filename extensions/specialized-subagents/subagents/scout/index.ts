@@ -16,7 +16,13 @@ import type {
 import { getMarkdownTheme, type Theme } from "@mariozechner/pi-coding-agent";
 import { Container, Markdown, Spacer, Text } from "@mariozechner/pi-tui";
 import { Type } from "@sinclair/typebox";
-import { executeSubagent, resolveModel, resolveSkillsByName } from "../../lib";
+import { SubagentFooter } from "../../components";
+import {
+  detectModelFamily,
+  executeSubagent,
+  resolveModel,
+  resolveSkillsByName,
+} from "../../lib";
 import type { SubagentToolCall } from "../../lib/types";
 import { getSpinnerFrame, INDICATOR } from "../../lib/ui/spinner";
 import { formatSubagentStats, pluralize } from "../../lib/ui/stats";
@@ -198,6 +204,9 @@ Pass relevant skills (e.g., 'ios-26', 'drizzle-orm') to provide specialized cont
         };
       }
 
+      const familyUnknown = detectModelFamily(MODEL) === "unknown";
+      let resolvedModel: { provider: string; id: string } | undefined;
+
       let currentToolCalls: SubagentToolCall[] = [];
       let spinnerFrame = 0;
 
@@ -219,6 +228,8 @@ Pass relevant skills (e.g., 'ios-26', 'drizzle-orm') to provide specialized cont
                 notFoundSkills.length > 0 ? notFoundSkills : undefined,
               toolCalls: currentToolCalls,
               spinnerFrame,
+              resolvedModel,
+              familyUnknown,
             },
           });
         }
@@ -226,6 +237,27 @@ Pass relevant skills (e.g., 'ios-26', 'drizzle-orm') to provide specialized cont
 
       try {
         const model = resolveModel(MODEL, ctx);
+        resolvedModel = { provider: model.provider, id: model.id };
+
+        // Publish resolved provider/model as early as possible for footer rendering.
+        onUpdate?.({
+          content: [{ type: "text", text: "" }],
+          details: {
+            url,
+            query,
+            repo,
+            prompt,
+            skills: skillNames,
+            skillsResolved: resolvedSkills.length,
+            skillsNotFound:
+              notFoundSkills.length > 0 ? notFoundSkills : undefined,
+            toolCalls: currentToolCalls,
+            spinnerFrame,
+            resolvedModel,
+            familyUnknown,
+          },
+        });
+
         let userMessage = buildUserMessage(args);
 
         // Append warning if skills not found
@@ -264,6 +296,8 @@ Pass relevant skills (e.g., 'ios-26', 'drizzle-orm') to provide specialized cont
                 toolCalls: currentToolCalls,
                 spinnerFrame,
                 response: accumulated,
+                resolvedModel,
+                familyUnknown,
               },
             });
           },
@@ -284,6 +318,8 @@ Pass relevant skills (e.g., 'ios-26', 'drizzle-orm') to provide specialized cont
                   notFoundSkills.length > 0 ? notFoundSkills : undefined,
                 toolCalls: currentToolCalls,
                 spinnerFrame,
+                resolvedModel,
+                familyUnknown,
               },
             });
           },
@@ -308,6 +344,8 @@ Pass relevant skills (e.g., 'ios-26', 'drizzle-orm') to provide specialized cont
               spinnerFrame,
               aborted: true,
               usage: result.usage,
+              resolvedModel,
+              familyUnknown,
             },
           };
         }
@@ -330,6 +368,8 @@ Pass relevant skills (e.g., 'ios-26', 'drizzle-orm') to provide specialized cont
               spinnerFrame,
               error: result.error,
               usage: result.usage,
+              resolvedModel,
+              familyUnknown,
             },
           };
         }
@@ -358,6 +398,8 @@ Pass relevant skills (e.g., 'ios-26', 'drizzle-orm') to provide specialized cont
               spinnerFrame,
               error,
               usage: result.usage,
+              resolvedModel,
+              familyUnknown,
             },
           };
         }
@@ -377,6 +419,8 @@ Pass relevant skills (e.g., 'ios-26', 'drizzle-orm') to provide specialized cont
             spinnerFrame,
             response: result.content,
             usage: result.usage,
+            resolvedModel,
+            familyUnknown,
           },
         };
       } finally {
@@ -387,15 +431,8 @@ Pass relevant skills (e.g., 'ios-26', 'drizzle-orm') to provide specialized cont
     renderCall(args, theme) {
       const container = new Container();
 
-      // Title with model name
-      const modelName = MODEL;
       container.addChild(
-        new Text(
-          theme.fg("toolTitle", theme.bold("Scout")) +
-            theme.fg("muted", ` (${modelName})`),
-          0,
-          0,
-        ),
+        new Text(theme.fg("toolTitle", theme.bold("Scout")), 0, 0),
       );
 
       // URL (if provided)
@@ -463,8 +500,16 @@ Pass relevant skills (e.g., 'ios-26', 'drizzle-orm') to provide specialized cont
         return new Text("", 0, 0);
       }
 
-      const { toolCalls, spinnerFrame, response, aborted, error, usage } =
-        details;
+      const {
+        toolCalls,
+        spinnerFrame,
+        response,
+        aborted,
+        error,
+        usage,
+        resolvedModel,
+        familyUnknown,
+      } = details;
 
       // Counts
       const doneCount = toolCalls.filter((tc) => tc.status === "done").length;
@@ -473,43 +518,73 @@ Pass relevant skills (e.g., 'ios-26', 'drizzle-orm') to provide specialized cont
       ).length;
       const errorCount = toolCalls.filter((tc) => tc.status === "error").length;
 
+      const footer = new SubagentFooter(theme, {
+        resolvedModel,
+        usage,
+        toolCalls,
+        familyUnknown,
+      });
+
       // Aborted state
       if (aborted) {
+        const container = new Container();
         const suffix =
           doneCount > 0
             ? ` (${doneCount} ${pluralize(doneCount, "tool call")} completed)`
             : "";
-        return new Text(
-          theme.fg("warning", "Aborted") + theme.fg("muted", suffix),
-          0,
-          0,
+        container.addChild(
+          new Text(
+            theme.fg("warning", "Aborted") + theme.fg("muted", suffix),
+            0,
+            0,
+          ),
         );
+        container.addChild(footer);
+        return container;
       }
 
       // Error state
       if (error) {
-        return new Text(theme.fg("error", `Error: ${error}`), 0, 0);
+        const container = new Container();
+        container.addChild(
+          new Text(theme.fg("error", `Error: ${error}`), 0, 0),
+        );
+        container.addChild(footer);
+        return container;
       }
 
-      // Running + collapsed: show current tool
+      // Running + collapsed: show current tool + footer
       if (isPartial && !expanded) {
+        const container = new Container();
+
         const currentTool = toolCalls.find((tc) => tc.status === "running");
         if (currentTool) {
           const spinner = getSpinnerFrame(spinnerFrame);
+
           // Show partialResult text if available (e.g., progress updates)
           const partialText = currentTool.partialResult?.content?.[0];
           if (partialText?.type === "text" && partialText.text) {
-            return new Text(`${spinner} ${partialText.text}`, 0, 0);
+            container.addChild(
+              new Text(`${spinner} ${partialText.text}`, 0, 0),
+            );
+          } else {
+            const { label, detail } = formatScoutToolCall(currentTool);
+            const text = detail ? `${label} ${detail}` : label;
+            container.addChild(new Text(`${spinner} ${text}`, 0, 0));
           }
-          const { label, detail } = formatScoutToolCall(currentTool);
-          const text = detail ? `${label} ${detail}` : label;
-          return new Text(`${spinner} ${text}`, 0, 0);
+        } else {
+          container.addChild(
+            new Text(
+              theme.fg("muted", `${getSpinnerFrame(spinnerFrame)} thinking...`),
+              0,
+              0,
+            ),
+          );
         }
-        return new Text(
-          theme.fg("muted", `${getSpinnerFrame(spinnerFrame)} thinking...`),
-          0,
-          0,
-        );
+
+        container.addChild(new Spacer(1));
+        container.addChild(footer);
+        return container;
       }
 
       // Running + expanded: show all tool calls
@@ -559,11 +634,15 @@ Pass relevant skills (e.g., 'ios-26', 'drizzle-orm') to provide specialized cont
           }
         }
 
+        container.addChild(new Spacer(1));
+        container.addChild(footer);
         return container;
       }
 
       // Done + collapsed
       if (!expanded) {
+        const container = new Container();
+
         const allFailed =
           toolCalls.length > 0 && errorCount === toolCalls.length;
         const stats = formatSubagentStats(
@@ -572,11 +651,17 @@ Pass relevant skills (e.g., 'ios-26', 'drizzle-orm') to provide specialized cont
         );
         const indicator = allFailed ? INDICATOR.error : INDICATOR.done;
         const indicatorColor = allFailed ? "error" : "success";
-        return new Text(
-          theme.fg(indicatorColor, `${indicator} `) + theme.fg("muted", stats),
-          0,
-          0,
+
+        container.addChild(
+          new Text(
+            theme.fg(indicatorColor, `${indicator} `) +
+              theme.fg("muted", stats),
+            0,
+            0,
+          ),
         );
+        container.addChild(footer);
+        return container;
       }
 
       // Done + expanded
@@ -647,9 +732,9 @@ Pass relevant skills (e.g., 'ios-26', 'drizzle-orm') to provide specialized cont
         }
 
         container.addChild(new Spacer(1));
-        container.addChild(new Text(theme.fg("muted", stats), 0, 0));
       }
 
+      container.addChild(footer);
       return container;
     },
   };

@@ -46,4 +46,10 @@ export interface ScoutDetails {
   error?: string;
   /** Usage stats from the subagent */
   usage?: SubagentUsage;
+
+  /** Resolved model used for this run (provider + model id) */
+  resolvedModel?: { provider: string; id: string };
+
+  /** Whether model family detection was "unknown" (default provider fallback ordering used) */
+  familyUnknown?: boolean;
 }
