@@ -68,15 +68,6 @@ export class SubagentFooter implements Component {
 
     parts.push(callsText);
 
-    // If we're going to truncate anyway, try a smaller tokens label first.
-    if (tokensPartIndex !== undefined) {
-      const plain =
-        parts.join(" - ") + (familyUnknown ? " - unknown-family" : "");
-      if (plain.length > width) {
-        parts[tokensPartIndex] = `${formatTokenCount(usage.outputTokens!)} tok`;
-      }
-    }
-
     const base = th.fg("muted", parts.join(" - "));
 
     const line = familyUnknown
