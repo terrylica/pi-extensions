@@ -13,6 +13,22 @@ Publish a single extension from this repo as `@aliou/pi-<name>` using the change
 - GitHub Actions publish workflow exists (uses `changesets/action@v1`).
 - `NPM_TOKEN` secret is configured in GitHub with publish rights for `@aliou`.
 
+## Documentation requirements
+
+Before publishing, ensure:
+
+1. **Extension README.md** exists with:
+   - Description of what the extension does
+   - Installation instructions (both git and npm)
+   - Features list (tools, commands, hooks)
+   - Usage examples
+   - Requirements section (if external dependencies exist)
+
+2. **Root README.md** includes the extension:
+   - Listed under the appropriate section (UX, Safety, Context Engineering, Monitoring, Tools, Introspection)
+   - Format: `### [name](extensions/name/)` header, short description, `[npm](url)` link
+   - Add the npm link after publishing: `[npm](https://www.npmjs.com/package/@aliou/pi-<name>)`
+
 ## Package.json requirements (extensions/<name>/package.json)
 - `name`: `@aliou/pi-<name>`
 - `version`: semantic version

@@ -62,6 +62,8 @@ Extensions that prevent mistakes.
 
 Security hooks. Blocks Homebrew commands (project uses Nix), protects `.env` files, prompts for confirmation on dangerous commands.
 
+[npm](https://www.npmjs.com/package/@aliou/pi-guardrails)
+
 ## Context Engineering
 
 Extensions that improve agent reasoning and planning.
