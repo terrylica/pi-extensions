@@ -27,7 +27,14 @@ export {
   parseGitHubUrl,
 } from "./clients";
 // Constants
-export { PROVIDER_PRIORITY, type PriorityProvider } from "./constants";
+export {
+  detectModelFamily,
+  getProviderPriorityForModelId,
+  type ModelFamily,
+  PROVIDER_PRIORITY_BY_FAMILY,
+  RESOLVER_PROVIDERS,
+  type ResolverProvider,
+} from "./constants";
 // Core executor
 export { executeSubagent, filterThinkingTags } from "./executor";
 // Logging

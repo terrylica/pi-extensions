@@ -4,12 +4,12 @@
 
 import type { Model } from "@mariozechner/pi-ai";
 import type { ExtensionContext } from "@mariozechner/pi-coding-agent";
-import { PROVIDER_PRIORITY } from "./constants";
+import { getProviderPriorityForModelId } from "./constants";
 
 /**
  * Find a model by name from available providers.
  *
- * Searches providers in priority order (PROVIDER_PRIORITY) and returns
+ * Searches providers in priority order (based on model family) and returns
  * the first matching model with a valid API key.
  *
  * @param modelName - Model ID to search for (e.g., "claude-haiku-4-5")
@@ -48,8 +48,9 @@ export function resolveModel(
     );
   }
 
-  // Return first match by priority order
-  for (const provider of PROVIDER_PRIORITY) {
+  // Return first match by priority order (varies by model family)
+  const providerPriority = getProviderPriorityForModelId(modelName);
+  for (const provider of providerPriority) {
     const model = matchesByProvider.get(provider);
     if (model) {
       return model;
