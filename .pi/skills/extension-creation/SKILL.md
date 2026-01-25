@@ -16,6 +16,9 @@ extensions/<name>/
 ├── tools/
 │   ├── index.ts       # Hub: exports setup function
 │   └── <tool>.ts      # Individual tool definitions
+├── components/        # Optional: reusable TUI components (used by tools/commands)
+│   ├── index.ts       # Optional: barrel exports
+│   └── <component>.ts # TUI Component implementation
 ├── hooks/             # Optional
 │   ├── index.ts       # Hub: exports setup function
 │   └── <hook>.ts      # Individual hooks
@@ -146,6 +149,41 @@ export function setupFooTool(pi: ExtensionAPI) {
 }
 ```
 
+## Components (custom TUI, used by tools)
+
+Use `components/` for reusable TUI rendering that is not a command, e.g., a single-line footer/status bar that must never wrap.
+
+```typescript
+// extensions/<name>/components/StatusLine.ts
+import type { Theme } from "@mariozechner/pi-coding-agent";
+import type { Component } from "@mariozechner/pi-tui";
+import { truncateToWidth } from "@mariozechner/pi-tui";
+
+export class StatusLine implements Component {
+  constructor(
+    private theme: Theme,
+    private text: string,
+  ) {}
+
+  render(width: number): string[] {
+    return [truncateToWidth(this.theme.fg("muted", this.text), width)];
+  }
+}
+```
+
+Use it from a tool’s `renderResult()`:
+
+```typescript
+import { Container, Text } from "@mariozechner/pi-tui";
+import { StatusLine } from "../components/StatusLine";
+
+// ...
+const container = new Container();
+container.addChild(new Text("Main output...", 0, 0));
+container.addChild(new StatusLine(theme, "provider/model - 12 calls"));
+return container;
+```
+
 ## Multi-Action Tool
 
 For tools with multiple actions (like `processes`), use StringEnum:
@@ -256,11 +294,12 @@ Run `/command` to open panel.
 2. Create `index.ts` entry point
 3. Create `tools/index.ts` hub
 4. Create individual tool files in `tools/`
-5. Add hooks in `hooks/` if needed (cleanup, events)
-6. Add commands in `commands/` if interactive UI needed
-7. Create `README.md`
-8. Update root `README.md` to list the new extension and link to its README
-9. Run `pnpm typecheck` to verify
+5. Create reusable TUI components in `components/` if you need single-line truncation, progress bars, tables, etc.
+6. Add hooks in `hooks/` if needed (cleanup, events)
+7. Add commands in `commands/` if interactive UI needed
+8. Create `README.md`
+9. Update root `README.md` to list the new extension and link to its README
+10. Run `pnpm typecheck` to verify
 
 ## Key Imports
 
