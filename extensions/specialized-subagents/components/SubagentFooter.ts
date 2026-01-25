@@ -48,9 +48,7 @@ export class SubagentFooter implements Component {
       parts.push(`${resolvedModel.provider}/${resolvedModel.id}`);
     }
 
-    let tokensPartIndex: number | undefined;
     if (usage?.outputTokens !== undefined) {
-      tokensPartIndex = parts.length;
       parts.push(`${formatTokenCount(usage.outputTokens)} tokens`);
     }
 
