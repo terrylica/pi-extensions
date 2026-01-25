@@ -700,7 +700,6 @@ function compareNodes(
       return dateB.localeCompare(dateA) || titleA.localeCompare(titleB);
     case "title-desc":
       return titleB.localeCompare(titleA);
-    case "title-asc":
     default:
       return titleA.localeCompare(titleB);
   }
