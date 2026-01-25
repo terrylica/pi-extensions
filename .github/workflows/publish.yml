@@ -26,8 +26,6 @@ jobs:
 
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
-        with:
-          version: 10
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -74,8 +72,20 @@ jobs:
               execSync(`git push origin ${tag}`);
             }
 
-            execSync(`gh release create ${tag} --title ${tag} --notes "Release ${tag}"`, {
-              stdio: "inherit",
-            });
+            let hasRelease = false;
+            try {
+              const output = execSync(`gh release view ${tag} --json tagName --jq .tagName`, {
+                stdio: ["ignore", "pipe", "ignore"],
+              }).toString().trim();
+              hasRelease = output.length > 0;
+            } catch {
+              hasRelease = false;
+            }
+
+            if (!hasRelease) {
+              execSync(`gh release create ${tag} --title ${tag} --notes "Release ${tag}"`, {
+                stdio: "inherit",
+              });
+            }
           }
           NODE
