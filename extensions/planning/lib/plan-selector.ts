@@ -1,4 +1,3 @@
-import { createThemedBoxRenderer } from "@aliou/tui-utils";
 import type { ExtensionContext, Theme } from "@mariozechner/pi-coding-agent";
 import {
   type Component,
@@ -78,10 +77,6 @@ export async function selectPlan(
   const result = await ctx.ui.custom<PlanSelectorResult>(
     (tui, theme, _keybindings, done) =>
       createPlanSelector({ title, plans }, done, theme, tui),
-    {
-      overlay: true,
-      overlayOptions: () => buildOverlayOptions(),
-    },
   );
 
   return result?.selected ?? null;
@@ -185,48 +180,50 @@ class PlanSelector implements Component {
   }
 
   render(width: number): string[] {
+    const theme = this.theme;
+    const dim = (s: string) => theme.fg("dim", s);
+    const accent = (s: string) => theme.fg("accent", s);
+    const bold = (s: string) => theme.bold(s);
+    const border = (s: string) => theme.fg("dim", s);
+
     const lines: string[] = [];
-    const box = createThemedBoxRenderer(width, this.theme, {
-      leadingSpace: true,
-      trailingSpace: true,
-    });
+    const innerWidth = width - 2; // 1 char padding each side
 
+    // Helper to pad line
+    const padLine = (content: string): string => {
+      const len = visibleWidth(content);
+      return ` ${content}${" ".repeat(Math.max(0, innerWidth - len))} `;
+    };
+
+    // Top border with title
+    const title = " Plans ";
+    const titleLen = title.length;
+    const borderLen = Math.max(0, width - titleLen);
+    const leftBorder = Math.floor(borderLen / 2);
+    const rightBorder = borderLen - leftBorder;
     lines.push(
-      box.padLine(
-        box.topWithTitle("Plans", (s: string) =>
-          this.theme.fg("accent", this.theme.bold(s)),
-        ),
-      ),
+      border("─".repeat(leftBorder)) +
+        accent(bold(title)) +
+        border("─".repeat(rightBorder)),
     );
 
     lines.push(
-      box.padLine(
-        box.row(
+      padLine(bold(truncateToWidth(this.options.title, innerWidth, ""))),
+    );
+
+    lines.push(
+      padLine(
+        dim(
           truncateToWidth(
-            this.theme.bold(this.options.title),
-            box.innerWidth,
+            `Sort: ${formatSortMode(this.sortMode)}  Filter: ${formatFilterMode(this.filterMode)}  Group: ${this.groupByStatus ? "on" : "off"}`,
+            innerWidth,
             "",
           ),
         ),
       ),
     );
 
-    lines.push(
-      box.padLine(
-        box.row(
-          truncateToWidth(
-            this.theme.fg(
-              "dim",
-              `Sort: ${formatSortMode(this.sortMode)}  Filter: ${formatFilterMode(this.filterMode)}  Group: ${this.groupByStatus ? "on" : "off"}`,
-            ),
-            box.innerWidth,
-            "",
-          ),
-        ),
-      ),
-    );
-
-    lines.push(box.padLine(box.divider()));
+    lines.push(border("─".repeat(width)));
 
     const visibleCount = this.visibleLines();
     const sliceStart = Math.min(
@@ -239,24 +236,16 @@ class PlanSelector implements Component {
     let renderedCount = 0;
 
     if (this.flatItems.length === 0) {
-      lines.push(
-        box.padLine(
-          box.row(this.theme.fg("dim", "No plans match the current filter")),
-        ),
-      );
+      lines.push(padLine(dim("No plans match the current filter")));
       renderedCount = 1;
     } else {
       for (const item of visibleItems) {
         if (item.type === "group") {
-          lines.push(
-            box.padLine(box.row(this.renderGroupLine(item, box.innerWidth))),
-          );
+          lines.push(padLine(this.renderGroupLine(item, innerWidth)));
         } else {
           const isSelected = this.isSelected(item.node);
           lines.push(
-            box.padLine(
-              box.row(this.renderPlanLine(item, box.innerWidth, isSelected)),
-            ),
+            padLine(this.renderPlanLine(item, innerWidth, isSelected)),
           );
         }
         renderedCount += 1;
@@ -264,25 +253,24 @@ class PlanSelector implements Component {
     }
 
     for (let i = renderedCount; i < visibleCount; i++) {
-      lines.push(box.padLine(box.empty()));
+      lines.push(padLine(""));
     }
 
-    lines.push(box.padLine(box.divider()));
+    lines.push(border("─".repeat(width)));
     lines.push(
-      box.padLine(
-        box.row(
+      padLine(
+        dim(
           truncateToWidth(
-            this.theme.fg(
-              "dim",
-              "↑/↓ move  ←/→ page  Enter select  Esc cancel  Ctrl+O filter  Ctrl+U sort  Ctrl+T group  Ctrl+D reset",
-            ),
-            box.innerWidth,
+            "↑/↓ move  ←/→ page  Enter select  Esc cancel  Ctrl+O filter  Ctrl+U sort  Ctrl+T group  Ctrl+D reset",
+            innerWidth,
             "",
           ),
         ),
       ),
     );
-    lines.push(box.padLine(box.bottom()));
+
+    // Bottom border
+    lines.push(border("─".repeat(width)));
 
     return lines;
   }
@@ -338,9 +326,8 @@ class PlanSelector implements Component {
   }
 
   private visibleLines(): number {
-    const rows = process.stdout.rows ?? 24;
-    const available = rows - 12;
-    return Math.max(3, Math.min(10, available));
+    // Cap at 10 visible lines to keep UI compact
+    return 10;
   }
 
   private moveSelection(delta: number): void {
@@ -434,29 +421,6 @@ class PlanSelector implements Component {
     this.closed = true;
     this.done(result);
   }
-}
-
-function buildOverlayOptions() {
-  const termWidth = process.stdout.columns ?? 120;
-  const termHeight = process.stdout.rows ?? 40;
-  const isNarrow = termWidth < 90 || termHeight < 20;
-
-  if (isNarrow) {
-    return {
-      anchor: "top-center" as const,
-      width: "100%" as const,
-      maxHeight: "100%" as const,
-      margin: 0,
-    };
-  }
-
-  return {
-    anchor: "top-center" as const,
-    width: "90%" as const,
-    minWidth: 70,
-    maxHeight: "80%" as const,
-    margin: { top: 1, left: 2, right: 2, bottom: 1 },
-  };
 }
 
 function buildPlanForest(plans: PlanInfo[]): PlanTreeNode[] {

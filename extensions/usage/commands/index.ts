@@ -1,8 +1,8 @@
-import { CenteredLoader, createBoxRenderer } from "@aliou/tui-utils";
-import type {
-  AuthStorage,
-  ExtensionAPI,
-  Theme,
+import {
+  type AuthStorage,
+  BorderedLoader,
+  type ExtensionAPI,
+  type Theme,
 } from "@mariozechner/pi-coding-agent";
 import {
   type Component,
@@ -99,6 +99,7 @@ type AnsiTheme = {
   yellow: (s: string) => string;
   red: (s: string) => string;
   cyan: (s: string) => string;
+  border: (s: string) => string;
 };
 
 type Rgb = { r: number; g: number; b: number };
@@ -213,6 +214,7 @@ function createAnsiTheme(theme: Theme): AnsiTheme {
     yellow: color(colors.yellow),
     red: color(colors.red),
     cyan: color(colors.cyan),
+    border: (s: string) => theme.fg("dim", s),
   };
 }
 
@@ -419,41 +421,46 @@ class UsageComponent implements Component {
   }
 
   render(width: number): string[] {
-    const FIXED_HEIGHT = 24;
-    const HEADER_LINES = 4;
-    const FOOTER_LINES = 3;
-
-    const box = createBoxRenderer(width, this.colors.dim, {
-      leadingSpace: true,
-      trailingSpace: true,
-    });
+    const colors = this.colors;
     const lines: string[] = [];
+    const innerWidth = width - 2; // 1 char padding each side
 
-    // Title
+    // Helper to pad line
+    const padLine = (content: string): string => {
+      const len = visibleWidth(content);
+      return ` ${content}${" ".repeat(Math.max(0, innerWidth - len))} `;
+    };
+
+    // Top border with title
+    const title = " Usage ";
+    const titleLen = title.length;
+    const borderLen = Math.max(0, width - titleLen);
+    const leftBorder = Math.floor(borderLen / 2);
+    const rightBorder = borderLen - leftBorder;
     lines.push(
-      box.padLine(
-        box.topWithTitle("Usage", (s: string) =>
-          this.colors.accent(this.colors.bold(s)),
-        ),
-      ),
+      colors.border("─".repeat(leftBorder)) +
+        colors.accent(colors.bold(title)) +
+        colors.border("─".repeat(rightBorder)),
     );
 
-    lines.push(box.padLine(box.empty()));
-    lines.push(box.padLine(box.row(this.renderTabs())));
-    lines.push(box.padLine(box.empty()));
+    lines.push(padLine(""));
+    lines.push(padLine(this.renderTabs()));
+    lines.push(padLine(""));
 
     const contentLines =
       this.activeTab === "session"
-        ? this.renderSessionTab(box.innerWidth)
-        : this.renderStatsTab(
-            this.getStatsForTab(this.activeTab),
-            box.innerWidth,
-          );
+        ? this.renderSessionTab(innerWidth)
+        : this.renderStatsTab(this.getStatsForTab(this.activeTab), innerWidth);
 
+    // Fixed height to keep UI compact (matches original overlay size)
+    const FIXED_HEIGHT = 24;
+    const headerLines = 4; // title + empty + tabs + empty
+    const footerLines = 2; // divider + footer
     const availableLines = Math.max(
-      0,
-      FIXED_HEIGHT - HEADER_LINES - FOOTER_LINES,
+      3,
+      FIXED_HEIGHT - headerLines - footerLines,
     );
+
     this.lastContentLines = contentLines.length;
     this.lastAvailableLines = availableLines;
     const maxOffset = Math.max(0, contentLines.length - availableLines);
@@ -465,21 +472,21 @@ class UsageComponent implements Component {
     );
 
     for (const line of visibleLines) {
-      lines.push(box.padLine(box.row(line)));
+      lines.push(padLine(line));
     }
 
     let renderedLines = visibleLines.length;
     while (renderedLines < availableLines) {
-      lines.push(box.padLine(box.empty()));
+      lines.push(padLine(""));
       renderedLines++;
     }
 
     const canScroll = contentLines.length > availableLines;
-    lines.push(box.padLine(box.empty()));
-    lines.push(
-      box.padLine(box.row(this.renderFooter(box.innerWidth, canScroll))),
-    );
-    lines.push(box.padLine(box.bottom()));
+    lines.push(colors.border("─".repeat(width)));
+    lines.push(padLine(this.renderFooter(innerWidth, canScroll)));
+
+    // Bottom border
+    lines.push(colors.border("─".repeat(width)));
 
     return lines;
   }
@@ -770,8 +777,9 @@ class UsageComponent implements Component {
 }
 
 class UsageContainer implements Component {
-  private loader: CenteredLoader;
+  private loader: BorderedLoader;
   private component: UsageComponent | null = null;
+  private colors: AnsiTheme;
 
   constructor(
     tui: TUI,
@@ -779,29 +787,25 @@ class UsageContainer implements Component {
     dataLoader: (signal: AbortSignal) => Promise<UsageData>,
     done: () => void,
   ) {
-    const colors = createAnsiTheme(theme);
-    this.loader = new CenteredLoader(tui, theme, "Loading usage...", {
-      boxWidth: 44,
-    });
+    this.colors = createAnsiTheme(theme);
+    this.loader = new BorderedLoader(tui, theme, "Loading usage...");
     this.loader.onAbort = () => done();
-    this.loader.start();
 
     dataLoader(this.loader.signal)
       .then((data) => {
-        if (this.loader.aborted) return;
+        if (this.loader.signal.aborted) return;
         this.component = new UsageComponent(
-          colors,
+          this.colors,
           data,
           () => tui.requestRender(),
           done,
         );
-        this.loader.stop();
         tui.requestRender();
       })
       .catch(() => {
-        if (this.loader.aborted) return;
+        if (this.loader.signal.aborted) return;
         this.component = new UsageComponent(
-          colors,
+          this.colors,
           {
             rateLimits: [],
             stats: {
@@ -813,7 +817,6 @@ class UsageContainer implements Component {
           () => tui.requestRender(),
           done,
         );
-        this.loader.stop();
         tui.requestRender();
       });
   }
@@ -874,17 +877,14 @@ export function setupUsageCommands(pi: ExtensionAPI): void {
       }
 
       const authStorage = cmdCtx.modelRegistry.authStorage;
-      await cmdCtx.ui.custom(
-        (tui, theme, _kb, done) => {
-          return new UsageContainer(
-            tui,
-            theme,
-            (signal) => loadUsageData(signal, authStorage),
-            () => done(undefined),
-          );
-        },
-        { overlay: true },
-      );
+      await cmdCtx.ui.custom((tui, theme, _kb, done) => {
+        return new UsageContainer(
+          tui,
+          theme,
+          (signal) => loadUsageData(signal, authStorage),
+          () => done(undefined),
+        );
+      });
     },
   });
 }

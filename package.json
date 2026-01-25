@@ -11,7 +11,6 @@
     "release": "pnpm changeset publish"
   },
   "dependencies": {
-    "@aliou/tui-utils": "workspace:*",
     "better-sqlite3": "^12.6.2"
   },
   "devDependencies": {

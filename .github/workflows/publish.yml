@@ -38,9 +38,6 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Build processes dist
-        run: pnpm --filter @aliou/pi-processes build
-
       - name: Get release info
         id: release-info
         run: |
