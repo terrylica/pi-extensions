@@ -9,7 +9,6 @@ Custom extensions for [Pi](https://github.com/mariozechner/pi-coding-agent), a c
 
 | Extension | Description | Requirements |
 |-----------|-------------|--------------|
-| [debug](extensions/debug/README.md) | Debugging utilities (session path clipboard) | - |
 | [meta](extensions/meta/README.md) | Pi introspection tools (version, docs, changelog) | - |
 | [mac-app](extensions/mac-app/README.md) | macOS UI automation via Accessibility | AXorcist CLI, Accessibility permissions |
 | [neovim](extensions/neovim/README.md) | Bidirectional Neovim integration (editor context, file reload, LSP diagnostics) | - |
@@ -21,6 +20,7 @@ Custom extensions for [Pi](https://github.com/mariozechner/pi-coding-agent), a c
 | [presenter](extensions/presenter/README.md) | Terminal notifications, title updates, sounds | macOS (for sounds) |
 | [specialized-subagents](extensions/specialized-subagents/README.md) | Framework for spawning specialized subagents | [External services](extensions/specialized-subagents/README.md#requirements) |
 | [guardrails](extensions/guardrails/README.md) | Security hooks (brew block, env protection, dangerous command gate) | - |
+| [session-management](extensions/session-management/README.md) | Session management utilities (copy path) | - |
 
 ## Development
 
