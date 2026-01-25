@@ -5,7 +5,10 @@
   "scripts": {
     "lint": "biome check .",
     "format": "biome check --write .",
-    "typecheck": "tsc --build"
+    "typecheck": "tsc --build",
+    "changeset": "changeset",
+    "version": "changeset version",
+    "release": "pnpm changeset publish"
   },
   "dependencies": {
     "@aliou/tui-utils": "workspace:*",
@@ -13,6 +16,7 @@
   },
   "devDependencies": {
     "@biomejs/biome": "^2.0.0",
+    "@changesets/cli": "^2.27.11",
     "@mariozechner/pi-agent-core": "0.49.2",
     "@mariozechner/pi-ai": "0.49.2",
     "@mariozechner/pi-coding-agent": "0.49.2",
@@ -20,6 +24,7 @@
     "@sinclair/typebox": "^0.34.41",
     "@types/better-sqlite3": "^7.6.13",
     "@types/node": "^22.0.0",
+    "tsx": "^4.20.5",
     "typescript": "^5.7.0"
   },
   "pnpm": {
