@@ -32,6 +32,12 @@ Some extensions are published individually to npm:
 pi install npm:@aliou/pi-processes
 ```
 
+## Themes
+
+### [jellybeans](themes/jellybeans/)
+
+Jellybeans mono theme variants.
+
 ## UX
 
 Extensions that improve the interaction experience.
