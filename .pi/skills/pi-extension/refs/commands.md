@@ -2,6 +2,15 @@
 
 Interactive TUI commands that users invoke with `/commandname`.
 
+## Directory Structure
+
+```
+commands/
+├── index.ts       # Hub: exports registerCommands function
+├── foo.ts         # Individual command
+└── bar.ts         # Individual command
+```
+
 ## Naming Convention
 
 When an extension has multiple commands, use the format `<extension>:<action>`:
@@ -17,16 +26,53 @@ Use a short prefix (e.g., `plan` instead of `planning`) for brevity. Keep action
 
 For extensions with a single command, use just the extension name: `/myextension`.
 
-## Registration
+## Command Hub
+
+```typescript
+// extensions/<name>/commands/index.ts
+import type { ExtensionAPI } from "@mariozechner/pi-coding-agent";
+import { registerFooCommand } from "./foo";
+import { registerBarCommand } from "./bar";
+
+export function registerCommands(pi: ExtensionAPI) {
+  registerFooCommand(pi);
+  registerBarCommand(pi);
+}
+```
+
+## Individual Command
 
 Register commands immediately in the setup function, not inside event handlers. Check for UI availability inside the handler.
 
 ```typescript
-// extensions/<name>/commands/index.ts
-import type { ExtensionAPI, Theme } from "@mariozechner/pi-coding-agent";
+// extensions/<name>/commands/foo.ts
+import type { ExtensionAPI } from "@mariozechner/pi-coding-agent";
+import { FooComponent } from "../components/foo-component";
+
+export function registerFooCommand(pi: ExtensionAPI) {
+  pi.registerCommand("xxx:foo", {
+    description: "Description for /xxx:foo",
+    handler: async (_args, ctx) => {
+      if (!ctx.hasUI) return;
+
+      await ctx.ui.custom((tui, theme, _keybindings, done) => {
+        return new FooComponent(tui, theme, () => done(undefined));
+      });
+    },
+  });
+}
+```
+
+## Component Extraction
+
+Extract TUI components to `components/` directory for reusability and clarity:
+
+```typescript
+// extensions/<name>/components/foo-component.ts
+import type { Theme } from "@mariozechner/pi-coding-agent";
 import { type Component, matchesKey } from "@mariozechner/pi-tui";
 
-class MyComponent implements Component {
+export class FooComponent implements Component {
   constructor(
     private tui: { requestRender: () => void },
     private theme: Theme,
@@ -46,19 +92,6 @@ class MyComponent implements Component {
   render(width: number): string[] {
     return ["Line 1", "Line 2"];
   }
-}
-
-export function setupXxxCommands(pi: ExtensionAPI) {
-  pi.registerCommand("xxx:action", {
-    description: "Description for /xxx:action",
-    handler: async (_args, ctx) => {
-      if (!ctx.hasUI) return; // Check UI availability in handler
-
-      await ctx.ui.custom((tui, theme, _keybindings, done) => {
-        return new MyComponent(tui, theme, () => done(undefined));
-      });
-    },
-  });
 }
 ```
 

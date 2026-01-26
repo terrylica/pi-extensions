@@ -16,7 +16,8 @@ extensions/<name>/
 │   ├── index.ts       # Hub: exports setup function
 │   └── <hook>.ts      # Individual hooks
 ├── commands/          # Optional
-│   └── index.ts       # Interactive TUI commands
+│   ├── index.ts       # Hub: exports register function
+│   └── <command>.ts   # Individual command definitions
 ├── constants.ts       # Optional: shared constants
 ├── manager.ts         # Optional: state management class
 └── utils.ts           # Optional: shared utilities
@@ -29,14 +30,14 @@ extensions/<name>/
 import type { ExtensionAPI } from "@mariozechner/pi-coding-agent";
 import { setupXxxTools } from "./tools";
 import { setupXxxHooks } from "./hooks";      // if hooks exist
-import { setupXxxCommands } from "./commands"; // if commands exist
+import { registerCommands } from "./commands"; // if commands exist
 
 export default function (pi: ExtensionAPI) {
   // If tools share state, create manager and pass to all
   const manager = new SomeManager(); // optional
 
   setupXxxTools(pi, manager);
-  setupXxxCommands(pi, manager);   // optional
+  registerCommands(pi, manager);   // optional
   setupXxxHooks(pi, manager);      // optional
 }
 ```
@@ -52,6 +53,20 @@ import { setupBarTool } from "./bar-tool";
 export function setupXxxTools(pi: ExtensionAPI) {
   setupFooTool(pi);
   setupBarTool(pi);
+}
+```
+
+## Command Hub
+
+```typescript
+// extensions/<name>/commands/index.ts
+import type { ExtensionAPI } from "@mariozechner/pi-coding-agent";
+import { registerFooCommand } from "./foo";
+import { registerBarCommand } from "./bar";
+
+export function registerCommands(pi: ExtensionAPI) {
+  registerFooCommand(pi);
+  registerBarCommand(pi);
 }
 ```
 
