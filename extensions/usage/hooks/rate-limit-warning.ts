@@ -16,6 +16,7 @@ const MIN_PACE_PERCENT = 5;
 const END_WINDOW_SUPPRESS_THRESHOLD = 90;
 
 type ProviderKey = "anthropic" | "openai-codex";
+type ClaudeModelFamily = "opus" | "sonnet" | null;
 
 /**
  * Tracks which windows have already shown warnings this session.
@@ -49,6 +50,73 @@ function inferWindowSeconds(label: string): number | null {
   const dayMatch = lower.match(/(\d+)\s*d/);
   if (dayMatch?.[1]) return Number(dayMatch[1]) * 24 * 60 * 60;
   return null;
+}
+
+/**
+ * Filters Claude rate limit windows based on the current model family.
+ * Always shows: 5-hour window + weekly window.
+ * For Sonnet: uses Sonnet-specific weekly window.
+ * For other models: uses generic weekly window.
+ */
+function filterClaudeWindows(
+  windows: RateLimitWindow[],
+  modelFamily: ClaudeModelFamily,
+): RateLimitWindow[] {
+  // For non-Claude models or unknown family, return all windows
+  if (!modelFamily) return windows;
+
+  let fiveHourWindow: RateLimitWindow | null = null;
+  let sonnetWeekWindow: RateLimitWindow | null = null;
+  let genericWeekWindow: RateLimitWindow | null = null;
+
+  for (const window of windows) {
+    const label = window.label.toLowerCase();
+    const windowSeconds =
+      window.windowSeconds ?? inferWindowSeconds(window.label);
+
+    const isFiveHour =
+      (windowSeconds !== null &&
+        windowSeconds > 0 &&
+        windowSeconds <= 6 * 60 * 60) ||
+      label.includes("5-hour") ||
+      label.includes("5h");
+    const isWeekly =
+      (windowSeconds !== null && windowSeconds >= 6 * 24 * 60 * 60) ||
+      label.includes("7-day") ||
+      label.includes("week") ||
+      label.includes("weekly");
+
+    if (isFiveHour) {
+      fiveHourWindow = window;
+      continue;
+    }
+
+    if (label.includes("sonnet") && isWeekly) {
+      sonnetWeekWindow = window;
+      continue;
+    }
+
+    if (
+      (label.includes("all models") || label === "7-day window") &&
+      isWeekly
+    ) {
+      genericWeekWindow = window;
+    }
+  }
+
+  const filtered: RateLimitWindow[] = [];
+
+  // Always show 5-hour window
+  if (fiveHourWindow) filtered.push(fiveHourWindow);
+
+  // Sonnet uses Sonnet-specific weekly, others use generic
+  if (modelFamily === "sonnet" && sonnetWeekWindow) {
+    filtered.push(sonnetWeekWindow);
+  } else if (genericWeekWindow) {
+    filtered.push(genericWeekWindow);
+  }
+
+  return filtered;
 }
 
 function getPacePercent(window: RateLimitWindow): number | null {
@@ -94,6 +162,20 @@ function getProviderKey(model: Model<any> | undefined): ProviderKey | null {
 }
 
 /**
+ * Detects the Claude model family (opus/sonnet) from the model ID.
+ */
+function getClaudeModelFamily(
+  // biome-ignore lint/suspicious/noExplicitAny: Model type requires any for generic API
+  model: Model<any> | undefined,
+): ClaudeModelFamily {
+  if (!model) return null;
+  const modelId = model.id.toLowerCase();
+  if (modelId.includes("opus")) return "opus";
+  if (modelId.includes("sonnet")) return "sonnet";
+  return null;
+}
+
+/**
  * Fetches rate limits for a specific provider.
  */
 async function fetchProviderRateLimits(
@@ -116,10 +198,19 @@ async function fetchProviderRateLimits(
  */
 function findNewHighUsageWindows(
   limits: ProviderRateLimits,
+  providerKey: ProviderKey,
+  modelFamily: ClaudeModelFamily,
   skipAlreadyWarned: boolean,
 ): WindowProjection[] {
   if (limits.error || !limits.windows.length) return [];
-  return limits.windows.flatMap((window) => {
+
+  // Filter Claude windows based on model family
+  const windows =
+    providerKey === "anthropic"
+      ? filterClaudeWindows(limits.windows, modelFamily)
+      : limits.windows;
+
+  return windows.flatMap((window) => {
     const pacePercent = getPacePercent(window);
     const projectedPercent = getProjectedPercent(
       window.usedPercent,
@@ -197,7 +288,13 @@ async function checkAndWarnRateLimits(
     // Verify model hasn't changed during the async check
     if (ctx.model !== model) return;
 
-    const highUsageWindows = findNewHighUsageWindows(limits, skipAlreadyWarned);
+    const modelFamily = getClaudeModelFamily(model);
+    const highUsageWindows = findNewHighUsageWindows(
+      limits,
+      providerKey,
+      modelFamily,
+      skipAlreadyWarned,
+    );
     if (highUsageWindows.length === 0) return;
 
     // Mark these windows as warned before showing notification
