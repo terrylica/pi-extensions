@@ -1,0 +1,100 @@
+import type { ExtensionAPI } from "@mariozechner/pi-coding-agent";
+
+export function registerOcProvider(pi: ExtensionAPI): void {
+  pi.registerProvider("oc", {
+    baseUrl: "https://opencode.ai/zen/v1",
+    apiKey: "OPENCODE_API_KEY",
+    models: [
+      {
+        id: "gpt-5.2",
+        name: "GPT-5.2",
+        api: "openai-responses",
+        reasoning: true,
+        input: ["text", "image"],
+        cost: {
+          input: 1.75,
+          output: 14,
+          cacheRead: 0.175,
+          cacheWrite: 0,
+        },
+        contextWindow: 400000,
+        maxTokens: 128000,
+      },
+      {
+        id: "gpt-5.2-codex",
+        name: "GPT-5.2 Codex",
+        api: "openai-responses",
+        reasoning: true,
+        input: ["text", "image"],
+        cost: {
+          input: 1.75,
+          output: 14,
+          cacheRead: 0.175,
+          cacheWrite: 0,
+        },
+        contextWindow: 400000,
+        maxTokens: 128000,
+      },
+      {
+        id: "gemini-3-pro",
+        name: "Gemini 3 Pro",
+        api: "google-generative-ai",
+        reasoning: true,
+        input: ["text", "image"],
+        cost: {
+          input: 2,
+          output: 12,
+          cacheRead: 0.2,
+          cacheWrite: 0,
+        },
+        contextWindow: 1048576,
+        maxTokens: 65536,
+      },
+      {
+        id: "gemini-3-flash",
+        name: "Gemini 3 Flash",
+        api: "google-generative-ai",
+        reasoning: true,
+        input: ["text", "image"],
+        cost: {
+          input: 0.5,
+          output: 3,
+          cacheRead: 0.05,
+          cacheWrite: 0,
+        },
+        contextWindow: 1048576,
+        maxTokens: 65536,
+      },
+      {
+        id: "glm-4.7",
+        name: "GLM-4.7",
+        api: "openai-completions",
+        reasoning: true,
+        input: ["text"],
+        cost: {
+          input: 0.6,
+          output: 2.2,
+          cacheRead: 0.1,
+          cacheWrite: 0,
+        },
+        contextWindow: 204800,
+        maxTokens: 131072,
+      },
+      {
+        id: "kimi-k2.5",
+        name: "Kimi K2.5",
+        api: "openai-completions",
+        reasoning: true,
+        input: ["text", "image"],
+        cost: {
+          input: 0.6,
+          output: 3,
+          cacheRead: 0.1,
+          cacheWrite: 0,
+        },
+        contextWindow: 262144,
+        maxTokens: 262144,
+      },
+    ],
+  });
+}

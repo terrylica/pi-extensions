@@ -46,6 +46,7 @@ function getProviderKey(model: Model<any> | undefined): ProviderKey | null {
   if (provider === "anthropic") return "anthropic";
   if (provider === "openai-codex") return "openai-codex";
   if (provider === "opencode") return "opencode";
+  if (provider === "oc" || provider === "oc/ant") return "opencode";
   if (provider === "openrouter-google") return "openrouter-google";
   if (provider === "openrouter-moonshot") return "openrouter-moonshot";
   return null;
