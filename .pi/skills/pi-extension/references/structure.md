@@ -4,6 +4,7 @@
 
 ```
 extensions/<name>/
+├── package.json       # Package configuration (pi key for extension entry point)
 ├── index.ts           # Entry point - exports default function(pi: ExtensionAPI)
 ├── README.md          # Documentation
 ├── tools/
@@ -26,6 +27,29 @@ extensions/<name>/
 │   └── <util>.ts      # Utility functions
 └── manager.ts         # Optional: state management class
 ```
+
+## Package Configuration
+
+Every extension needs a `package.json` with the `pi` key declaring the extension entry point:
+
+```json
+// extensions/<name>/package.json
+{
+  "name": "@aliou/pi-<name>",
+  "type": "module",
+  "private": true,
+  "keywords": ["pi-package", "pi-extension"],
+  "pi": {
+    "extensions": ["./index.ts"]
+  }
+}
+```
+
+- **name**: Scoped under `@aliou/` for this repository
+- **type**: `"module"` for ES modules (required for TypeScript extensions)
+- **private**: Set to `true` for unpublished extensions; set to `false` when publishing to npm
+- **keywords**: Include `"pi-package"` for discoverability on npm
+- **pi.extensions**: Array of entry point files (usually just `./index.ts`)
 
 ## Entry Point
 
@@ -77,11 +101,12 @@ export function registerCommands(pi: ExtensionAPI) {
 ## Workflow
 
 1. Create directory: `extensions/<name>/`
-2. Create `index.ts` entry point
-3. Create `tools/index.ts` hub
-4. Create individual tool files in `tools/`
-5. Add hooks in `hooks/` if needed
-6. Add commands in `commands/` if needed
-7. Create `README.md`
-8. Update root `README.md`
-9. Run `pnpm typecheck`
+2. Create `package.json` with `pi` key
+3. Create `index.ts` entry point
+4. Create `tools/index.ts` hub
+5. Create individual tool files in `tools/`
+6. Add hooks in `hooks/` if needed
+7. Add commands in `commands/` if needed
+8. Create `README.md`
+9. Update root `README.md`
+10. Run `pnpm typecheck`
