@@ -1,8 +1,8 @@
 /**
  * Scout subagent - web research and URL fetching.
  *
- * Takes a URL and/or query, optionally with a prompt, and returns
- * either raw content or a detailed answer based on fetched information.
+ * Takes a URL and/or query with a prompt, and returns a detailed
+ * answer based on fetched information.
  */
 
 import type {
@@ -55,16 +55,18 @@ Use scout for web research and GitHub codebase exploration. It can fetch URLs, s
 - \`url\`: Specific URL to fetch
 - \`query\`: Search query for web or GitHub research
 - \`repo\`: GitHub repository to focus on (owner/repo format)
-- \`prompt\`: Question to answer based on fetched content (omit for raw content)
+- \`prompt\`: Question to answer based on fetched content
 
 At least one of url, query, or repo is required.
 
+**Note:** Scout always provides LLM-analyzed responses. For raw markdown content without analysis, use the \`web_fetch\` tool instead.
+
 **Examples:**
-- Fetch a URL: \`{ url: "https://example.com/docs" }\`
-- Web search: \`{ query: "typescript best practices 2025" }\`
+- Fetch a URL: \`{ url: "https://example.com/docs", prompt: "What is the API rate limit?" }\`
+- Web search: \`{ query: "typescript best practices 2025", prompt: "Summarize the top 3 practices" }\`
 - Explore repo: \`{ repo: "facebook/react", prompt: "how is useState implemented?" }\`
-- GitHub search: \`{ query: "useState implementation", repo: "facebook/react" }\`
-- Issue/PR: \`{ url: "https://github.com/owner/repo/issues/123" }\`
+- GitHub search: \`{ query: "useState implementation", repo: "facebook/react", prompt: "explain the implementation" }\`
+- Issue/PR: \`{ url: "https://github.com/owner/repo/issues/123", prompt: "what is the current status?" }\`
 
 **Repository mappings:**
 Some npm packages are published under a different owner than the actual GitHub repository:
@@ -96,12 +98,9 @@ const parameters = Type.Object({
       description: "GitHub repository to focus on (owner/repo format)",
     }),
   ),
-  prompt: Type.Optional(
-    Type.String({
-      description:
-        "What to analyze or answer based on the fetched content. If not provided, returns raw content.",
-    }),
-  ),
+  prompt: Type.String({
+    description: "What to analyze or answer based on the fetched content.",
+  }),
   skills: Type.Optional(
     Type.Array(Type.String(), {
       description:
@@ -126,13 +125,7 @@ function buildUserMessage(input: ScoutInput): string {
     parts.push(`GitHub repository to explore: ${input.repo}`);
   }
 
-  if (input.prompt) {
-    parts.push(`\nQuestion/Task: ${input.prompt}`);
-  } else {
-    parts.push(
-      "\nReturn the fetched content as markdown. Do not add any analysis.",
-    );
-  }
+  parts.push(`\nQuestion/Task: ${input.prompt}`);
 
   return parts.join("\n");
 }
@@ -151,14 +144,14 @@ Inputs (at least one of url, query, or repo required):
 - url: Specific URL to fetch
 - query: Search query for web or GitHub research
 - repo: GitHub repository to focus on (owner/repo format)
-- prompt: Question to answer based on content (if omitted, returns raw content)
+- prompt: Question to answer based on content
 
 Use cases:
-- Fetch a URL: { url: "https://..." }
-- Web search: { query: "how to..." }
+- Fetch a URL: { url: "https://...", prompt: "What is the API rate limit?" }
+- Web search: { query: "how to...", prompt: "Summarize best practices" }
 - Explore repo: { repo: "facebook/react", prompt: "how is useState implemented?" }
-- GitHub search: { query: "useState", repo: "facebook/react" }
-- Fetch issue/PR: { url: "https://github.com/owner/repo/issues/123" }
+- GitHub search: { query: "useState", repo: "facebook/react", prompt: "explain implementation" }
+- Fetch issue/PR: { url: "https://github.com/owner/repo/issues/123", prompt: "what is the status?" }
 
 Pass relevant skills (e.g., 'ios-26', 'drizzle-orm') to provide specialized context for the task.`,
 

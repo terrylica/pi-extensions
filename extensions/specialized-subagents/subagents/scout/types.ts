@@ -13,7 +13,7 @@ export interface ScoutInput {
   /** GitHub repository to focus on (owner/repo format) */
   repo?: string;
   /** Question to answer based on fetched content */
-  prompt?: string;
+  prompt: string;
   /** Optional skill names to provide specialized context */
   skills?: string[];
 }

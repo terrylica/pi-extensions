@@ -35,7 +35,7 @@ Based on your input, decide what to do:
    - Use \`github_commits\` to understand code evolution
    - Use \`github_issue\` for issues and PRs
 
-4. **Prompt provided**: After gathering content, analyze it and provide a detailed answer
+4. **Answer the prompt**: After gathering content, analyze it and provide a detailed answer to the question
 
 ## Codebase Exploration Patterns
 
@@ -48,9 +48,9 @@ When exploring a codebase:
 
 ## Response Format
 
-- If no prompt: Return the fetched/searched content as-is (formatted markdown)
-- If prompt provided: Provide a clear, detailed answer based on the gathered content
+- Provide a clear, detailed answer based on the gathered content and the prompt
 - Link to source files with full GitHub URLs when referencing code
+- Format your response in markdown
 
 ## Important
 
