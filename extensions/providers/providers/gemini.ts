@@ -1,6 +1,6 @@
 import type { ExtensionAPI } from "@mariozechner/pi-coding-agent";
 
-export function registerGoogleProvider(pi: ExtensionAPI): void {
+export function registerGeminiProvider(pi: ExtensionAPI): void {
   pi.registerProvider("openrouter-google", {
     baseUrl: "https://openrouter.ai/api/v1",
     apiKey: "OPENROUTER_GOOGLE_API_KEY",

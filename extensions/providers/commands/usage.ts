@@ -11,7 +11,7 @@ import {
   visibleWidth,
 } from "@mariozechner/pi-tui";
 import { collectSessionStats } from "../collectors/session-stats";
-import { fetchAllProviderRateLimits } from "../providers";
+import { fetchAllProviderRateLimits } from "../rate-limits";
 import type {
   ProviderRateLimits,
   RateLimitWindow,
@@ -868,11 +868,11 @@ async function loadUsageData(
 }
 
 export function setupUsageCommand(pi: ExtensionAPI): void {
-  pi.registerCommand("usage", {
+  pi.registerCommand("providers:usage", {
     description: "Show usage statistics dashboard",
     handler: async (_args, cmdCtx) => {
       if (!cmdCtx.hasUI) {
-        cmdCtx.ui.notify("/usage requires interactive mode", "error");
+        cmdCtx.ui.notify("/providers:usage requires interactive mode", "error");
         return;
       }
 

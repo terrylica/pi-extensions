@@ -4,8 +4,8 @@ import type {
   ExtensionAPI,
   ExtensionContext,
 } from "@mariozechner/pi-coding-agent";
-import { fetchClaudeRateLimits } from "../providers/claude";
-import { fetchCodexRateLimits } from "../providers/codex";
+import { fetchClaudeRateLimits } from "../rate-limits/claude";
+import { fetchCodexRateLimits } from "../rate-limits/codex";
 import type { ProviderRateLimits, RateLimitWindow } from "../types";
 import { formatResetTime } from "../utils";
 

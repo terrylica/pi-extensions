@@ -1,8 +1,8 @@
 import type { ExtensionAPI } from "@mariozechner/pi-coding-agent";
-import { registerGoogleProvider } from "./google";
+import { registerGeminiProvider } from "./gemini";
 import { registerMoonshotProvider } from "./moonshot";
 
 export function registerAllProviders(pi: ExtensionAPI): void {
-  registerGoogleProvider(pi);
+  registerGeminiProvider(pi);
   registerMoonshotProvider(pi);
 }

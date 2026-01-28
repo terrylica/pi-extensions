@@ -11,7 +11,10 @@
   },
   "pi": {
     "extensions": [
-      "./extensions/*"
+      "./extensions/*/index.ts"
+    ],
+    "themes": [
+      "./themes"
     ]
   },
   "scripts": {

@@ -1,5 +1,5 @@
 {
-  "name": "@aliou/pi-custom-providers",
+  "name": "@aliou/pi-providers",
   "version": "0.1.0",
   "type": "module",
   "private": true,
@@ -7,9 +7,8 @@
     "pi-package",
     "pi-extension",
     "pi",
-    "openrouter",
     "providers",
-    "custom-models"
+    "usage"
   ],
   "repository": {
     "type": "git",
@@ -26,10 +25,15 @@
   "files": [
     "*.ts",
     "providers",
-    "usage",
+    "rate-limits",
+    "commands",
+    "hooks",
+    "collectors",
     "README.md"
   ],
   "peerDependencies": {
-    "@mariozechner/pi-coding-agent": "0.50.0"
+    "@mariozechner/pi-ai": "0.50.0",
+    "@mariozechner/pi-coding-agent": "0.50.0",
+    "@mariozechner/pi-tui": "0.50.0"
   }
 }

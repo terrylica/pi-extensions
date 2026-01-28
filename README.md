@@ -90,9 +90,9 @@ Session management utilities. Copy session path to clipboard. Future: summarizat
 
 Extensions that track session health and API usage.
 
-### [usage](extensions/usage/)
+### [providers](extensions/providers/)
 
-Usage dashboard. Shows rate limits, per-window usage with pace marker, projection-based warnings. Requires Anthropic and/or OpenAI auth.
+Providers and usage dashboard. Registers OpenRouter Gemini/Moonshot models, shows rate limits with pace markers, and exposes the `/usage` dashboard.
 
 ### [the-dumb-zone](extensions/the-dumb-zone/)
 

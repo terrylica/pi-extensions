@@ -6,20 +6,28 @@ import type {
   Theme,
 } from "@mariozechner/pi-coding-agent";
 import { type Component, truncateToWidth } from "@mariozechner/pi-tui";
-import { fetchClaudeRateLimits } from "../providers/claude";
-import { fetchCodexRateLimits } from "../providers/codex";
-import { fetchOpencodeRateLimits } from "../providers/opencode";
+import { fetchClaudeRateLimits } from "../rate-limits/claude";
+import { fetchCodexRateLimits } from "../rate-limits/codex";
+import { fetchOpencodeRateLimits } from "../rate-limits/opencode";
+import { fetchOpenRouterRateLimits } from "../rate-limits/openrouter";
 import type { ProviderRateLimits, RateLimitWindow } from "../types";
 
 const WIDGET_ID = "usage-bar";
 
-type ProviderKey = "anthropic" | "openai-codex" | "opencode";
+type ProviderKey =
+  | "anthropic"
+  | "openai-codex"
+  | "opencode"
+  | "openrouter-google"
+  | "openrouter-moonshot";
 type ClaudeModelFamily = "opus" | "sonnet" | null;
 
 const PROVIDER_DISPLAY_NAMES: Record<ProviderKey, string> = {
   anthropic: "Claude",
   "openai-codex": "Codex",
   opencode: "Opencode",
+  "openrouter-google": "OpenRouter Gemini",
+  "openrouter-moonshot": "OpenRouter Moonshot",
 };
 
 // State
@@ -38,6 +46,8 @@ function getProviderKey(model: Model<any> | undefined): ProviderKey | null {
   if (provider === "anthropic") return "anthropic";
   if (provider === "openai-codex") return "openai-codex";
   if (provider === "opencode") return "opencode";
+  if (provider === "openrouter-google") return "openrouter-google";
+  if (provider === "openrouter-moonshot") return "openrouter-moonshot";
   return null;
 }
 
@@ -137,6 +147,20 @@ async function fetchProviderRateLimits(
       return fetchCodexRateLimits(authStorage, signal);
     case "opencode":
       return fetchOpencodeRateLimits(signal);
+    case "openrouter-google":
+      return fetchOpenRouterRateLimits(
+        authStorage,
+        "openrouter-google",
+        "OpenRouter Gemini",
+        signal,
+      );
+    case "openrouter-moonshot":
+      return fetchOpenRouterRateLimits(
+        authStorage,
+        "openrouter-moonshot",
+        "OpenRouter Moonshot",
+        signal,
+      );
     default:
       return null;
   }
