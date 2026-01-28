@@ -13,14 +13,11 @@
 
 import type { ExtensionAPI } from "@mariozechner/pi-coding-agent";
 import { setupPlanningCommands } from "./commands";
-import { createAskUserTool } from "./tools/ask-user";
+import { setupPlanningHooks } from "./hooks";
+import { setupPlanningTools } from "./tools";
 
 export default function (pi: ExtensionAPI) {
   setupPlanningCommands(pi);
-  pi.registerTool(createAskUserTool(pi));
-
-  // Clear plan execution widget when switching sessions
-  pi.on("session_before_switch", async (_event, ctx) => {
-    ctx.ui.setWidget("plan-execution", undefined);
-  });
+  setupPlanningHooks(pi);
+  setupPlanningTools(pi);
 }
