@@ -22,7 +22,7 @@ Publish a single extension from this repo as `@aliou/pi-<name>` using changesets
   "name": "@aliou/pi-<name>",
   "version": "0.0.1",
   "type": "module",
-  "private": false,
+  "private": true,
   "keywords": ["pi-package", "pi-extension", "pi", "<name>"],
   "repository": {
     "type": "git",
