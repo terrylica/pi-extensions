@@ -11,10 +11,12 @@
   },
   "pi": {
     "extensions": [
-      "./extensions/*/index.ts"
+      "./extensions",
+      "extensions/*/index.ts"
     ],
     "themes": [
-      "./themes"
+      "./themes",
+      "!themes/**/package.json"
     ]
   },
   "scripts": {

@@ -13,14 +13,18 @@ Install all extensions from this repository:
 pi install git:github.com/aliou/pi-extensions
 ```
 
-To install selectively, edit your `settings.json`:
+To install selectively (or disable specific extensions), edit your `settings.json`:
 
 ```json
 {
   "packages": [
     {
       "source": "git:github.com/aliou/pi-extensions",
-      "extensions": ["extensions/processes", "extensions/defaults"]
+      "extensions": [
+        "extensions/processes/index.ts",
+        "extensions/defaults/index.ts",
+        "!extensions/the-dumb-zone/index.ts"
+      ]
     }
   ]
 }
@@ -116,10 +120,19 @@ Pi introspection tools. Query current version, read documentation, view changelo
 
 ## Development
 
-Uses pnpm workspaces. Nix environment available via `flake.nix`.
+Uses pnpm workspaces. Nix dev environment available via `flake.nix`.
 
 ```sh
+nix develop
 pnpm install
 pnpm typecheck
 pnpm lint
+```
+
+Or as one-liners:
+
+```sh
+nix develop -c pnpm install
+nix develop -c pnpm typecheck
+nix develop -c pnpm lint
 ```
