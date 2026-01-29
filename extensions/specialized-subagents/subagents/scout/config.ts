@@ -8,5 +8,5 @@ export type SearchProvider = "exa";
 /** Active search provider */
 export const SEARCH_PROVIDER: SearchProvider = "exa";
 
-/** Model ID for scout subagent */
-export const MODEL = "claude-haiku-4-5";
+/** Model ID for scout subagent (OpenRouter) */
+export const MODEL = "anthropic/claude-haiku-4.5";

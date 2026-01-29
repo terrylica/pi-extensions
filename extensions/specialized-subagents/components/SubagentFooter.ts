@@ -14,7 +14,6 @@ export interface SubagentFooterData {
   resolvedModel?: ResolvedModelRef;
   usage?: SubagentUsage;
   toolCalls?: SubagentToolCall[];
-  familyUnknown?: boolean;
 }
 
 /**
@@ -23,8 +22,8 @@ export interface SubagentFooterData {
  * Rendering rules:
  * - Always returns exactly one line.
  * - Never wraps (uses truncateToWidth()).
- * - Shows resolved provider/model, output tokens (if available), cost (if available),
- *   tool call counts (total + failed), and optional unknown-family warning marker.
+ * - Shows model ID, output tokens (if available), cost (if available),
+ *   and tool call counts (total + failed).
  */
 export class SubagentFooter implements Component {
   constructor(
@@ -40,7 +39,7 @@ export class SubagentFooter implements Component {
 
   render(width: number): string[] {
     const th = this.theme;
-    const { resolvedModel, usage, toolCalls, familyUnknown } = this.data;
+    const { resolvedModel, usage, toolCalls } = this.data;
 
     const parts: string[] = [];
 
@@ -66,11 +65,7 @@ export class SubagentFooter implements Component {
 
     parts.push(callsText);
 
-    const base = th.fg("muted", parts.join(" - "));
-
-    const line = familyUnknown
-      ? `${base}${th.fg("muted", " - ")}${th.fg("warning", "unknown-family")}`
-      : base;
+    const line = th.fg("muted", parts.join(" - "));
 
     return [truncateToWidth(line, width)];
   }

@@ -14,7 +14,7 @@ import { Container, Markdown, Spacer, Text } from "@mariozechner/pi-tui";
 import { Type } from "@sinclair/typebox";
 
 import { SubagentFooter } from "../../components";
-import { detectModelFamily, executeSubagent, resolveModel } from "../../lib";
+import { executeSubagent, resolveModel } from "../../lib";
 import type { SubagentToolCall } from "../../lib/types";
 import { getSpinnerFrame } from "../../lib/ui/spinner";
 import { MODEL } from "./config";
@@ -64,7 +64,6 @@ export function createJesterTool(): ToolDefinition<
     ): Promise<AgentToolResult<JesterDetails>> {
       const { question } = args;
 
-      const familyUnknown = detectModelFamily(MODEL) === "unknown";
       let resolvedModel: { provider: string; id: string } | undefined;
 
       const toolCalls: SubagentToolCall[] = [];
@@ -79,7 +78,6 @@ export function createJesterTool(): ToolDefinition<
             toolCalls,
             spinnerFrame,
             resolvedModel,
-            familyUnknown,
           },
         });
       }, 80);
@@ -96,7 +94,6 @@ export function createJesterTool(): ToolDefinition<
             toolCalls,
             spinnerFrame,
             resolvedModel,
-            familyUnknown,
           },
         });
 
@@ -128,7 +125,6 @@ export function createJesterTool(): ToolDefinition<
                 spinnerFrame,
                 response: accumulated,
                 resolvedModel,
-                familyUnknown,
               },
             });
           },
@@ -145,7 +141,6 @@ export function createJesterTool(): ToolDefinition<
               aborted: true,
               usage: result.usage,
               resolvedModel,
-              familyUnknown,
             },
           };
         }
@@ -162,7 +157,6 @@ export function createJesterTool(): ToolDefinition<
               error: result.error,
               usage: result.usage,
               resolvedModel,
-              familyUnknown,
             },
           };
         }
@@ -176,7 +170,6 @@ export function createJesterTool(): ToolDefinition<
             response: result.content,
             usage: result.usage,
             resolvedModel,
-            familyUnknown,
           },
         };
       } catch (err) {
@@ -195,7 +188,6 @@ export function createJesterTool(): ToolDefinition<
             spinnerFrame,
             error,
             resolvedModel,
-            familyUnknown,
           },
         };
       } finally {
@@ -244,7 +236,6 @@ export function createJesterTool(): ToolDefinition<
         usage,
         toolCalls,
         resolvedModel,
-        familyUnknown,
         spinnerFrame,
       } = details;
 
@@ -252,7 +243,6 @@ export function createJesterTool(): ToolDefinition<
         resolvedModel,
         usage,
         toolCalls,
-        familyUnknown,
       });
 
       if (aborted) {

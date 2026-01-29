@@ -39,7 +39,4 @@ export interface LookoutDetails {
 
   /** Resolved model used for this run (provider + model id) */
   resolvedModel?: { provider: string; id: string };
-
-  /** Whether model family detection was "unknown" (default provider fallback ordering used) */
-  familyUnknown?: boolean;
 }

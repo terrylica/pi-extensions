@@ -21,12 +21,7 @@ import {
 import { Container, Markdown, Spacer, Text } from "@mariozechner/pi-tui";
 import { Type } from "@sinclair/typebox";
 import { SubagentFooter } from "../../components";
-import {
-  detectModelFamily,
-  executeSubagent,
-  resolveModel,
-  resolveSkillsByName,
-} from "../../lib";
+import { executeSubagent, resolveModel, resolveSkillsByName } from "../../lib";
 import type { SubagentToolCall } from "../../lib/types";
 import { getSpinnerFrame, INDICATOR } from "../../lib/ui/spinner";
 import { formatSubagentStats, pluralize } from "../../lib/ui/stats";
@@ -140,7 +135,6 @@ Pass relevant skills (e.g., 'ios-26', 'drizzle-orm') to provide specialized cont
       // Use custom cwd if provided, otherwise use context cwd
       const workingDir = customCwd ?? ctx.cwd;
 
-      const familyUnknown = detectModelFamily(MODEL) === "unknown";
       let resolvedModel: { provider: string; id: string } | undefined;
 
       let currentToolCalls: SubagentToolCall[] = [];
@@ -162,7 +156,6 @@ Pass relevant skills (e.g., 'ios-26', 'drizzle-orm') to provide specialized cont
               toolCalls: currentToolCalls,
               spinnerFrame,
               resolvedModel,
-              familyUnknown,
             },
           });
         }
@@ -184,7 +177,6 @@ Pass relevant skills (e.g., 'ios-26', 'drizzle-orm') to provide specialized cont
             toolCalls: currentToolCalls,
             spinnerFrame,
             resolvedModel,
-            familyUnknown,
           },
         });
 
@@ -228,7 +220,6 @@ Pass relevant skills (e.g., 'ios-26', 'drizzle-orm') to provide specialized cont
                 spinnerFrame,
                 response: accumulated,
                 resolvedModel,
-                familyUnknown,
               },
             });
           },
@@ -247,7 +238,6 @@ Pass relevant skills (e.g., 'ios-26', 'drizzle-orm') to provide specialized cont
                 toolCalls: currentToolCalls,
                 spinnerFrame,
                 resolvedModel,
-                familyUnknown,
               },
             });
           },
@@ -270,7 +260,6 @@ Pass relevant skills (e.g., 'ios-26', 'drizzle-orm') to provide specialized cont
               aborted: true,
               usage: result.usage,
               resolvedModel,
-              familyUnknown,
             },
           };
         }
@@ -291,7 +280,6 @@ Pass relevant skills (e.g., 'ios-26', 'drizzle-orm') to provide specialized cont
               error: result.error,
               usage: result.usage,
               resolvedModel,
-              familyUnknown,
             },
           };
         }
@@ -318,7 +306,6 @@ Pass relevant skills (e.g., 'ios-26', 'drizzle-orm') to provide specialized cont
               error,
               usage: result.usage,
               resolvedModel,
-              familyUnknown,
             },
           };
         }
@@ -336,7 +323,6 @@ Pass relevant skills (e.g., 'ios-26', 'drizzle-orm') to provide specialized cont
             response: result.content,
             usage: result.usage,
             resolvedModel,
-            familyUnknown,
           },
         };
       } finally {
@@ -410,7 +396,6 @@ Pass relevant skills (e.g., 'ios-26', 'drizzle-orm') to provide specialized cont
         error,
         usage,
         resolvedModel,
-        familyUnknown,
       } = details;
 
       // Counts
@@ -424,7 +409,6 @@ Pass relevant skills (e.g., 'ios-26', 'drizzle-orm') to provide specialized cont
         resolvedModel,
         usage,
         toolCalls,
-        familyUnknown,
       });
 
       // Aborted state

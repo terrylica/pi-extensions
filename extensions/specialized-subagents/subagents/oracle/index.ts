@@ -19,12 +19,7 @@ import { getMarkdownTheme, type Theme } from "@mariozechner/pi-coding-agent";
 import { Container, Markdown, Spacer, Text } from "@mariozechner/pi-tui";
 import { Type } from "@sinclair/typebox";
 import { SubagentFooter } from "../../components";
-import {
-  detectModelFamily,
-  executeSubagent,
-  resolveModel,
-  resolveSkillsByName,
-} from "../../lib";
+import { executeSubagent, resolveModel, resolveSkillsByName } from "../../lib";
 import { formatSubagentStats } from "../../lib/ui/stats";
 import { MODEL } from "./config";
 import { ORACLE_SYSTEM_PROMPT } from "./system-prompt";
@@ -155,7 +150,6 @@ Pass relevant skills (e.g., 'ios-26', 'drizzle-orm') to provide specialized cont
         notFoundSkills = result.notFound;
       }
 
-      const familyUnknown = detectModelFamily(MODEL) === "unknown";
       let resolvedModel: { provider: string; id: string } | undefined;
 
       let spinnerFrame = 0;
@@ -176,7 +170,6 @@ Pass relevant skills (e.g., 'ios-26', 'drizzle-orm') to provide specialized cont
             toolCalls: [],
             spinnerFrame,
             resolvedModel,
-            familyUnknown,
           },
         });
       }, 80);
@@ -199,7 +192,6 @@ Pass relevant skills (e.g., 'ios-26', 'drizzle-orm') to provide specialized cont
             toolCalls: [],
             spinnerFrame,
             resolvedModel,
-            familyUnknown,
           },
         });
 
@@ -247,7 +239,6 @@ Pass relevant skills (e.g., 'ios-26', 'drizzle-orm') to provide specialized cont
                 spinnerFrame,
                 response: accumulated,
                 resolvedModel,
-                familyUnknown,
               },
             });
           },
@@ -270,7 +261,6 @@ Pass relevant skills (e.g., 'ios-26', 'drizzle-orm') to provide specialized cont
               aborted: true,
               usage: result.usage,
               resolvedModel,
-              familyUnknown,
             },
           };
         }
@@ -295,7 +285,6 @@ Pass relevant skills (e.g., 'ios-26', 'drizzle-orm') to provide specialized cont
             response: result.content,
             usage: result.usage,
             resolvedModel,
-            familyUnknown,
           },
         };
       } finally {
@@ -370,21 +359,13 @@ Pass relevant skills (e.g., 'ios-26', 'drizzle-orm') to provide specialized cont
         return new Text("", 0, 0);
       }
 
-      const {
-        response,
-        aborted,
-        error,
-        usage,
-        toolCalls,
-        resolvedModel,
-        familyUnknown,
-      } = details;
+      const { response, aborted, error, usage, toolCalls, resolvedModel } =
+        details;
 
       const footer = new SubagentFooter(theme, {
         resolvedModel,
         usage,
         toolCalls,
-        familyUnknown,
       });
 
       // Aborted state
