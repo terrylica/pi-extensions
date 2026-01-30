@@ -29,6 +29,7 @@ For each extension in `./extensions/`:
 2. Read all tools, commands, and hooks
 3. Identify any API usage that needs updating based on changelog/docs
 4. Note any deprecated patterns or new recommended approaches
+5. Look for custom utility functions that duplicate functionality now available in the Pi SDK (e.g. clipboard helpers, file utilities). If the SDK provides an equivalent, flag it for replacement.
 
 ### 4. Analyze Themes
 
@@ -50,6 +51,7 @@ Present a detailed plan that includes:
   - Specific schema or API migrations required
   - Any breaking changes and how to address them
 - Any new features from the changelog that could improve existing code
+- Custom utilities that can be replaced by SDK exports (remove the local code, switch to the SDK import)
 
 ### 6. User Confirmation
 
