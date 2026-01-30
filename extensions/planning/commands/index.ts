@@ -1,10 +1,8 @@
 import type { ExtensionAPI } from "@mariozechner/pi-coding-agent";
-import { setupEditPlanCommand } from "./edit-plan";
-import { setupExecutePlanCommand } from "./execute-plan";
+import { setupListPlansCommand } from "./list-plans";
 import { setupSaveAsPlanCommand } from "./save-as-plan";
 
 export function setupPlanningCommands(pi: ExtensionAPI) {
-  setupEditPlanCommand(pi);
-  setupExecutePlanCommand(pi);
+  setupListPlansCommand(pi);
   setupSaveAsPlanCommand(pi);
 }

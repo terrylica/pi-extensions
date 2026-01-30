@@ -8,25 +8,36 @@ import {
 } from "@mariozechner/pi-tui";
 import type { PlanInfo } from "./types";
 
+export interface ArchiveResult {
+  ok: boolean;
+  message: string;
+}
+
 export interface PlanSelectorOptions {
-  title: string;
   plans: PlanInfo[];
+  onArchive?: (plan: PlanInfo) => Promise<ArchiveResult>;
 }
 
 export interface PlanSelectorResult {
   selected: PlanInfo | null;
 }
 
-type StatusFilter =
-  | "all"
-  | "pending"
-  | "in-progress"
-  | "completed"
-  | "cancelled"
-  | "abandoned"
-  | "missing";
+export async function selectPlan(
+  ctx: ExtensionContext,
+  plans: PlanInfo[],
+  onArchive?: (plan: PlanInfo) => Promise<ArchiveResult>,
+): Promise<PlanInfo | null> {
+  if (!ctx.hasUI) return null;
 
-type SortMode = "date-desc" | "date-asc" | "title-asc" | "title-desc";
+  const result = await ctx.ui.custom<PlanSelectorResult>(
+    (tui, theme, _keybindings, done) =>
+      new PlanSelector(tui, theme, { plans, onArchive }, done),
+  );
+
+  return result?.selected ?? null;
+}
+
+type SortMode = "date-desc" | "date-asc";
 
 interface PlanTreeNode {
   id: string;
@@ -52,47 +63,31 @@ interface FlatNodeItem {
 interface FlatGroupItem {
   type: "group";
   label: string;
-  status: StatusFilter;
+  status: string;
   count: number;
 }
 
 type FlatItem = FlatNodeItem | FlatGroupItem;
 
-export function createPlanSelector(
-  options: PlanSelectorOptions,
-  done: (result: PlanSelectorResult) => void,
-  theme: Theme,
-  tui: { requestRender: () => void },
-): Component {
-  return new PlanSelector(tui, theme, options, done);
-}
-
-export async function selectPlan(
-  ctx: ExtensionContext,
-  plans: PlanInfo[],
-  title: string,
-): Promise<PlanInfo | null> {
-  if (!ctx.hasUI) return null;
-
-  const result = await ctx.ui.custom<PlanSelectorResult>(
-    (tui, theme, _keybindings, done) =>
-      createPlanSelector({ title, plans }, done, theme, tui),
-  );
-
-  return result?.selected ?? null;
-}
+type StatusMessage = {
+  text: string;
+  level: "info" | "error" | "progress";
+};
 
 class PlanSelector implements Component {
   private closed = false;
   private sortMode: SortMode = "date-desc";
-  private filterMode: StatusFilter = "all";
   private groupByStatus = false;
   private flatItems: FlatItem[] = [];
   private selectableNodes: PlanTreeNode[] = [];
   private selectedIndex = 0;
   private selectedId: string | null = null;
   private scrollOffset = 0;
-  private readonly roots: PlanTreeNode[];
+  private roots: PlanTreeNode[];
+  private plans: PlanInfo[];
+  private archiving = false;
+  private statusMessage: StatusMessage | null = null;
+  private statusTimer: ReturnType<typeof setTimeout> | null = null;
 
   constructor(
     private readonly tui: { requestRender: () => void },
@@ -100,11 +95,15 @@ class PlanSelector implements Component {
     private readonly options: PlanSelectorOptions,
     private readonly done: (result: PlanSelectorResult) => void,
   ) {
-    this.roots = buildPlanForest(options.plans);
+    this.plans = [...options.plans];
+    this.roots = buildPlanForest(this.plans);
     this.refreshView();
   }
 
   handleInput(data: string): void {
+    // Block all input while archiving
+    if (this.archiving) return;
+
     const kb = getEditorKeybindings();
 
     if (kb.matches(data, "selectUp") || data === "k") {
@@ -114,16 +113,6 @@ class PlanSelector implements Component {
 
     if (kb.matches(data, "selectDown") || data === "j") {
       this.moveSelection(1);
-      return;
-    }
-
-    if (kb.matches(data, "cursorLeft")) {
-      this.moveSelection(-Math.max(1, this.visibleLines()));
-      return;
-    }
-
-    if (kb.matches(data, "cursorRight")) {
-      this.moveSelection(Math.max(1, this.visibleLines()));
       return;
     }
 
@@ -140,38 +129,23 @@ class PlanSelector implements Component {
       return;
     }
 
-    if (matchesKey(data, "ctrl+d")) {
-      this.sortMode = "date-desc";
-      this.filterMode = "all";
-      this.groupByStatus = false;
-      this.refreshView();
+    // Archive: Ctrl+A
+    if (matchesKey(data, "ctrl+a")) {
+      const selected = this.selectableNodes[this.selectedIndex];
+      if (selected?.plan) {
+        this.startArchive(selected.plan);
+      }
       return;
     }
 
-    if (matchesKey(data, "ctrl+o")) {
-      this.filterMode = nextFilterMode(this.filterMode, true);
-      this.refreshView();
-      return;
-    }
-
-    if (matchesKey(data, "shift+ctrl+o")) {
-      this.filterMode = nextFilterMode(this.filterMode, false);
-      this.refreshView();
-      return;
-    }
-
+    // Toggle sort: Ctrl+U
     if (matchesKey(data, "ctrl+u")) {
-      this.sortMode = nextSortMode(this.sortMode, true);
+      this.sortMode = this.sortMode === "date-desc" ? "date-asc" : "date-desc";
       this.refreshView();
       return;
     }
 
-    if (matchesKey(data, "shift+ctrl+u")) {
-      this.sortMode = nextSortMode(this.sortMode, false);
-      this.refreshView();
-      return;
-    }
-
+    // Toggle group by status: Ctrl+T
     if (matchesKey(data, "ctrl+t")) {
       this.groupByStatus = !this.groupByStatus;
       this.refreshView();
@@ -187,9 +161,8 @@ class PlanSelector implements Component {
     const border = (s: string) => theme.fg("dim", s);
 
     const lines: string[] = [];
-    const innerWidth = width - 2; // 1 char padding each side
+    const innerWidth = width - 2;
 
-    // Helper to pad line
     const padLine = (content: string): string => {
       const len = visibleWidth(content);
       return ` ${content}${" ".repeat(Math.max(0, innerWidth - len))} `;
@@ -207,21 +180,35 @@ class PlanSelector implements Component {
         border("─".repeat(rightBorder)),
     );
 
-    lines.push(
-      padLine(bold(truncateToWidth(this.options.title, innerWidth, ""))),
-    );
-
-    lines.push(
-      padLine(
-        dim(
-          truncateToWidth(
-            `Sort: ${formatSortMode(this.sortMode)}  Filter: ${formatFilterMode(this.filterMode)}  Group: ${this.groupByStatus ? "on" : "off"}`,
-            innerWidth,
-            "",
+    // Status line: sort/group info, or status message
+    if (this.statusMessage) {
+      const style =
+        this.statusMessage.level === "error"
+          ? (s: string) => theme.fg("error", s)
+          : this.statusMessage.level === "progress"
+            ? (s: string) => theme.fg("warning", s)
+            : (s: string) => theme.fg("accent", s);
+      lines.push(
+        padLine(
+          style(truncateToWidth(this.statusMessage.text, innerWidth, "")),
+        ),
+      );
+    } else {
+      const sortLabel =
+        this.sortMode === "date-desc" ? "newest first" : "oldest first";
+      const groupLabel = this.groupByStatus ? "on" : "off";
+      lines.push(
+        padLine(
+          dim(
+            truncateToWidth(
+              `Sort: ${sortLabel}  Group: ${groupLabel}`,
+              innerWidth,
+              "",
+            ),
           ),
         ),
-      ),
-    );
+      );
+    }
 
     lines.push(border("─".repeat(width)));
 
@@ -236,7 +223,7 @@ class PlanSelector implements Component {
     let renderedCount = 0;
 
     if (this.flatItems.length === 0) {
-      lines.push(padLine(dim("No plans match the current filter")));
+      lines.push(padLine(dim("No plans")));
       renderedCount = 1;
     } else {
       for (const item of visibleItems) {
@@ -248,7 +235,7 @@ class PlanSelector implements Component {
             padLine(this.renderPlanLine(item, innerWidth, isSelected)),
           );
         }
-        renderedCount += 1;
+        renderedCount++;
       }
     }
 
@@ -261,21 +248,70 @@ class PlanSelector implements Component {
       padLine(
         dim(
           truncateToWidth(
-            "↑/↓ move  ←/→ page  Enter select  Esc cancel  Ctrl+O filter  Ctrl+U sort  Ctrl+T group  Ctrl+D reset",
+            "↑/↓ move  Enter select  Ctrl+A archive  Ctrl+U sort  Ctrl+T group  Esc cancel",
             innerWidth,
             "",
           ),
         ),
       ),
     );
-
-    // Bottom border
     lines.push(border("─".repeat(width)));
 
     return lines;
   }
 
   invalidate(): void {}
+
+  private startArchive(plan: PlanInfo): void {
+    if (!this.options.onArchive) {
+      this.showStatus("Archive not configured", "error");
+      return;
+    }
+
+    this.archiving = true;
+    const title = plan.title?.trim() || plan.slug || plan.filename;
+    this.showStatus(`Archiving ${title}...`, "progress");
+
+    this.options
+      .onArchive(plan)
+      .then((result) => {
+        this.archiving = false;
+
+        if (result.ok) {
+          // Remove the archived plan and rebuild the tree
+          this.plans = this.plans.filter((p) => p.slug !== plan.slug);
+          this.roots = buildPlanForest(this.plans);
+          this.refreshView();
+          this.showStatus(result.message, "info");
+        } else {
+          this.showStatus(result.message, "error");
+        }
+      })
+      .catch((err) => {
+        this.archiving = false;
+        const msg = err instanceof Error ? err.message : String(err);
+        this.showStatus(`Archive failed: ${msg}`, "error");
+      });
+  }
+
+  private showStatus(text: string, level: StatusMessage["level"]): void {
+    if (this.statusTimer) {
+      clearTimeout(this.statusTimer);
+      this.statusTimer = null;
+    }
+
+    this.statusMessage = { text, level };
+    this.tui.requestRender();
+
+    // Auto-clear non-progress messages after 3 seconds
+    if (level !== "progress") {
+      this.statusTimer = setTimeout(() => {
+        this.statusMessage = null;
+        this.statusTimer = null;
+        this.tui.requestRender();
+      }, 3000);
+    }
+  }
 
   private renderGroupLine(item: FlatGroupItem, width: number): string {
     const label = `${item.label} (${item.count})`;
@@ -296,7 +332,7 @@ class PlanSelector implements Component {
     );
     const date = item.node.plan?.date || "????-??-??";
     const title = getNodeTitle(item.node);
-    const status = getNodeStatus(item.node);
+    const status = item.node.plan?.status ?? "pending";
     const statusLabel = formatStatusLabel(status);
     const statusDisplay = this.styleStatus(statusLabel, status);
     const statusWidth = visibleWidth(statusLabel);
@@ -308,7 +344,7 @@ class PlanSelector implements Component {
     return `${left} ${statusDisplay}`;
   }
 
-  private styleStatus(value: string, status: StatusFilter): string {
+  private styleStatus(value: string, status: string): string {
     switch (status) {
       case "completed":
         return this.theme.fg("success", value);
@@ -326,7 +362,6 @@ class PlanSelector implements Component {
   }
 
   private visibleLines(): number {
-    // Cap at 10 visible lines to keep UI compact
     return 10;
   }
 
@@ -342,11 +377,7 @@ class PlanSelector implements Component {
   }
 
   private refreshView(): void {
-    const viewRoots = buildViewForest(
-      this.roots,
-      this.sortMode,
-      this.filterMode,
-    );
+    const viewRoots = buildViewForest(this.roots, this.sortMode);
     const grouped = this.groupByStatus
       ? buildGroupedView(viewRoots, this.sortMode)
       : viewRoots.map((node) => ({ type: "node" as const, node }));
@@ -423,6 +454,8 @@ class PlanSelector implements Component {
   }
 }
 
+// --- Tree building ---
+
 function buildPlanForest(plans: PlanInfo[]): PlanTreeNode[] {
   const nodes = new Map<string, PlanTreeNode>();
 
@@ -468,40 +501,40 @@ function buildPlanForest(plans: PlanInfo[]): PlanTreeNode[] {
 function buildViewForest(
   roots: PlanTreeNode[],
   sortMode: SortMode,
-  filterMode: StatusFilter,
 ): ViewNode[] {
   const sortedRoots = sortNodes(roots, sortMode);
   const result: ViewNode[] = [];
 
   for (const node of sortedRoots) {
-    const viewChildren = buildViewForest(node.children, sortMode, filterMode);
-    const matches = filterMode === "all" || getNodeStatus(node) === filterMode;
-
-    if (matches) {
-      result.push({ node, children: viewChildren });
-    } else {
-      result.push(...viewChildren);
-    }
+    const viewChildren = buildViewForest(node.children, sortMode);
+    result.push({ node, children: viewChildren });
   }
 
   return result;
 }
 
 function buildGroupedView(viewRoots: ViewNode[], sortMode: SortMode) {
-  const groups = new Map<StatusFilter, ViewNode[]>();
+  const groups = new Map<string, ViewNode[]>();
 
   for (const root of viewRoots) {
-    const status = getNodeStatus(root.node);
+    const status = root.node.plan?.status ?? "pending";
     if (!groups.has(status)) {
       groups.set(status, []);
     }
     groups.get(status)?.push(root);
   }
 
-  const orderedStatuses = getStatusOrder();
+  const orderedStatuses = [
+    "in-progress",
+    "pending",
+    "completed",
+    "cancelled",
+    "abandoned",
+    "missing",
+  ];
   const result: {
     type: "group";
-    status: StatusFilter;
+    status: string;
     label: string;
     count: number;
     nodes: ViewNode[];
@@ -528,12 +561,11 @@ function flattenViewNodes(
   ancestors: boolean[],
 ): FlatNodeItem[] {
   const items: FlatNodeItem[] = [];
-  const sorted = nodes;
 
-  for (let i = 0; i < sorted.length; i++) {
-    const node = sorted[i];
+  for (let i = 0; i < nodes.length; i++) {
+    const node = nodes[i];
     if (!node) continue;
-    const isLast = i === sorted.length - 1;
+    const isLast = i === nodes.length - 1;
     items.push({
       type: "node",
       node: node.node,
@@ -541,9 +573,8 @@ function flattenViewNodes(
       isLast,
     });
 
-    const nextAncestors = [...ancestors, isLast];
     if (node.children.length > 0) {
-      items.push(...flattenViewNodes(node.children, nextAncestors));
+      items.push(...flattenViewNodes(node.children, [...ancestors, isLast]));
     }
   }
 
@@ -572,67 +603,8 @@ function getNodeTitle(node: PlanTreeNode): string {
   return "(untitled)";
 }
 
-function getNodeStatus(node: PlanTreeNode): StatusFilter {
-  if (node.missing) return "missing";
-  const status = node.plan?.status ?? "pending";
+function formatStatusLabel(status: string): string {
   return status;
-}
-
-function formatStatusLabel(status: StatusFilter): string {
-  if (status === "all") return "all";
-  if (status === "in-progress") return "in-progress";
-  return status;
-}
-
-function formatSortMode(mode: SortMode): string {
-  switch (mode) {
-    case "date-asc":
-      return "date asc";
-    case "date-desc":
-      return "date desc";
-    case "title-asc":
-      return "title asc";
-    case "title-desc":
-      return "title desc";
-    default:
-      return mode;
-  }
-}
-
-function formatFilterMode(mode: StatusFilter): string {
-  if (mode === "all") return "all";
-  return mode;
-}
-
-function nextSortMode(current: SortMode, forward: boolean): SortMode {
-  const modes: SortMode[] = [
-    "date-desc",
-    "date-asc",
-    "title-asc",
-    "title-desc",
-  ];
-  const index = modes.indexOf(current);
-  const nextIndex = forward
-    ? (index + 1) % modes.length
-    : (index - 1 + modes.length) % modes.length;
-  return modes[nextIndex] ?? "date-desc";
-}
-
-function nextFilterMode(current: StatusFilter, forward: boolean): StatusFilter {
-  const modes: StatusFilter[] = [
-    "all",
-    "pending",
-    "in-progress",
-    "completed",
-    "cancelled",
-    "abandoned",
-    "missing",
-  ];
-  const index = modes.indexOf(current);
-  const nextIndex = forward
-    ? (index + 1) % modes.length
-    : (index - 1 + modes.length) % modes.length;
-  return modes[nextIndex] ?? "all";
 }
 
 function sortViewNodes(nodes: ViewNode[], sortMode: SortMode): ViewNode[] {
@@ -652,30 +624,10 @@ function compareNodes(
   b: PlanTreeNode,
   sortMode: SortMode,
 ): number {
-  const titleA = getNodeTitle(a).toLowerCase();
-  const titleB = getNodeTitle(b).toLowerCase();
   const dateA = a.plan?.date || "";
   const dateB = b.plan?.date || "";
-
-  switch (sortMode) {
-    case "date-asc":
-      return dateA.localeCompare(dateB) || titleA.localeCompare(titleB);
-    case "date-desc":
-      return dateB.localeCompare(dateA) || titleA.localeCompare(titleB);
-    case "title-desc":
-      return titleB.localeCompare(titleA);
-    default:
-      return titleA.localeCompare(titleB);
+  if (sortMode === "date-asc") {
+    return dateA.localeCompare(dateB);
   }
-}
-
-function getStatusOrder(): StatusFilter[] {
-  return [
-    "in-progress",
-    "pending",
-    "completed",
-    "cancelled",
-    "abandoned",
-    "missing",
-  ];
+  return dateB.localeCompare(dateA);
 }

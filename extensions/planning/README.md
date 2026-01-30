@@ -1,19 +1,39 @@
 # Planning
 
-Commands for turning conversations into implementation plans and executing saved plans.
+Commands for turning conversations into implementation plans and managing saved plans.
 
 ## Features
 
 - **Command**: `/plan:save` - creates a structured plan from the current conversation
-- **Command**: `/plan:execute` - selects and runs a saved plan from `.agents/plans/`
-- **Command**: `/plan:edit` - opens a saved plan in your $VISUAL/$EDITOR
+- **Command**: `/plan:list` - lists saved plans with options to execute, edit, or archive
 
 ## Usage
 
-### Command (interactive)
+### Creating Plans
 
-Run `/plan:save` to generate a plan, `/plan:execute` to run one, and `/plan:edit` to update an existing plan.
+Run `/plan:save` to generate a plan from the current conversation. The agent will analyze the discussion and create a structured implementation plan in `.agents/plans/`.
 
-## Future Improvements
+### Managing Plans
 
-- [ ] Add plan filtering by tag or project
+Run `/plan:list` to see all saved plans. Select a plan to:
+- **Execute** - Run the plan (optionally in a new session)
+- **Edit** - Open the plan in your `$VISUAL/$EDITOR`
+- **Archive** - Move the plan to an archive directory
+
+## Configuration
+
+Create `~/.pi/agent/extensions/planning.json` to configure archiving:
+
+```json
+{
+  "archiveDir": "/path/to/plan-archive"
+}
+```
+
+The `archiveDir` should point to a git repository. When archiving, the extension will:
+1. Move the plan file to the archive directory
+2. Stage the change
+3. Commit with message "Archive plan: <filename>"
+4. Push to remote (silently)
+
+If any git operation fails, you'll receive a notification but the plan will still be archived locally.
