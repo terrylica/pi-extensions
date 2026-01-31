@@ -1,0 +1,63 @@
+import type {
+  Theme,
+  ToolRenderResultOptions,
+} from "@mariozechner/pi-coding-agent";
+import type { Component } from "@mariozechner/pi-tui";
+import { Text } from "@mariozechner/pi-tui";
+import type { SubagentFooter } from "./SubagentFooter";
+
+/** A field is either a plain label/value or a custom Component */
+export type ToolDetailsField = { label: string; value: string } | Component;
+
+export interface ToolDetailsConfig {
+  /** Fields to display when expanded */
+  fields: ToolDetailsField[];
+  /** Footer -- always displayed */
+  footer: SubagentFooter;
+}
+
+/**
+ * Collapsed: empty line + footer.
+ * Expanded: fields + empty line + footer.
+ */
+export class ToolDetails implements Component {
+  constructor(
+    private config: ToolDetailsConfig,
+    private options: ToolRenderResultOptions,
+    private theme: Theme,
+  ) {}
+
+  handleInput(_data: string): boolean {
+    return false;
+  }
+
+  invalidate(): void {}
+
+  render(width: number): string[] {
+    const lines: string[] = [];
+    const th = this.theme;
+
+    if (this.options.expanded) {
+      for (const field of this.config.fields) {
+        if (isComponent(field)) {
+          lines.push(...field.render(width));
+        } else {
+          const text = new Text(
+            `${th.fg("muted", `${field.label}: `)}${field.value}`,
+            0,
+            0,
+          );
+          lines.push(...text.render(width));
+        }
+      }
+    }
+
+    lines.push("");
+    lines.push(...this.config.footer.render(width));
+    return lines;
+  }
+}
+
+function isComponent(field: ToolDetailsField): field is Component {
+  return "render" in field && typeof (field as Component).render === "function";
+}

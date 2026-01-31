@@ -16,11 +16,17 @@ import type {
   ToolRenderResultOptions,
 } from "@mariozechner/pi-coding-agent";
 import { getMarkdownTheme, type Theme } from "@mariozechner/pi-coding-agent";
-import { Container, Markdown, Spacer, Text } from "@mariozechner/pi-tui";
+import { Markdown, Text } from "@mariozechner/pi-tui";
 import { Type } from "@sinclair/typebox";
-import { SubagentFooter } from "../../components";
+import {
+  MarkdownResponse,
+  SubagentFooter,
+  ToolDetails,
+  type ToolDetailsField,
+  ToolPreview,
+  type ToolPreviewField,
+} from "../../components";
 import { executeSubagent, resolveModel, resolveSkillsByName } from "../../lib";
-import { formatSubagentStats } from "../../lib/ui/stats";
 import { MODEL } from "./config";
 import { ORACLE_SYSTEM_PROMPT } from "./system-prompt";
 import { createOracleTools } from "./tools";
@@ -293,47 +299,17 @@ Pass relevant skills (e.g., 'ios-26', 'drizzle-orm') to provide specialized cont
     },
 
     renderCall(args, theme) {
-      const container = new Container();
-
-      container.addChild(
-        new Text(theme.fg("toolTitle", theme.bold("Oracle")), 0, 0),
-      );
-
-      // Task preview (truncated to ~80 chars)
-      if (args.task) {
-        const maxLen = 80;
-        const preview =
-          args.task.length > maxLen
-            ? `${args.task.slice(0, maxLen)}...`
-            : args.task;
-        container.addChild(
-          new Text(`  ${theme.fg("muted", "Task: ")}${preview}`, 0, 0),
-        );
+      const fields: ToolPreviewField[] = [{ label: "Task", value: args.task }];
+      if (args.files?.length) {
+        fields.push({
+          label: "Files",
+          value: `${args.files.length} file${args.files.length > 1 ? "s" : ""}`,
+        });
       }
-
-      // Show file count if files provided
-      if (args.files && args.files.length > 0) {
-        container.addChild(
-          new Text(
-            `  ${theme.fg("muted", "Files: ")}${args.files.length} file${args.files.length > 1 ? "s" : ""}`,
-            0,
-            0,
-          ),
-        );
+      if (args.skills?.length) {
+        fields.push({ label: "Skills", value: args.skills.join(", ") });
       }
-
-      // Show skills if provided
-      if (args.skills && args.skills.length > 0) {
-        container.addChild(
-          new Text(
-            `  ${theme.fg("muted", "Skills: ")}${args.skills.join(", ")}`,
-            0,
-            0,
-          ),
-        );
-      }
-
-      return container;
+      return new ToolPreview({ title: "Oracle", fields }, theme);
     },
 
     renderResult(
@@ -342,7 +318,6 @@ Pass relevant skills (e.g., 'ios-26', 'drizzle-orm') to provide specialized cont
       theme: Theme,
     ) {
       const { details } = result;
-      const { expanded, isPartial } = options;
 
       // Fallback if details missing
       if (!details) {
@@ -359,8 +334,17 @@ Pass relevant skills (e.g., 'ios-26', 'drizzle-orm') to provide specialized cont
         return new Text("", 0, 0);
       }
 
-      const { response, aborted, error, usage, toolCalls, resolvedModel } =
-        details;
+      const {
+        response,
+        aborted,
+        error,
+        usage,
+        toolCalls,
+        resolvedModel,
+        task,
+        context,
+        files,
+      } = details;
 
       const footer = new SubagentFooter(theme, {
         resolvedModel,
@@ -368,106 +352,28 @@ Pass relevant skills (e.g., 'ios-26', 'drizzle-orm') to provide specialized cont
         toolCalls,
       });
 
-      // Aborted state
+      // Build fields based on state
+      const fields: ToolDetailsField[] = [];
+
       if (aborted) {
-        const container = new Container();
-        container.addChild(new Text(theme.fg("warning", "Aborted"), 0, 0));
-        container.addChild(footer);
-        return container;
-      }
-
-      // Error state
-      if (error) {
-        const container = new Container();
-        container.addChild(
-          new Text(theme.fg("error", `Error: ${error}`), 0, 0),
-        );
-        container.addChild(footer);
-        return container;
-      }
-
-      // Running state (isPartial = true)
-      if (isPartial) {
-        const container = new Container();
-        container.addChild(
-          new Text(theme.fg("muted", "Consulting the Oracle..."), 0, 0),
-        );
-        container.addChild(new Spacer(1));
-        container.addChild(footer);
-        return container;
-      }
-
-      // Stats line for footer
-      const statsText = formatSubagentStats(
-        usage ?? { estimatedTokens: Math.round((response?.length ?? 0) / 4) },
-        0,
-        "the oracle has spoken.",
-      );
-
-      // Done state - collapsed: just show completion info
-      if (!expanded) {
-        const container = new Container();
-        container.addChild(
-          new Text(
-            theme.fg("success", "✓ ") + theme.fg("muted", statsText),
-            0,
-            0,
-          ),
-        );
-        container.addChild(footer);
-        return container;
-      }
-
-      // Done state - expanded: show full response
-      const container = new Container();
-
-      // Separator
-      container.addChild(new Text(theme.fg("muted", "───"), 0, 0));
-      container.addChild(new Spacer(1));
-
-      // Show full task/context/files when expanded
-      if (details.task) {
-        container.addChild(
-          new Text(theme.fg("muted", "Task: ") + details.task, 0, 0),
-        );
-        container.addChild(new Spacer(1));
-      }
-      if (details.context) {
-        container.addChild(
-          new Text(theme.fg("muted", "Context: ") + details.context, 0, 0),
-        );
-        container.addChild(new Spacer(1));
-      }
-      if (details.files && details.files.length > 0) {
-        container.addChild(
-          new Text(
-            theme.fg("muted", "Files: ") + details.files.join(", "),
-            0,
-            0,
-          ),
-        );
-        container.addChild(new Spacer(1));
-      }
-
-      // Stats line
-      container.addChild(new Text(theme.fg("muted", statsText), 0, 0));
-      container.addChild(new Spacer(1));
-
-      // Response as markdown
-      if (response) {
-        try {
-          const mdTheme = getMarkdownTheme();
-          container.addChild(new Markdown(response, 0, 0, mdTheme));
-        } catch {
-          container.addChild(new Text(response, 0, 0));
+        fields.push({ label: "Status", value: "Aborted" });
+      } else if (error) {
+        fields.push({ label: "Error", value: error });
+      } else if (response) {
+        // Done state
+        if (task) {
+          fields.push({ label: "Task", value: task });
         }
+        if (context) {
+          fields.push({ label: "Context", value: context });
+        }
+        if (files?.length) {
+          fields.push({ label: "Files", value: files.join(", ") });
+        }
+        fields.push(new MarkdownResponse(response, theme));
       }
 
-      // Footer
-      container.addChild(new Spacer(1));
-      container.addChild(footer);
-
-      return container;
+      return new ToolDetails({ fields, footer }, options, theme);
     },
   };
 }

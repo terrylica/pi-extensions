@@ -22,13 +22,21 @@ import {
   getMarkdownTheme,
   type Theme,
 } from "@mariozechner/pi-coding-agent";
-import { Container, Markdown, Spacer, Text } from "@mariozechner/pi-tui";
+import { Markdown, Text } from "@mariozechner/pi-tui";
 import { Type } from "@sinclair/typebox";
-import { SubagentFooter } from "../../components";
+import {
+  FileList,
+  MarkdownResponse,
+  SubagentFooter,
+  ToolCallList,
+  ToolDetails,
+  type ToolDetailsField,
+  ToolPreview,
+  type ToolPreviewField,
+} from "../../components";
 import { executeSubagent, resolveModel, resolveSkillsByName } from "../../lib";
 import type { SubagentToolCall } from "../../lib/types";
-import { getSpinnerFrame, INDICATOR } from "../../lib/ui/spinner";
-import { formatSubagentStats, pluralize } from "../../lib/ui/stats";
+import { pluralize } from "../../lib/ui/stats";
 import { MODEL } from "./config";
 import { WORKER_SYSTEM_PROMPT } from "./system-prompt";
 import { formatWorkerToolCall } from "./tool-formatter";
@@ -270,9 +278,9 @@ Pass relevant skills (e.g., 'ios-26', 'drizzle-orm') to provide specialized cont
           userMessage,
           ctx,
           // onTextUpdate
-          (_delta, accumulated) => {
+          (_delta, _accumulated) => {
             onUpdate?.({
-              content: [{ type: "text", text: accumulated }],
+              content: [{ type: "text", text: "" }],
               details: {
                 task,
                 instructions,
@@ -284,7 +292,6 @@ Pass relevant skills (e.g., 'ios-26', 'drizzle-orm') to provide specialized cont
                   notFoundSkills.length > 0 ? notFoundSkills : undefined,
                 toolCalls: currentToolCalls,
                 spinnerFrame,
-                response: accumulated,
                 resolvedModel,
               },
             });
@@ -412,29 +419,14 @@ Pass relevant skills (e.g., 'ios-26', 'drizzle-orm') to provide specialized cont
     },
 
     renderCall(args, theme) {
-      const container = new Container();
+      const fields: ToolPreviewField[] = [{ label: "Task", value: args.task }];
 
-      container.addChild(
-        new Text(theme.fg("toolTitle", theme.bold("Worker")), 0, 0),
-      );
-
-      // Task label
-      container.addChild(
-        new Text(`  ${theme.fg("muted", "Task: ")}${args.task}`, 0, 0),
-      );
-
-      // Show skills if provided
-      if (args.skills && args.skills.length > 0) {
-        container.addChild(
-          new Text(
-            `  ${theme.fg("muted", "Skills: ")}${args.skills.join(", ")}`,
-            0,
-            0,
-          ),
-        );
+      // Only add optional fields if present
+      if (args.skills?.length) {
+        fields.push({ label: "Skills", value: args.skills.join(", ") });
       }
 
-      return container;
+      return new ToolPreview({ title: "Worker", fields }, theme);
     },
 
     renderResult(
@@ -443,7 +435,6 @@ Pass relevant skills (e.g., 'ios-26', 'drizzle-orm') to provide specialized cont
       theme: Theme,
     ) {
       const { details } = result;
-      const { expanded, isPartial } = options;
 
       // Fallback if details missing
       if (!details) {
@@ -468,14 +459,12 @@ Pass relevant skills (e.g., 'ios-26', 'drizzle-orm') to provide specialized cont
         error,
         usage,
         resolvedModel,
+        files,
+        instructions,
       } = details;
 
       // Counts
       const doneCount = toolCalls.filter((tc) => tc.status === "done").length;
-      const runningCount = toolCalls.filter(
-        (tc) => tc.status === "running",
-      ).length;
-      const errorCount = toolCalls.filter((tc) => tc.status === "error").length;
 
       const footer = new SubagentFooter(theme, {
         resolvedModel,
@@ -483,218 +472,42 @@ Pass relevant skills (e.g., 'ios-26', 'drizzle-orm') to provide specialized cont
         toolCalls,
       });
 
-      const instructionsLine = new Text(
-        `${theme.fg("muted", "Instructions: ")}${details.instructions}`,
-        0,
-        0,
-      );
+      // Build fields based on state
+      const fields: ToolDetailsField[] = [];
 
-      // Aborted state
+      // Instructions
+      fields.push({ label: "Instructions", value: instructions });
+
+      // State-specific fields
       if (aborted) {
-        const container = new Container();
-        container.addChild(instructionsLine);
         const suffix =
           doneCount > 0
             ? ` (${doneCount} ${pluralize(doneCount, "tool call")} completed)`
             : "";
-        container.addChild(
-          new Text(
-            theme.fg("warning", "Aborted") + theme.fg("muted", suffix),
-            0,
-            0,
+        fields.push({
+          label: "Status",
+          value: theme.fg("warning", "Aborted") + theme.fg("muted", suffix),
+        });
+      } else if (error) {
+        fields.push({ label: "Error", value: error });
+      } else if (response) {
+        // Done state
+        fields.push(new FileList(files, theme));
+        fields.push(new ToolCallList(toolCalls, formatWorkerToolCall, theme));
+        fields.push(new MarkdownResponse(response, theme));
+      } else {
+        // Running state
+        fields.push(
+          new ToolCallList(
+            toolCalls,
+            formatWorkerToolCall,
+            theme,
+            spinnerFrame,
           ),
         );
-        container.addChild(footer);
-        return container;
       }
 
-      // Error state
-      if (error) {
-        const container = new Container();
-        container.addChild(instructionsLine);
-        container.addChild(
-          new Text(theme.fg("error", `Error: ${error}`), 0, 0),
-        );
-        container.addChild(footer);
-        return container;
-      }
-
-      // Running + collapsed: show current tool + footer
-      if (isPartial && !expanded) {
-        const container = new Container();
-        container.addChild(instructionsLine);
-
-        const currentTool = toolCalls.find((tc) => tc.status === "running");
-        if (currentTool) {
-          const spinner = getSpinnerFrame(spinnerFrame);
-          const partialText = currentTool.partialResult?.content?.[0];
-
-          if (partialText?.type === "text" && partialText.text) {
-            container.addChild(
-              new Text(`${spinner} ${partialText.text}`, 0, 0),
-            );
-          } else {
-            const { label, detail } = formatWorkerToolCall(currentTool);
-            const text = detail ? `${label} ${detail}` : label;
-            container.addChild(new Text(`${spinner} ${text}`, 0, 0));
-          }
-        } else {
-          container.addChild(
-            new Text(
-              theme.fg("muted", `${getSpinnerFrame(spinnerFrame)} working...`),
-              0,
-              0,
-            ),
-          );
-        }
-
-        container.addChild(new Spacer(1));
-        container.addChild(footer);
-        return container;
-      }
-
-      // Running + expanded: show all tool calls
-      if (isPartial) {
-        const container = new Container();
-        container.addChild(instructionsLine);
-
-        const statusText =
-          runningCount > 0
-            ? `${doneCount} done, ${runningCount} running`
-            : "Working...";
-        container.addChild(new Text(theme.fg("muted", statusText), 0, 0));
-
-        if (toolCalls.length > 0) {
-          for (const tc of toolCalls) {
-            const indicator =
-              tc.status === "running"
-                ? getSpinnerFrame(spinnerFrame)
-                : tc.status === "done"
-                  ? INDICATOR.done
-                  : INDICATOR.error;
-
-            const indicatorColored =
-              tc.status === "done"
-                ? theme.fg("success", indicator)
-                : tc.status === "error"
-                  ? theme.fg("error", indicator)
-                  : indicator;
-
-            let text: string;
-            const partialText = tc.partialResult?.content?.[0];
-            if (
-              tc.status === "running" &&
-              partialText?.type === "text" &&
-              partialText.text
-            ) {
-              text = partialText.text;
-            } else {
-              const { label, detail } = formatWorkerToolCall(tc);
-              text = detail
-                ? `${theme.bold(label)} ${detail}`
-                : theme.bold(label);
-            }
-            container.addChild(new Text(`${indicatorColored} ${text}`, 0, 0));
-          }
-        }
-
-        container.addChild(new Spacer(1));
-        container.addChild(footer);
-        return container;
-      }
-
-      // Done + collapsed
-      if (!expanded) {
-        const container = new Container();
-        container.addChild(instructionsLine);
-
-        const allFailed =
-          toolCalls.length > 0 && errorCount === toolCalls.length;
-        const stats = formatSubagentStats(
-          usage ?? { estimatedTokens: Math.round((response?.length ?? 0) / 4) },
-          toolCalls.length,
-        );
-        const indicator = allFailed ? INDICATOR.error : INDICATOR.done;
-        const indicatorColor = allFailed ? "error" : "success";
-
-        container.addChild(
-          new Text(
-            theme.fg(indicatorColor, `${indicator} `) +
-              theme.fg("muted", stats),
-            0,
-            0,
-          ),
-        );
-        container.addChild(footer);
-        return container;
-      }
-
-      // Done + expanded
-      const container = new Container();
-      container.addChild(instructionsLine);
-
-      // Stats line
-      const allFailed = toolCalls.length > 0 && errorCount === toolCalls.length;
-      const stats = formatSubagentStats(
-        usage ?? { estimatedTokens: Math.round((response?.length ?? 0) / 4) },
-        toolCalls.length,
-      );
-      const indicator = allFailed ? INDICATOR.error : INDICATOR.done;
-      const indicatorColor = allFailed ? "error" : "success";
-      container.addChild(
-        new Text(
-          theme.fg(indicatorColor, `${indicator} `) + theme.fg("muted", stats),
-          0,
-          0,
-        ),
-      );
-
-      // Files list
-      if (details.files.length > 0) {
-        container.addChild(new Spacer(1));
-        container.addChild(new Text(theme.fg("muted", "Files:"), 0, 0));
-        for (const f of details.files) {
-          container.addChild(new Text(`  ${f}`, 0, 0));
-        }
-      }
-
-      // All tool calls with status indicators
-      if (toolCalls.length > 0) {
-        container.addChild(new Spacer(1));
-        const tcHeader = theme.fg("muted", `Tool calls (${toolCalls.length}):`);
-        container.addChild(new Text(tcHeader, 0, 0));
-
-        for (const tc of toolCalls) {
-          const tcIndicator =
-            tc.status === "done"
-              ? theme.fg("success", INDICATOR.done)
-              : theme.fg("error", INDICATOR.error);
-          const { label, detail } = formatWorkerToolCall(tc);
-          const text = detail
-            ? `${theme.bold(label)} ${detail}`
-            : theme.bold(label);
-          container.addChild(new Text(`  ${tcIndicator} ${text}`, 0, 0));
-        }
-      }
-
-      // Response as markdown
-      if (response) {
-        container.addChild(new Spacer(1));
-        container.addChild(new Text(theme.fg("muted", "───"), 0, 0));
-        container.addChild(new Spacer(1));
-
-        try {
-          const mdTheme = getMarkdownTheme();
-          container.addChild(new Markdown(response, 0, 0, mdTheme));
-        } catch {
-          container.addChild(new Text(response, 0, 0));
-        }
-
-        container.addChild(new Spacer(1));
-      }
-
-      container.addChild(footer);
-      return container;
+      return new ToolDetails({ fields, footer }, options, theme);
     },
   };
 }

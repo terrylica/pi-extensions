@@ -6,17 +6,23 @@ import type {
   AgentToolResult,
   AgentToolUpdateCallback,
   ExtensionContext,
+  Theme,
   ToolDefinition,
   ToolRenderResultOptions,
 } from "@mariozechner/pi-coding-agent";
-import { getMarkdownTheme, type Theme } from "@mariozechner/pi-coding-agent";
-import { Container, Markdown, Spacer, Text } from "@mariozechner/pi-tui";
+import { Text } from "@mariozechner/pi-tui";
 import { Type } from "@sinclair/typebox";
 
-import { SubagentFooter } from "../../components";
+import {
+  MarkdownResponse,
+  SubagentFooter,
+  ToolDetails,
+  type ToolDetailsField,
+  ToolPreview,
+  type ToolPreviewField,
+} from "../../components";
 import { executeSubagent, resolveModel } from "../../lib";
 import type { SubagentToolCall } from "../../lib/types";
-import { getSpinnerFrame } from "../../lib/ui/spinner";
 import { MODEL } from "./config";
 import { JESTER_SYSTEM_PROMPT } from "./system-prompt";
 import type { JesterDetails, JesterInput } from "./types";
@@ -199,23 +205,11 @@ export function createJesterTool(): ToolDefinition<
     },
 
     renderCall(args, theme) {
-      const container = new Container();
-      container.addChild(
-        new Text(theme.fg("toolTitle", theme.bold("Jester")), 0, 0),
-      );
-
+      const fields: ToolPreviewField[] = [];
       if (args.question) {
-        const maxLen = 80;
-        const preview =
-          args.question.length > maxLen
-            ? `${args.question.slice(0, maxLen)}...`
-            : args.question;
-        container.addChild(
-          new Text(`  ${theme.fg("muted", "Q: ")}${preview}`, 0, 0),
-        );
+        fields.push({ label: "Q", value: args.question });
       }
-
-      return container;
+      return new ToolPreview({ title: "Jester", fields }, theme);
     },
 
     renderResult(
@@ -224,7 +218,6 @@ export function createJesterTool(): ToolDefinition<
       theme: Theme,
     ) {
       const { details } = result;
-      const { expanded, isPartial } = options;
 
       if (!details) {
         const text = result.content[0];
@@ -232,15 +225,8 @@ export function createJesterTool(): ToolDefinition<
         return new Text(content || "", 0, 0);
       }
 
-      const {
-        response,
-        aborted,
-        error,
-        usage,
-        toolCalls,
-        resolvedModel,
-        spinnerFrame,
-      } = details;
+      const { response, aborted, error, usage, toolCalls, resolvedModel } =
+        details;
 
       const footer = new SubagentFooter(theme, {
         resolvedModel,
@@ -248,60 +234,19 @@ export function createJesterTool(): ToolDefinition<
         toolCalls,
       });
 
+      // Build fields based on state
+      const fields: ToolDetailsField[] = [];
+
       if (aborted) {
-        const container = new Container();
-        container.addChild(new Text(theme.fg("warning", "Aborted"), 0, 0));
-        container.addChild(footer);
-        return container;
+        fields.push({ label: "Status", value: "Aborted" });
+      } else if (error) {
+        fields.push({ label: "Error", value: error });
+      } else if (response) {
+        // Done state
+        fields.push(new MarkdownResponse(response, theme));
       }
 
-      if (error) {
-        const container = new Container();
-        container.addChild(
-          new Text(theme.fg("error", `Error: ${error}`), 0, 0),
-        );
-        container.addChild(footer);
-        return container;
-      }
-
-      if (isPartial) {
-        const container = new Container();
-        container.addChild(
-          new Text(
-            theme.fg("muted", `${getSpinnerFrame(spinnerFrame)} jesting...`),
-            0,
-            0,
-          ),
-        );
-        container.addChild(new Spacer(1));
-        container.addChild(footer);
-        return container;
-      }
-
-      if (!expanded) {
-        const container = new Container();
-        container.addChild(new Text(theme.fg("success", "✓ done"), 0, 0));
-        container.addChild(footer);
-        return container;
-      }
-
-      const container = new Container();
-      if (response) {
-        container.addChild(new Text(theme.fg("muted", "───"), 0, 0));
-        container.addChild(new Spacer(1));
-
-        try {
-          const mdTheme = getMarkdownTheme();
-          container.addChild(new Markdown(response, 0, 0, mdTheme));
-        } catch {
-          container.addChild(new Text(response, 0, 0));
-        }
-
-        container.addChild(new Spacer(1));
-      }
-
-      container.addChild(footer);
-      return container;
+      return new ToolDetails({ fields, footer }, options, theme);
     },
   };
 }
