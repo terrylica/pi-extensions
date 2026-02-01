@@ -104,6 +104,22 @@ export class AgentsDiscoveryManager {
     return this.currentCwd;
   }
 
+  /**
+   * Format a path for display. Uses relative path if inside cwd, otherwise
+   * replaces home directory prefix with ~.
+   */
+  prettyPath(filePath: string): string {
+    if (this.isInsideRoot(this.currentCwd, filePath)) {
+      return path.relative(this.currentCwd, filePath);
+    }
+
+    if (this.homeDir && filePath.startsWith(this.homeDir + path.sep)) {
+      return "~" + filePath.slice(this.homeDir.length);
+    }
+
+    return filePath;
+  }
+
   private resolvePath(targetPath: string, baseDir: string): string {
     const absolute = path.isAbsolute(targetPath)
       ? path.normalize(targetPath)

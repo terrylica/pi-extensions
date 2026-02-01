@@ -7,7 +7,6 @@
  * being read.
  */
 
-import path from "node:path";
 import type {
   ExtensionAPI,
   ExtensionContext,
@@ -50,19 +49,17 @@ export function setupAgentsDiscoveryHook(
 
     if (!discovered) return undefined;
 
-    const additions: TextContent[] = discovered.map((file) => ({
-      type: "text",
-      text: `Loaded subdirectory context from ${file.path}\n\n${file.content}`,
-    }));
+    const prettyPaths = discovered.map((f) => manager.prettyPath(f.path));
 
-    const relativePaths = discovered.map((f) =>
-      path.relative(manager.cwd, f.path),
-    );
+    const additions: TextContent[] = discovered.map((file, i) => ({
+      type: "text",
+      text: `Loaded subdirectory context from ${prettyPaths[i]}\n\n${file.content}`,
+    }));
 
     // Notify UI without adding to agent context (appendEntry doesn't go to LLM)
     if (ctx.hasUI) {
       ctx.ui.notify(
-        `Loaded subdirectory context: ${relativePaths.join(", ")}`,
+        `Loaded subdirectory context: ${prettyPaths.join(", ")}`,
         "info",
       );
     }
