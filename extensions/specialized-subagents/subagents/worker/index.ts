@@ -26,6 +26,7 @@ import { Markdown, Text } from "@mariozechner/pi-tui";
 import { Type } from "@sinclair/typebox";
 import {
   FileList,
+  MarkdownField,
   MarkdownResponse,
   SubagentFooter,
   ToolCallList,
@@ -476,7 +477,7 @@ Pass relevant skills (e.g., 'ios-26', 'drizzle-orm') to provide specialized cont
       const fields: ToolDetailsField[] = [];
 
       // Instructions
-      fields.push({ label: "Instructions", value: instructions });
+      fields.push(new MarkdownField("Instructions", instructions, theme));
 
       // State-specific fields
       if (aborted) {
