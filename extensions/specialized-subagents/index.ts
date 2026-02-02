@@ -41,6 +41,19 @@ function checkApiKeys(): string[] {
   return missing;
 }
 
+/**
+ * Shared guidance for the `skills` parameter accepted by most subagent tools.
+ * Merged once into the system prompt so every tool benefits without repetition.
+ */
+const SKILLS_GUIDANCE = `
+## Passing skills to subagents
+
+Most subagent tools (scout, lookout, oracle, reviewer, worker) accept an optional \`skills\` parameter.
+When you pass skill names, the skill content is injected into the subagent's system prompt so it has domain-specific knowledge without needing to read files itself.
+
+Use \`skills\` whenever the task involves a domain covered by an available skill. For example, when delegating iOS work to the worker, pass \`skills: ["ios-26"]\` instead of listing skill files in \`files\` or mentioning them in \`instructions\`.
+`;
+
 // Collect all subagent guidances
 const SUBAGENT_GUIDANCES = [
   SCOUT_GUIDANCE,
@@ -49,6 +62,7 @@ const SUBAGENT_GUIDANCES = [
   REVIEWER_GUIDANCE,
   JESTER_GUIDANCE,
   WORKER_GUIDANCE,
+  SKILLS_GUIDANCE,
 ];
 
 export default function (pi: ExtensionAPI) {
