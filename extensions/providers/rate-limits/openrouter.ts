@@ -89,7 +89,7 @@ function buildWindow(
 
 export async function fetchOpenRouterRateLimits(
   authStorage: AuthStorage,
-  providerId: "openrouter-google" | "openrouter-moonshot",
+  providerId: string,
   providerName: string,
   signal?: AbortSignal,
 ): Promise<ProviderRateLimits> {
