@@ -7,7 +7,9 @@ import { Text } from "@mariozechner/pi-tui";
 import type { SubagentFooter } from "./SubagentFooter";
 
 /** A field is either a plain label/value or a custom Component */
-export type ToolDetailsField = { label: string; value: string } | Component;
+export type ToolDetailsField =
+  | { label: string; value: string; showCollapsed?: boolean }
+  | (Component & { showCollapsed?: boolean });
 
 export interface ToolDetailsConfig {
   /** Fields to display when expanded */
@@ -37,18 +39,22 @@ export class ToolDetails implements Component {
     const lines: string[] = [];
     const th = this.theme;
 
-    if (this.options.expanded) {
-      for (const field of this.config.fields) {
-        if (isComponent(field)) {
-          lines.push(...field.render(width));
-        } else {
-          const text = new Text(
-            `${th.fg("muted", `${field.label}: `)}${field.value}`,
-            0,
-            0,
-          );
-          lines.push(...text.render(width));
-        }
+    const fieldsToRender = this.options.expanded
+      ? this.config.fields
+      : this.config.fields.filter(
+          (f) => "showCollapsed" in f && f.showCollapsed,
+        );
+
+    for (const field of fieldsToRender) {
+      if (isComponent(field)) {
+        lines.push(...field.render(width));
+      } else {
+        const text = new Text(
+          `${th.fg("muted", `${field.label}: `)}${field.value}`,
+          0,
+          0,
+        );
+        lines.push(...text.render(width));
       }
     }
 

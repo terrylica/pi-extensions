@@ -159,6 +159,7 @@ export async function executeSubagent(
         if (event.partialResult) {
           existing.partialResult = event.partialResult as {
             content: Array<{ type: string; text?: string }>;
+            details?: unknown;
           };
         }
         onToolUpdate?.([...toolCalls.values()]);

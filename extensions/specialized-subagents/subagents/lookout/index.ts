@@ -411,6 +411,24 @@ Pass relevant skills (e.g., 'ios-26', 'drizzle-orm') to provide specialized cont
             spinnerFrame,
           ),
         );
+
+        // Show indexing progress when collapsed
+        const indexingCall = toolCalls.find(
+          (tc) =>
+            tc.toolName === "semantic_search" &&
+            tc.status === "running" &&
+            tc.partialResult &&
+            (tc.partialResult.details as { indexing?: boolean } | undefined)
+              ?.indexing === true,
+        );
+        const indexingText = indexingCall?.partialResult?.content?.[0]?.text;
+        if (indexingText) {
+          fields.push({
+            label: "Status",
+            value: indexingText,
+            showCollapsed: true,
+          });
+        }
       }
 
       return new ToolDetails({ fields, footer }, options, theme);

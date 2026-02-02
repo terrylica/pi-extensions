@@ -253,7 +253,7 @@ async function runOsgrepSearch(
 
 export function createSemanticSearchTool(
   cwd: string,
-): ToolDefinition<typeof parameters, undefined> {
+): ToolDefinition<typeof parameters, { indexing: boolean } | undefined> {
   return {
     name: "semantic_search",
     label: "Semantic Search",
@@ -281,7 +281,7 @@ Returns file paths, line ranges, roles (ORCHESTRATION = logic, DEFINITION = type
             : "Indexing repository...";
           onUpdate?.({
             content: [{ type: "text", text: message }],
-            details: undefined,
+            details: { indexing: true },
           });
 
           // Run indexing with progress streaming
@@ -297,13 +297,19 @@ Returns file paths, line ranges, roles (ORCHESTRATION = logic, DEFINITION = type
 
               onUpdate?.({
                 content: [{ type: "text", text: progressMessage }],
-                details: undefined,
+                details: { indexing: true },
               });
             },
             signal,
             needsReset,
           );
         }
+
+        // Clear indexing status after indexing completes
+        onUpdate?.({
+          content: [{ type: "text", text: "" }],
+          details: { indexing: false },
+        });
 
         // Run the actual search
         const output = await runOsgrepSearch(cwd, query, maxResults, signal);
