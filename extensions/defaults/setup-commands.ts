@@ -1,6 +1,6 @@
 import type { ExtensionAPI } from "@mariozechner/pi-coding-agent";
 import { registerCommands } from "./commands";
-import { generateTitle, getFirstUserText } from "./lib/title";
+import { generateAndSetTitle } from "./lib/title";
 
 export function setupCommands(pi: ExtensionAPI) {
   registerCommands(pi);
@@ -10,64 +10,27 @@ export function setupCommands(pi: ExtensionAPI) {
     handler: async (args, ctx) => {
       const input = args.trim();
 
-      // /name auto - force regenerate
-      if (input === "auto") {
-        const firstUserText = getFirstUserText(ctx);
-        if (!firstUserText?.trim()) {
-          ctx.ui.notify("No user message to generate title from", "warning");
+      // /ad-name auto -- force regenerate
+      if (input === "auto" || !input) {
+        const currentName = pi.getSessionName();
+
+        // /ad-name (no args) with existing name -- just display it
+        if (!input && currentName) {
+          ctx.ui.notify(
+            `Session: ${currentName} (use /ad-name <text> to change)`,
+            "info",
+          );
           return;
         }
 
-        try {
-          const title = await generateTitle(firstUserText, ctx);
-          if (title) {
-            pi.setSessionName(title);
-            ctx.ui.notify(`Session: ${title}`, "info");
-          } else {
-            ctx.ui.notify("Failed to generate title", "error");
-          }
-        } catch {
-          ctx.ui.notify("Failed to generate title", "error");
-        }
+        // Auto-generate (either explicit "auto" or no args + no name)
+        await generateAndSetTitle(pi, ctx);
         return;
       }
 
-      // /name foo - set manually
-      if (input) {
-        pi.setSessionName(input);
-        ctx.ui.notify(`Session: ${input}`, "info");
-        return;
-      }
-
-      // /name (no args)
-      const currentName = pi.getSessionName();
-      if (currentName) {
-        // Has name - display it with hint
-        ctx.ui.notify(
-          `Session: ${currentName} (use /ad-name <text> to change)`,
-          "info",
-        );
-        return;
-      }
-
-      // No name - auto generate
-      const firstUserText = getFirstUserText(ctx);
-      if (!firstUserText?.trim()) {
-        ctx.ui.notify("No user message to generate title from", "warning");
-        return;
-      }
-
-      try {
-        const title = await generateTitle(firstUserText, ctx);
-        if (title) {
-          pi.setSessionName(title);
-          ctx.ui.notify(`Session: ${title}`, "info");
-        } else {
-          ctx.ui.notify("Failed to generate title", "error");
-        }
-      } catch {
-        ctx.ui.notify("Failed to generate title", "error");
-      }
+      // /ad-name <text> -- set manually
+      pi.setSessionName(input);
+      ctx.ui.notify(`Session: ${input}`, "info");
     },
   });
 }
