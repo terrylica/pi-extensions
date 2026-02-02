@@ -30,95 +30,38 @@ To install selectively (or disable specific extensions), edit your `settings.jso
 }
 ```
 
-Some extensions are published individually to npm:
+## Published Extensions
 
-```bash
-pi install npm:@aliou/pi-processes
-```
+Standalone extensions published to npm. Install individually with `pi install npm:<package>`.
+
+| Extension | Description | README | npm |
+|-----------|-------------|--------|-----|
+| extension-dev | Tools and commands for developing and updating Pi extensions | [README](extensions/extension-dev/README.md) | [@aliou/pi-extension-dev](https://www.npmjs.com/package/@aliou/pi-extension-dev) |
+| guardrails | Security hooks to prevent potentially dangerous operations | [README](extensions/guardrails/README.md) | [@aliou/pi-guardrails](https://www.npmjs.com/package/@aliou/pi-guardrails) |
+| processes | Background process management without blocking the conversation | [README](extensions/processes/README.md) | [@aliou/pi-processes](https://www.npmjs.com/package/@aliou/pi-processes) |
+
+## All Extensions
+
+| Extension | Description | README |
+|-----------|-------------|--------|
+| defaults | Sensible defaults and quality-of-life improvements | [README](extensions/defaults/README.md) |
+| extension-dev | Pi extension development tools and update workflow | [README](extensions/extension-dev/README.md) |
+| guardrails | Security hooks (brew block, env protection, dangerous command gate) | [README](extensions/guardrails/README.md) |
+| mac-app | macOS UI automation via Accessibility | [README](extensions/mac-app/README.md) |
+| neovim | Bidirectional Neovim integration (editor context, file reload, LSP diagnostics) | [README](extensions/neovim/README.md) |
+| planning | Save and execute implementation plans | [README](extensions/planning/README.md) |
+| presenter | Terminal notifications, title updates, sounds | [README](extensions/presenter/README.md) |
+| processes | Background process management | [README](extensions/processes/README.md) |
+| providers | Providers and usage dashboard (rate limits, session stats) | [README](extensions/providers/README.md) |
+| session-management | Session management utilities (copy path) | [README](extensions/session-management/README.md) |
+| specialized-subagents | Framework for spawning specialized subagents (scout, oracle, reviewer, etc.) | [README](extensions/specialized-subagents/README.md) |
+| the-dumb-zone | Context window degradation warning | [README](extensions/the-dumb-zone/README.md) |
 
 ## Themes
 
-### [jellybeans](themes/jellybeans/)
-
-Jellybeans mono theme variants.
-
-## UX
-
-Extensions that improve the interaction experience.
-
-### [defaults](extensions/defaults/)
-
-Sensible defaults and quality-of-life improvements. Directory-aware read (returns listing instead of failing), auto theme sync with macOS appearance.
-
-### [neovim](extensions/neovim/)
-
-Bidirectional Neovim integration. Injects visible splits into context, reloads files after edits, sends LSP diagnostics. Includes a Neovim plugin for the editor side.
-
-### [processes](extensions/processes/)
-
-Background process management. Start long-running commands (dev servers, build watchers) without blocking the conversation. File-based logging, friendly names, auto-cleanup.
-
-[npm](https://www.npmjs.com/package/@aliou/pi-processes)
-
-### [presenter](extensions/presenter/)
-
-Terminal presentation layer. Updates terminal title, sends system notifications (iTerm2, Kitty, Ghostty), plays sound alerts on macOS.
-
-## Safety
-
-Extensions that prevent mistakes.
-
-### [guardrails](extensions/guardrails/)
-
-Security hooks. Blocks Homebrew commands (project uses Nix), protects `.env` files, prompts for confirmation on dangerous commands.
-
-[npm](https://www.npmjs.com/package/@aliou/pi-guardrails)
-
-## Context Engineering
-
-Extensions that improve agent reasoning and planning.
-
-### [specialized-subagents](extensions/specialized-subagents/)
-
-Framework for spawning specialized subagents with custom tools. Includes scout (web research), oracle (GPT-5 advisor), reviewer (code review), lookout (semantic search), and more.
-
-### [planning](extensions/planning/)
-
-Save and execute implementation plans. `/plan:save` creates a structured plan from the current conversation, `/plan:execute` runs a saved plan.
-
-### [session-management](extensions/session-management/)
-
-Session management utilities. Copy session path to clipboard. Future: summarization of previous sessions, cross-session context.
-
-## Monitoring
-
-Extensions that track session health and API usage.
-
-### [providers](extensions/providers/)
-
-Providers and usage dashboard. Registers OpenRouter Gemini/Moonshot models, shows rate limits with pace markers, and exposes the `/usage` dashboard.
-
-### [the-dumb-zone](extensions/the-dumb-zone/)
-
-Context window degradation warning. Monitors token usage relative to the model's context window and shows a warning overlay when quality may be degrading.
-
-## Tools
-
-Extensions that provide custom tools for external automation.
-
-### [mac-app](extensions/mac-app/)
-
-macOS UI automation via Accessibility. Query UI elements, click, type, scroll, run actions. Requires AXorcist CLI and Accessibility permissions.
-
-## Development
-
-Extensions for developing and maintaining Pi extensions.
-
-### [extension-dev](extensions/extension-dev/)
-
-Pi extension development tools and update workflow. Detects package manager, queries current version, reads documentation, views changelog, and provides a guided prompt for updating extensions to new Pi releases.
-
-[npm](https://www.npmjs.com/package/@aliou/pi-extension-dev)
+| Theme | README |
+|-------|--------|
+| jellybeans | [README](themes/jellybeans/README.md) |
 
 ## Development
 
