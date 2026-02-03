@@ -90,6 +90,16 @@ export function createLookoutTool(): ToolDefinition<
   typeof parameters,
   LookoutDetails
 > {
+  // Render cache for reusing components across updates
+  const renderCache = new Map<
+    string,
+    {
+      toolDetails: ToolDetails;
+      footer: SubagentFooter;
+      markdownResponse: MarkdownResponse | null;
+    }
+  >();
+
   return {
     name: "lookout",
     label: "Lookout",
@@ -104,7 +114,7 @@ Pass relevant skills (e.g., 'ios-26', 'drizzle-orm') to provide specialized cont
     parameters,
 
     async execute(
-      _toolCallId: string,
+      toolCallId: string,
       args: LookoutInput,
       signal: AbortSignal | undefined,
       onUpdate: AgentToolUpdateCallback<LookoutDetails> | undefined,
@@ -128,6 +138,7 @@ Pass relevant skills (e.g., 'ios-26', 'drizzle-orm') to provide specialized cont
         return {
           content: [{ type: "text" as const, text: `Error: ${error}` }],
           details: {
+            _renderKey: toolCallId,
             query: "",
             skills: skillNames,
             skillsResolved: resolvedSkills.length,
@@ -157,6 +168,7 @@ Pass relevant skills (e.g., 'ios-26', 'drizzle-orm') to provide specialized cont
           onUpdate?.({
             content: [{ type: "text", text: "" }],
             details: {
+              _renderKey: toolCallId,
               query,
               skills: skillNames,
               skillsResolved: resolvedSkills.length,
@@ -179,6 +191,7 @@ Pass relevant skills (e.g., 'ios-26', 'drizzle-orm') to provide specialized cont
         onUpdate?.({
           content: [{ type: "text", text: "" }],
           details: {
+            _renderKey: toolCallId,
             query,
             skills: skillNames,
             skillsResolved: resolvedSkills.length,
@@ -222,6 +235,7 @@ Pass relevant skills (e.g., 'ios-26', 'drizzle-orm') to provide specialized cont
             onUpdate?.({
               content: [{ type: "text", text: "" }],
               details: {
+                _renderKey: toolCallId,
                 query,
                 skills: skillNames,
                 skillsResolved: resolvedSkills.length,
@@ -241,6 +255,7 @@ Pass relevant skills (e.g., 'ios-26', 'drizzle-orm') to provide specialized cont
             onUpdate?.({
               content: [{ type: "text", text: "" }],
               details: {
+                _renderKey: toolCallId,
                 query,
                 skills: skillNames,
                 skillsResolved: resolvedSkills.length,
@@ -262,6 +277,7 @@ Pass relevant skills (e.g., 'ios-26', 'drizzle-orm') to provide specialized cont
           return {
             content: [{ type: "text" as const, text: "Aborted" }],
             details: {
+              _renderKey: toolCallId,
               query,
               skills: skillNames,
               skillsResolved: resolvedSkills.length,
@@ -283,6 +299,7 @@ Pass relevant skills (e.g., 'ios-26', 'drizzle-orm') to provide specialized cont
               { type: "text" as const, text: `Error: ${result.error}` },
             ],
             details: {
+              _renderKey: toolCallId,
               query,
               skills: skillNames,
               skillsResolved: resolvedSkills.length,
@@ -310,6 +327,7 @@ Pass relevant skills (e.g., 'ios-26', 'drizzle-orm') to provide specialized cont
           return {
             content: [{ type: "text" as const, text: `Error: ${error}` }],
             details: {
+              _renderKey: toolCallId,
               query,
               skills: skillNames,
               skillsResolved: resolvedSkills.length,
@@ -328,6 +346,7 @@ Pass relevant skills (e.g., 'ios-26', 'drizzle-orm') to provide specialized cont
         return {
           content: [{ type: "text" as const, text: result.content }],
           details: {
+            _renderKey: toolCallId,
             query,
             skills: skillNames,
             skillsResolved: resolvedSkills.length,
@@ -379,6 +398,7 @@ Pass relevant skills (e.g., 'ios-26', 'drizzle-orm') to provide specialized cont
       }
 
       const {
+        _renderKey,
         toolCalls,
         spinnerFrame,
         response,
@@ -389,11 +409,21 @@ Pass relevant skills (e.g., 'ios-26', 'drizzle-orm') to provide specialized cont
         cwd,
       } = details;
 
-      const footer = new SubagentFooter(theme, {
-        resolvedModel,
-        usage,
-        toolCalls,
-      });
+      const renderKey = _renderKey ?? "_default_";
+      const cached = renderCache.get(renderKey);
+
+      // Footer - reuse or create
+      const footerData = { resolvedModel, usage, toolCalls };
+      let footer: SubagentFooter;
+      if (cached) {
+        footer = cached.footer;
+        footer.updateData(footerData);
+      } else {
+        footer = new SubagentFooter(theme, footerData);
+      }
+
+      // MarkdownResponse - reuse or create
+      let mdResponse = cached?.markdownResponse ?? null;
 
       // Build fields based on state
       const fields: ToolDetailsField[] = [];
@@ -407,7 +437,13 @@ Pass relevant skills (e.g., 'ios-26', 'drizzle-orm') to provide specialized cont
         // Done state
         fields.push(new ToolCallSummary(toolCalls, formatToolCall, theme));
         fields.push(new FailedToolCalls(toolCalls, formatToolCall, theme));
-        fields.push(new MarkdownResponse(response, theme));
+
+        if (mdResponse) {
+          mdResponse.setContent(response);
+        } else {
+          mdResponse = new MarkdownResponse(response, theme);
+        }
+        fields.push(mdResponse);
       } else {
         // Running state
         fields.push(
@@ -433,7 +469,23 @@ Pass relevant skills (e.g., 'ios-26', 'drizzle-orm') to provide specialized cont
         }
       }
 
-      return new ToolDetails({ fields, footer }, options, theme);
+      // ToolDetails - reuse or create
+      let toolDetails: ToolDetails;
+      if (cached) {
+        toolDetails = cached.toolDetails;
+        toolDetails.update({ fields, footer }, options);
+      } else {
+        toolDetails = new ToolDetails({ fields, footer }, options, theme);
+      }
+
+      // Update cache
+      renderCache.set(renderKey, {
+        toolDetails,
+        footer,
+        markdownResponse: mdResponse,
+      });
+
+      return toolDetails;
     },
   };
 }

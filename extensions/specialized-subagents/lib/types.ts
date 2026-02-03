@@ -156,4 +156,7 @@ export interface SubagentResponseDetails {
 export interface BaseSubagentDetails
   extends SubagentSkillDetails,
     SubagentToolCallDetails,
-    SubagentResponseDetails {}
+    SubagentResponseDetails {
+  /** Tool call ID used as cache key for render component reuse */
+  _renderKey?: string;
+}

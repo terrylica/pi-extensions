@@ -37,6 +37,10 @@ export class SubagentFooter implements Component {
 
   invalidate(): void {}
 
+  updateData(data: SubagentFooterData): void {
+    this.data = data;
+  }
+
   render(width: number): string[] {
     const th = this.theme;
     const { resolvedModel, usage, toolCalls } = this.data;

@@ -117,6 +117,16 @@ export function createOracleTool(): ToolDefinition<
   typeof parameters,
   OracleDetails
 > {
+  // Render cache for reusing components across updates
+  const renderCache = new Map<
+    string,
+    {
+      toolDetails: ToolDetails;
+      footer: SubagentFooter;
+      markdownResponse: MarkdownResponse | null;
+    }
+  >();
+
   return {
     name: "oracle",
     label: "Oracle",
@@ -138,7 +148,7 @@ Pass relevant skills (e.g., 'ios-26', 'drizzle-orm') to provide specialized cont
     parameters,
 
     async execute(
-      _toolCallId: string,
+      toolCallId: string,
       args: OracleInput,
       signal: AbortSignal | undefined,
       onUpdate: AgentToolUpdateCallback<OracleDetails> | undefined,
@@ -158,27 +168,12 @@ Pass relevant skills (e.g., 'ios-26', 'drizzle-orm') to provide specialized cont
 
       let resolvedModel: { provider: string; id: string } | undefined;
 
-      let spinnerFrame = 0;
+      const spinnerFrame = 0;
 
-      // Set up spinner animation interval
-      const spinnerInterval = setInterval(() => {
-        spinnerFrame++;
-        onUpdate?.({
-          content: [{ type: "text", text: "" }],
-          details: {
-            task,
-            context,
-            files,
-            skills: skillNames,
-            skillsResolved: resolvedSkills.length,
-            skillsNotFound:
-              notFoundSkills.length > 0 ? notFoundSkills : undefined,
-            toolCalls: [],
-            spinnerFrame,
-            resolvedModel,
-          },
-        });
-      }, 80);
+      // No spinner interval needed - Oracle's renderResult doesn't use spinnerFrame
+      // and toolCalls is always empty, so spinner updates produce no visible change.
+      const spinnerInterval: ReturnType<typeof setInterval> | undefined =
+        undefined;
 
       try {
         const model = resolveModel(MODEL, ctx);
@@ -188,6 +183,7 @@ Pass relevant skills (e.g., 'ios-26', 'drizzle-orm') to provide specialized cont
         onUpdate?.({
           content: [{ type: "text", text: "" }],
           details: {
+            _renderKey: toolCallId,
             task,
             context,
             files,
@@ -234,6 +230,7 @@ Pass relevant skills (e.g., 'ios-26', 'drizzle-orm') to provide specialized cont
             onUpdate?.({
               content: [{ type: "text", text: accumulated }],
               details: {
+                _renderKey: toolCallId,
                 task,
                 context,
                 files,
@@ -255,6 +252,7 @@ Pass relevant skills (e.g., 'ios-26', 'drizzle-orm') to provide specialized cont
           return {
             content: [{ type: "text" as const, text: "Aborted" }],
             details: {
+              _renderKey: toolCallId,
               task,
               context,
               files,
@@ -279,6 +277,7 @@ Pass relevant skills (e.g., 'ios-26', 'drizzle-orm') to provide specialized cont
         return {
           content: [{ type: "text" as const, text: result.content }],
           details: {
+            _renderKey: toolCallId,
             task,
             context,
             files,
@@ -294,7 +293,7 @@ Pass relevant skills (e.g., 'ios-26', 'drizzle-orm') to provide specialized cont
           },
         };
       } finally {
-        clearInterval(spinnerInterval);
+        if (spinnerInterval) clearInterval(spinnerInterval);
       }
     },
 
@@ -335,6 +334,7 @@ Pass relevant skills (e.g., 'ios-26', 'drizzle-orm') to provide specialized cont
       }
 
       const {
+        _renderKey,
         response,
         aborted,
         error,
@@ -346,11 +346,21 @@ Pass relevant skills (e.g., 'ios-26', 'drizzle-orm') to provide specialized cont
         files,
       } = details;
 
-      const footer = new SubagentFooter(theme, {
-        resolvedModel,
-        usage,
-        toolCalls,
-      });
+      const renderKey = _renderKey ?? "_default_";
+      const cached = renderCache.get(renderKey);
+
+      // Footer - reuse or create
+      const footerData = { resolvedModel, usage, toolCalls };
+      let footer: SubagentFooter;
+      if (cached) {
+        footer = cached.footer;
+        footer.updateData(footerData);
+      } else {
+        footer = new SubagentFooter(theme, footerData);
+      }
+
+      // MarkdownResponse - reuse or create
+      let mdResponse = cached?.markdownResponse ?? null;
 
       // Build fields based on state
       const fields: ToolDetailsField[] = [];
@@ -360,7 +370,6 @@ Pass relevant skills (e.g., 'ios-26', 'drizzle-orm') to provide specialized cont
       } else if (error) {
         fields.push({ label: "Error", value: error });
       } else if (response) {
-        // Done state
         if (task) {
           fields.push({ label: "Task", value: task });
         }
@@ -370,10 +379,32 @@ Pass relevant skills (e.g., 'ios-26', 'drizzle-orm') to provide specialized cont
         if (files?.length) {
           fields.push({ label: "Files", value: files.join(", ") });
         }
-        fields.push(new MarkdownResponse(response, theme));
+
+        if (mdResponse) {
+          mdResponse.setContent(response);
+        } else {
+          mdResponse = new MarkdownResponse(response, theme);
+        }
+        fields.push(mdResponse);
       }
 
-      return new ToolDetails({ fields, footer }, options, theme);
+      // ToolDetails - reuse or create
+      let toolDetails: ToolDetails;
+      if (cached) {
+        toolDetails = cached.toolDetails;
+        toolDetails.update({ fields, footer }, options);
+      } else {
+        toolDetails = new ToolDetails({ fields, footer }, options, theme);
+      }
+
+      // Update cache
+      renderCache.set(renderKey, {
+        toolDetails,
+        footer,
+        markdownResponse: mdResponse,
+      });
+
+      return toolDetails;
     },
   };
 }

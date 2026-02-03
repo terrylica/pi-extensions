@@ -12,6 +12,9 @@ export interface JesterInput {
 
 /** Details structure for jester tool rendering */
 export interface JesterDetails {
+  /** Tool call ID used as cache key for render component reuse */
+  _renderKey?: string;
+
   /** Question input */
   question: string;
 

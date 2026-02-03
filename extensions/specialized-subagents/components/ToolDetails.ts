@@ -35,6 +35,11 @@ export class ToolDetails implements Component {
 
   invalidate(): void {}
 
+  update(config: ToolDetailsConfig, options: ToolRenderResultOptions): void {
+    this.config = config;
+    this.options = options;
+  }
+
   render(width: number): string[] {
     const lines: string[] = [];
     const th = this.theme;

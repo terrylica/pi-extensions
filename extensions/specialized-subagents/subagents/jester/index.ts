@@ -56,6 +56,16 @@ export function createJesterTool(): ToolDefinition<
   typeof parameters,
   JesterDetails
 > {
+  // Render cache for reusing components across updates
+  const renderCache = new Map<
+    string,
+    {
+      toolDetails: ToolDetails;
+      footer: SubagentFooter;
+      markdownResponse: MarkdownResponse | null;
+    }
+  >();
+
   return {
     name: "jester",
     label: "Jester",
@@ -64,7 +74,7 @@ export function createJesterTool(): ToolDefinition<
     parameters,
 
     async execute(
-      _toolCallId: string,
+      toolCallId: string,
       args: JesterInput,
       signal: AbortSignal | undefined,
       onUpdate: AgentToolUpdateCallback<JesterDetails> | undefined,
@@ -75,20 +85,12 @@ export function createJesterTool(): ToolDefinition<
       let resolvedModel: { provider: string; id: string } | undefined;
 
       const toolCalls: SubagentToolCall[] = [];
-      let spinnerFrame = 0;
+      const spinnerFrame = 0;
 
-      const spinnerInterval = setInterval(() => {
-        spinnerFrame++;
-        onUpdate?.({
-          content: [{ type: "text", text: "" }],
-          details: {
-            question,
-            toolCalls,
-            spinnerFrame,
-            resolvedModel,
-          },
-        });
-      }, 80);
+      // No spinner interval needed - Jester's renderResult doesn't use spinnerFrame
+      // and toolCalls is always empty, so spinner updates produce no visible change.
+      const spinnerInterval: ReturnType<typeof setInterval> | undefined =
+        undefined;
 
       try {
         const model = resolveModel(MODEL, ctx);
@@ -98,6 +100,7 @@ export function createJesterTool(): ToolDefinition<
         onUpdate?.({
           content: [{ type: "text", text: "" }],
           details: {
+            _renderKey: toolCallId,
             question,
             toolCalls,
             spinnerFrame,
@@ -129,6 +132,7 @@ export function createJesterTool(): ToolDefinition<
             onUpdate?.({
               content: [{ type: "text", text: accumulated }],
               details: {
+                _renderKey: toolCallId,
                 question,
                 toolCalls,
                 spinnerFrame,
@@ -144,6 +148,7 @@ export function createJesterTool(): ToolDefinition<
           return {
             content: [{ type: "text" as const, text: "Aborted" }],
             details: {
+              _renderKey: toolCallId,
               question,
               toolCalls,
               spinnerFrame,
@@ -160,6 +165,7 @@ export function createJesterTool(): ToolDefinition<
               { type: "text" as const, text: `Error: ${result.error}` },
             ],
             details: {
+              _renderKey: toolCallId,
               question,
               toolCalls,
               spinnerFrame,
@@ -173,6 +179,7 @@ export function createJesterTool(): ToolDefinition<
         return {
           content: [{ type: "text" as const, text: result.content }],
           details: {
+            _renderKey: toolCallId,
             question,
             toolCalls,
             spinnerFrame,
@@ -192,6 +199,7 @@ export function createJesterTool(): ToolDefinition<
         return {
           content: [{ type: "text" as const, text: `Error: ${error}` }],
           details: {
+            _renderKey: toolCallId,
             question,
             toolCalls,
             spinnerFrame,
@@ -200,7 +208,7 @@ export function createJesterTool(): ToolDefinition<
           },
         };
       } finally {
-        clearInterval(spinnerInterval);
+        if (spinnerInterval) clearInterval(spinnerInterval);
       }
     },
 
@@ -225,14 +233,31 @@ export function createJesterTool(): ToolDefinition<
         return new Text(content || "", 0, 0);
       }
 
-      const { response, aborted, error, usage, toolCalls, resolvedModel } =
-        details;
-
-      const footer = new SubagentFooter(theme, {
-        resolvedModel,
+      const {
+        _renderKey,
+        response,
+        aborted,
+        error,
         usage,
         toolCalls,
-      });
+        resolvedModel,
+      } = details;
+
+      const renderKey = _renderKey ?? "_default_";
+      const cached = renderCache.get(renderKey);
+
+      // Footer - reuse or create
+      const footerData = { resolvedModel, usage, toolCalls };
+      let footer: SubagentFooter;
+      if (cached) {
+        footer = cached.footer;
+        footer.updateData(footerData);
+      } else {
+        footer = new SubagentFooter(theme, footerData);
+      }
+
+      // MarkdownResponse - reuse or create
+      let mdResponse = cached?.markdownResponse ?? null;
 
       // Build fields based on state
       const fields: ToolDetailsField[] = [];
@@ -242,11 +267,31 @@ export function createJesterTool(): ToolDefinition<
       } else if (error) {
         fields.push({ label: "Error", value: error });
       } else if (response) {
-        // Done state
-        fields.push(new MarkdownResponse(response, theme));
+        if (mdResponse) {
+          mdResponse.setContent(response);
+        } else {
+          mdResponse = new MarkdownResponse(response, theme);
+        }
+        fields.push(mdResponse);
       }
 
-      return new ToolDetails({ fields, footer }, options, theme);
+      // ToolDetails - reuse or create
+      let toolDetails: ToolDetails;
+      if (cached) {
+        toolDetails = cached.toolDetails;
+        toolDetails.update({ fields, footer }, options);
+      } else {
+        toolDetails = new ToolDetails({ fields, footer }, options, theme);
+      }
+
+      // Update cache
+      renderCache.set(renderKey, {
+        toolDetails,
+        footer,
+        markdownResponse: mdResponse,
+      });
+
+      return toolDetails;
     },
   };
 }

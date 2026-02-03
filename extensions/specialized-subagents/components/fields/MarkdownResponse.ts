@@ -1,6 +1,6 @@
 import type { Theme } from "@mariozechner/pi-coding-agent";
 import { DynamicBorder, getMarkdownTheme } from "@mariozechner/pi-coding-agent";
-import type { Component } from "@mariozechner/pi-tui";
+import type { Component, MarkdownTheme } from "@mariozechner/pi-tui";
 import { Markdown, Text } from "@mariozechner/pi-tui";
 
 /**
@@ -12,6 +12,8 @@ import { Markdown, Text } from "@mariozechner/pi-tui";
  */
 export class MarkdownResponse implements Component {
   private border: DynamicBorder;
+  private md: Markdown | null = null;
+  private cachedTheme: MarkdownTheme | null = null;
 
   constructor(
     private content: string,
@@ -24,7 +26,20 @@ export class MarkdownResponse implements Component {
     return false;
   }
 
-  invalidate(): void {}
+  /**
+   * Updates the content. If a cached Markdown exists, updates it via setText
+   * instead of creating a new instance.
+   */
+  setContent(content: string): void {
+    this.content = content;
+    if (this.md) {
+      this.md.setText(content);
+    }
+  }
+
+  invalidate(): void {
+    this.md?.invalidate();
+  }
 
   render(width: number): string[] {
     if (!this.content) return [];
@@ -35,9 +50,17 @@ export class MarkdownResponse implements Component {
     lines.push("");
 
     try {
-      const mdTheme = getMarkdownTheme();
-      const md = new Markdown(this.content, 0, 0, mdTheme);
-      lines.push(...md.render(width));
+      // Cache the theme, call getMarkdownTheme() only once
+      if (!this.cachedTheme) {
+        this.cachedTheme = getMarkdownTheme();
+      }
+
+      // Create Markdown instance only on first render, reuse on subsequent renders
+      if (!this.md) {
+        this.md = new Markdown(this.content, 0, 0, this.cachedTheme);
+      }
+
+      lines.push(...this.md.render(width));
     } catch {
       const text = new Text(this.content, 0, 0);
       lines.push(...text.render(width));
