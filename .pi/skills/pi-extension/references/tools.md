@@ -1,118 +1,200 @@
-# Writing Tools
+# Tools
 
-## Basic Tool
+Tools are functions the LLM can call. They are the primary way extensions add capabilities to pi.
 
-```typescript
-// extensions/<name>/tools/foo-tool.ts
-import type {
-  AgentToolResult,
-  ExtensionAPI,
-  ExtensionContext,
-  Theme,
-  ToolRenderResultOptions,
-} from "@mariozechner/pi-coding-agent";
-import { Text } from "@mariozechner/pi-tui";
-import { type Static, Type } from "@sinclair/typebox";
-
-// Parameters schema using TypeBox
-const FooParams = Type.Object({
-  param1: Type.String({ description: "Parameter description" }),
-  param2: Type.Optional(Type.Number({ description: "Optional param" })),
-});
-type FooParamsType = Static<typeof FooParams>;
-
-// Typed details for rich rendering
-interface FooDetails {
-  success: boolean;
-  message: string;
-  // ... other result fields
-}
-
-type ExecuteResult = AgentToolResult<FooDetails>;
-
-export function setupFooTool(pi: ExtensionAPI) {
-  pi.registerTool<typeof FooParams, FooDetails>({
-    name: "tool_name",
-    label: "Tool Label",
-    description: "Description for the LLM - be specific about when to use",
-    parameters: FooParams,
-
-    async execute(
-      _toolCallId: string,
-      params: FooParamsType,
-      _onUpdate: unknown,
-      _ctx: ExtensionContext,
-      _signal?: AbortSignal,
-    ): Promise<ExecuteResult> {
-      // Implementation
-      return {
-        content: [{ type: "text", text: "result for LLM" }],
-        details: { success: true, message: "Result for rendering" },
-      };
-    },
-
-    renderCall(args: FooParamsType, theme: Theme): Text {
-      let text = theme.fg("toolTitle", theme.bold("tool_name"));
-      if (args.param1) {
-        text += ` ${theme.fg("accent", args.param1)}`;
-      }
-      return new Text(text, 0, 0);
-    },
-
-    renderResult(
-      result: AgentToolResult<FooDetails>,
-      _options: ToolRenderResultOptions,
-      theme: Theme,
-    ): Text {
-      const { details } = result;
-      if (!details) {
-        const text = result.content[0];
-        return new Text(
-          text?.type === "text" && text.text ? text.text : "No result",
-          0,
-          0,
-        );
-      }
-      if (!details.success) {
-        return new Text(theme.fg("error", details.message), 0, 0);
-      }
-      return new Text(theme.fg("success", details.message), 0, 0);
-    },
-  });
-}
-```
-
-## Multi-Action Tool
-
-For tools with multiple actions (like `processes`), use StringEnum:
+## Registration
 
 ```typescript
-import { StringEnum } from "@mariozechner/pi-ai";
+import { Type, type ExtensionAPI, type ToolDefinition } from "@mariozechner/pi-coding-agent";
 
-const MultiParams = Type.Object({
-  action: StringEnum(["start", "list", "stop"] as const, {
-    description: "Action: start (run), list (show all), stop (terminate)",
+const myTool: ToolDefinition = {
+  name: "my_tool",
+  description: "What this tool does. The LLM reads this to decide when to call it.",
+  parameters: Type.Object({
+    query: Type.String({ description: "Search query" }),
+    limit: Type.Optional(Type.Number({ description: "Max results", default: 10 })),
   }),
-  id: Type.Optional(Type.String({ description: "Required for stop" })),
-});
+  execute: async (toolCallId, params, signal, onUpdate, ctx) => {
+    const results = await doSomething(params.query, params.limit);
+    return {
+      output: JSON.stringify(results),
+      display: true,
+      details: { results },
+    };
+  },
+};
+
+export default function (pi: ExtensionAPI) {
+  pi.registerTool(myTool);
+}
 ```
 
-## Return Values
+## Execute Signature
 
-The `execute` function returns:
-- `content`: Array of content blocks for the LLM (text, images, etc.)
-- `details`: Optional typed object for rich TUI rendering
+```typescript
+execute(
+  toolCallId: string,
+  params: Static<TParams>,      // Typed from the parameters schema
+  signal: AbortSignal | undefined,
+  onUpdate: AgentToolUpdateCallback<TDetails> | undefined,
+  ctx: ExtensionContext,
+): Promise<AgentToolResult<TDetails>>
+```
+
+**Parameter order matters.** The signal comes before onUpdate.
+
+Always use optional chaining when calling `onUpdate`:
+
+```typescript
+onUpdate?.({ output: "partial result", details: { progress: 50 } });
+```
+
+The `onUpdate` parameter can be `undefined`. Calling it without optional chaining will throw.
+
+## Return Value
 
 ```typescript
 return {
-  content: [{ type: "text", text: "Result text for LLM" }],
-  details: { success: true, data: someData },
+  output: string,          // Text sent to the LLM
+  display?: boolean,       // Whether to show in the TUI (default: false)
+  isError?: boolean,       // Report as error to the LLM (default: false)
+  details?: TDetails,      // Arbitrary data available in the renderer
 };
 ```
 
-## Rendering
+- `output` is what the LLM sees. Keep it structured and concise.
+- `details` is what the renderer sees. Put rich data here for custom display.
+- Set `isError: true` to tell the LLM the tool call failed.
 
-- `renderCall`: Shows tool invocation in TUI (e.g., `tool_name param1`)
-- `renderResult`: Shows result in TUI (success/error messages, tables, etc.)
+## Parameters Schema
 
-Both receive the theme for consistent styling. Use `theme.fg("color", text)` for coloring.
+Use TypeBox (`Type.*`) for parameter schemas. The LLM sees the schema to know what arguments to provide.
+
+```typescript
+import { Type } from "@mariozechner/pi-coding-agent";
+
+// Required string
+Type.String({ description: "File path to read" })
+
+// Optional with default
+Type.Optional(Type.Number({ description: "Max results", default: 10 }))
+
+// Enum (string union)
+Type.StringEnum(["created", "updated", "relevance"], { description: "Sort order" })
+
+// Boolean
+Type.Boolean({ description: "Include hidden files" })
+
+// Nested object
+Type.Object({
+  name: Type.String(),
+  value: Type.String(),
+})
+
+// Array
+Type.Array(Type.String(), { description: "List of tags" })
+```
+
+Always provide `description` on parameters. The LLM uses these to understand what to pass.
+
+## Streaming Updates
+
+Use `onUpdate` to stream partial results while the tool executes. This gives the user feedback during long operations.
+
+```typescript
+execute: async (toolCallId, params, signal, onUpdate, ctx) => {
+  for (const chunk of chunks) {
+    const partial = processChunk(chunk);
+    onUpdate?.({
+      output: partial,
+      details: { progress: chunk.index / chunks.length },
+    });
+  }
+  return { output: finalResult, display: true, details: { complete: true } };
+},
+```
+
+## Custom Rendering
+
+Override how a tool's invocation and result appear in the TUI.
+
+```typescript
+const myTool: ToolDefinition = {
+  name: "my_tool",
+  // ... parameters, execute ...
+
+  renderCall(params, theme) {
+    return theme.fg("toolTitle", `Searching for: ${params.query}`);
+  },
+
+  renderResult(result, { expanded, isPartial }, theme) {
+    if (isPartial) {
+      return theme.fg("muted", "Searching...");
+    }
+    const data = result.details;
+    return [
+      theme.fg("success", `Found ${data.results.length} results`),
+      ...data.results.map((r: string) => `  ${r}`),
+    ].join("\n");
+  },
+};
+```
+
+`renderCall` receives the params the LLM passed and returns a string shown when the tool is invoked.
+
+`renderResult` receives the result (with `details`) and rendering options:
+- `expanded`: Whether the entry is expanded in the TUI.
+- `isPartial`: Whether this is a streaming update (from `onUpdate`) or the final result.
+
+Both return a string or undefined (falls back to default rendering).
+
+## Naming Conventions
+
+For extensions wrapping a third-party API, prefix tool names with the API name to avoid conflicts:
+
+```
+linkup_web_search
+linkup_web_fetch
+synthetic_web_search
+```
+
+For internal/custom tools, no prefix is needed:
+
+```
+get_current_time
+processes
+```
+
+Use snake_case for all tool names.
+
+## Abort Signal
+
+The `signal` parameter lets you cancel long-running operations when the user interrupts.
+
+```typescript
+execute: async (toolCallId, params, signal, onUpdate, ctx) => {
+  const response = await fetch(url, { signal });
+  // If the user cancels, fetch throws an AbortError
+  return { output: await response.text() };
+},
+```
+
+Pass `signal` to any async operation that supports it (fetch, child processes, etc.).
+
+## Output Truncation
+
+For tools that may return large outputs, use the `truncateHead` utility:
+
+```typescript
+import { truncateHead } from "@mariozechner/pi-coding-agent";
+
+execute: async (toolCallId, params, signal, onUpdate, ctx) => {
+  const fullOutput = await getLargeOutput();
+  return {
+    output: truncateHead(fullOutput, 50000), // Keep last 50KB
+    display: true,
+  };
+},
+```
+
+`truncateHead` keeps the tail of the output (most recent content), which is usually most relevant.

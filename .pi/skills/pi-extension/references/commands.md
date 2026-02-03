@@ -1,133 +1,102 @@
-# Writing Commands
+# Commands
 
-Interactive TUI commands that users invoke with `/commandname`.
+Commands are user-invoked actions triggered with `/command-name` in the input editor.
 
-## Directory Structure
-
-```
-commands/
-├── index.ts       # Hub: exports registerCommands function
-├── foo.ts         # Individual command
-└── bar.ts         # Individual command
-```
-
-## Naming Convention
-
-When an extension has multiple commands, use the format `<extension>:<action>`:
-
-```
-/plan:save      # planning extension - save command
-/plan:execute   # planning extension - execute command
-/git:status     # git extension - status command
-/git:commit     # git extension - commit command
-```
-
-Use a short prefix (e.g., `plan` instead of `planning`) for brevity. Keep action names concise and descriptive.
-
-For extensions with a single command, use just the extension name: `/myextension`.
-
-## Command Hub
+## Registration
 
 ```typescript
-// extensions/<name>/commands/index.ts
-import type { ExtensionAPI } from "@mariozechner/pi-coding-agent";
-import { registerFooCommand } from "./foo";
-import { registerBarCommand } from "./bar";
-
-export function registerCommands(pi: ExtensionAPI) {
-  registerFooCommand(pi);
-  registerBarCommand(pi);
-}
+pi.registerCommand("my-command", {
+  description: "What this command does",
+  handler: async (args, ctx) => {
+    // args: string (everything after the command name)
+    // ctx: ExtensionContext
+  },
+});
 ```
 
-## Individual Command
+## Command Context
 
-Register commands immediately in the setup function, not inside event handlers. Check for UI availability inside the handler.
+The `ctx` parameter provides the same `ExtensionContext` as hooks, with access to `ctx.ui`, `ctx.hasUI`, `ctx.cwd`, etc.
+
+Commands are interactive by nature (the user typed them), so `ctx.hasUI` is almost always `true`. However, commands can also be invoked programmatically (e.g., via RPC), so the three-tier pattern still applies.
+
+## Simple Command
 
 ```typescript
-// extensions/<name>/commands/foo.ts
-import type { ExtensionAPI } from "@mariozechner/pi-coding-agent";
-import { FooComponent } from "../components/foo-component";
-
-export function registerFooCommand(pi: ExtensionAPI) {
-  pi.registerCommand("xxx:foo", {
-    description: "Description for /xxx:foo",
-    handler: async (_args, ctx) => {
-      if (!ctx.hasUI) return;
-
-      await ctx.ui.custom((tui, theme, _keybindings, done) => {
-        return new FooComponent(tui, theme, () => done(undefined));
-      });
-    },
-  });
-}
+pi.registerCommand("balance", {
+  description: "Check API balance",
+  handler: async (_args, ctx) => {
+    const balance = await fetchBalance();
+    ctx.ui.notify(`Balance: $${balance.toFixed(2)}`, "info");
+  },
+});
 ```
 
-## Component Extraction
+## Command with Rich Display
 
-Extract TUI components to `components/` directory for reusability and clarity:
+When a command needs a rich TUI display, use the three-tier pattern from `references/modes.md`:
 
 ```typescript
-// extensions/<name>/components/foo-component.ts
-import type { Theme } from "@mariozechner/pi-coding-agent";
-import { type Component, matchesKey } from "@mariozechner/pi-tui";
+pi.registerCommand("quotas", {
+  description: "Show API quotas",
+  handler: async (_args, ctx) => {
+    const quotas = await fetchQuotas();
 
-export class FooComponent implements Component {
-  constructor(
-    private tui: { requestRender: () => void },
-    private theme: Theme,
-    private onClose: () => void,
-  ) {}
-
-  handleInput(data: string): boolean {
-    if (matchesKey(data, "escape") || data === "q") {
-      this.onClose();
-      return true;
+    // Print mode
+    if (!ctx.hasUI) {
+      console.log(formatQuotasPlain(quotas));
+      return;
     }
-    return true;
-  }
 
-  invalidate(): void {}
+    // Interactive mode: full TUI component
+    const result = await ctx.ui.custom<void>((tui, theme, _kb, done) => {
+      return new QuotasDisplay(theme, quotas, () => done(undefined));
+    });
 
-  render(width: number): string[] {
-    return ["Line 1", "Line 2"];
-  }
-}
+    // RPC mode: custom() returned undefined
+    if (result === undefined) {
+      pi.sendMessage({
+        customType: "quotas",
+        content: formatQuotasPlain(quotas),
+        display: true,
+        details: quotas,
+      });
+    }
+  },
+});
 ```
 
-## Component Interface
+## Extracting Components
 
-Commands use components that implement:
+Keep command handlers thin. Extract the TUI component into a separate file:
+
+```
+src/
+  commands/
+    quotas.ts              # Handler + formatQuotasPlain
+  components/
+    quotas-display.ts      # QuotasDisplay component class
+```
+
+The component file should export the component class. The command file imports it and wires up the handler.
+
+## Arguments
+
+The `args` parameter is the raw string after the command name. Parse it yourself:
 
 ```typescript
-interface Component {
-  handleInput(data: string): boolean;  // Return true if handled
-  invalidate(): void;                   // Called when state changes
-  render(width: number): string[];      // Return lines to display
-}
+handler: async (args, ctx) => {
+  const parts = args.trim().split(/\s+/);
+  const subcommand = parts[0];
+  // ...
+},
 ```
 
-## Input Handling
+## Command vs Tool
 
-Use `matchesKey` for key detection:
-
-```typescript
-import { matchesKey } from "@mariozechner/pi-tui";
-
-handleInput(data: string): boolean {
-  if (matchesKey(data, "escape")) { /* ... */ }
-  if (matchesKey(data, "enter")) { /* ... */ }
-  if (matchesKey(data, "up")) { /* ... */ }
-  if (matchesKey(data, "down")) { /* ... */ }
-  return true;
-}
-```
-
-## Triggering Re-renders
-
-Call `tui.requestRender()` when state changes:
-
-```typescript
-this.selectedIndex++;
-this.tui.requestRender();
-```
+| Aspect | Command | Tool |
+|---|---|---|
+| Invoked by | User (typing `/name`) | LLM (during a turn) |
+| Purpose | User-facing actions, settings, displays | LLM capabilities |
+| UI access | Full (user is present) | Limited (LLM is driving) |
+| Return value | void | `AgentToolResult` (output for LLM) |

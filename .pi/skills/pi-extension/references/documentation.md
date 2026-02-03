@@ -1,124 +1,54 @@
 # Documentation
 
-## Extension README Template
+Every published extension should have a README that explains what it does, how to set it up, and what it provides.
+
+## README Template
 
 ```markdown
-# Extension Name
+# pi-my-extension
 
-Short description.
+Brief description of the extension.
 
-## Installation
-
-Install via the pi-extensions package:
+## Setup
 
 \`\`\`bash
-pi install git:github.com/aliou/pi-extensions
+pi install @scope/pi-my-extension
 \`\`\`
 
-Or selectively in your `settings.json`:
+### Environment Variables
 
-\`\`\`json
-{
-  "packages": [
-    {
-      "source": "git:github.com/aliou/pi-extensions",
-      "extensions": ["extensions/<name>"]
-    }
-  ]
-}
-\`\`\`
+| Variable | Required | Description |
+|---|---|---|
+| `MY_API_KEY` | Yes | API key from [provider](https://...) |
 
-If published to npm, also include:
+## Tools
 
-\`\`\`bash
-pi install npm:@aliou/pi-<name>
-\`\`\`
+| Tool | Description |
+|---|---|
+| `my_tool` | What it does |
 
-## Features
+## Commands
 
-- **Tool**: `tool_name` - what it does
-- **Command**: `/command` - interactive panel (if applicable)
+| Command | Description |
+|---|---|
+| `/my-command` | What it does |
 
-## Usage
+## Providers
 
-### Tool (for agent)
-
-\`\`\`
-tool_name param="value"
-\`\`\`
-
-### Command (interactive)
-
-Run `/command` to open panel.
-
-## Requirements
-
-(Include this section if the extension depends on external binaries, permissions, system services, or environment setup.)
-
-## Future Improvements
-
-- [ ] ...
+| Provider | Models |
+|---|---|
+| `my-provider` | model-a, model-b |
 ```
 
-## Root README Update
+## What to Document
 
-Add the extension under the appropriate section:
-- **UX**: interaction experience improvements
-- **Safety**: mistake prevention
-- **Context Engineering**: agent reasoning and planning
-- **Monitoring**: session health and API usage
-- **Tools**: custom tools for external automation
-- **Introspection**: understanding Pi itself
+- **Installation**: `pi install` command.
+- **Environment variables**: Every required and optional env var, with links to where to get them.
+- **Tools**: Name and description of each registered tool. Include example usage if non-obvious.
+- **Commands**: Name and description of each registered command.
+- **Providers**: Provider name and available models (if the extension registers a provider).
+- **Limitations**: Known limitations, unsupported modes, or missing features.
 
-Format:
-```markdown
-### [name](extensions/name/)
+## Changelog
 
-Short description paragraph.
-
-[npm](https://www.npmjs.com/package/@aliou/pi-<name>)  <!-- after publishing -->
-```
-
-## Notifications
-
-Extensions can emit notifications to alert users.
-
-### Event Channels
-
-| Event | Description |
-|-------|-------------|
-| `ad:terminal-title` | Updates terminal title bar |
-| `ad:notification` | Sends system notification with optional sound |
-
-### Emitting Notifications
-
-```typescript
-const NOTIFICATION_EVENT = "ad:notification";
-
-interface NotificationEvent {
-  message: string;
-  sound?: string;  // Path to .aiff file (macOS)
-}
-
-function emitNotification(pi: ExtensionAPI, message: string, sound?: string) {
-  const event: NotificationEvent = { message, sound };
-  pi.events.emit(NOTIFICATION_EVENT, event);
-}
-
-// Usage
-emitNotification(pi, "Task completed", "/System/Library/Sounds/Blow.aiff");
-```
-
-### Common Sounds (macOS)
-
-```
-/System/Library/Sounds/Blow.aiff    # Default notification
-/System/Library/Sounds/Ping.aiff    # Attention/alert
-/System/Library/Sounds/Glass.aiff   # Success
-```
-
-### When to Notify
-
-- User attention required (e.g., dangerous command confirmation)
-- Long-running task completed
-- Errors that need user intervention
+If using changesets, the CHANGELOG.md is generated automatically. Each changeset entry should describe what changed from the user's perspective, not implementation details.

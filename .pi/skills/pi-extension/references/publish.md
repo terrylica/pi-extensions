@@ -1,95 +1,86 @@
-# Publishing to npm
+# Publishing
 
-Publish a single extension from this repo as `@aliou/pi-<name>` using changesets and CI.
+Extensions are published to npm and installed with `pi install`.
 
-## Preconditions
+## Package Setup
 
-- Extension has its own `package.json` in `extensions/<name>/`
-- Root changesets config exists at `.changeset/config.json`
-- GitHub Actions publish workflow exists (uses `changesets/action@v1` with OIDC)
-- npm trusted publisher configured for the package
+The `package.json` must have the `pi` key declaring extension resources. See `references/structure.md` for the full template.
 
-## Pre-publish Checklist
-
-1. **Extension README.md** exists with installation, features, usage
-2. **Root README.md** includes the extension under the appropriate section
-3. Add npm link after publishing: `[npm](https://www.npmjs.com/package/@aliou/pi-<name>)`
-
-## Package.json Template
+Key fields for publishing:
 
 ```json
 {
-  "name": "@aliou/pi-<name>",
-  "version": "0.0.1",
-  "type": "module",
-  "private": true,
-  "keywords": ["pi-package", "pi-extension", "pi", "<name>"],
-  "repository": {
-    "type": "git",
-    "url": "https://github.com/aliou/pi-extensions"
-  },
+  "name": "@scope/pi-my-extension",
+  "version": "0.1.0",
+  "description": "Clear description of what the extension does",
+  "license": "MIT",
   "pi": {
-    "extensions": ["./index.ts"]
+    "extensions": ["./src/index.ts"]
   },
-  "publishConfig": {
-    "access": "public"
-  },
-  "files": ["*.ts", "<subdirs>", "README.md"],
   "peerDependencies": {
-    "@mariozechner/pi-coding-agent": ">=0.49.0",
-    "@mariozechner/pi-tui": ">=0.49.0"
+    "@mariozechner/pi-coding-agent": ">=0.51.0"
   }
 }
 ```
 
-## Vendoring @aliou/tui-utils
+## Versioning with Changesets
 
-If the extension uses `@aliou/tui-utils`, vendor it into the published output. Do not publish with a runtime import of `@aliou/tui-utils`. Use a build script that copies `packages/tui-utils/index.ts` into `dist/vendor/tui-utils/` and rewrites imports.
+Use [changesets](https://github.com/changesets/changesets) for versioning and changelogs.
 
-## Create a Changeset
-
-Changesets must be placed in the root `.changeset/` directory, not inside the extension directory. This is a changesets convention -- the CI workflow only looks at root `.changeset/` for pending version bumps.
-
-1. Run `pnpm changeset`
-2. Select the package and bump type:
-   - First publish: `minor` (0.0.1 -> 0.1.0)
-   - Bug fixes: `patch`
-   - New features: `minor`
-   - Breaking changes: `major`
-3. Write a short summary
-4. Commit the changeset with code changes
-
-## Publish Flow
-
-1. Push to `main`
-2. CI runs `pnpm changeset version` and `pnpm changeset publish`
-3. Tags created as `pi-<name>@x.y.z`
-4. GitHub release created for each tag
-
-## First-time npm Trusted Publisher Setup
-
-For new packages:
-
-1. Create placeholder package locally:
-   ```bash
-   mkdir /tmp/pi-<name>-init && cd /tmp/pi-<name>-init
-   echo '{"name":"@aliou/pi-<name>","version":"0.0.0","publishConfig":{"access":"public"}}' > package.json
-   npm publish --access public --otp=<code>
-   ```
-
-2. Configure on npmjs.com:
-   - Package settings -> Trusted Publisher
-   - Add GitHub Actions: `aliou/pi-extensions`, workflow `publish.yml`
-
-3. CI can now publish via OIDC
-
-## Local Validation
+### Setup
 
 ```bash
-# Verify version bumps
-pnpm changeset version
-
-# Verify tarball contents
-cd extensions/<name>
-npm pack
+pnpm add -D @changesets/cli
+pnpm changeset init
 ```
+
+### Workflow
+
+1. Make changes to the extension.
+2. Create a changeset:
+   ```bash
+   pnpm changeset
+   ```
+   Select the package, choose the bump type (patch/minor/major), and write a summary.
+3. Commit the changeset file along with your changes.
+4. When ready to release:
+   ```bash
+   pnpm changeset version   # Updates version and CHANGELOG.md
+   pnpm publish             # Publishes to npm
+   ```
+
+### .changeset/config.json
+
+```json
+{
+  "$schema": "https://unpkg.com/@changesets/config@3.1.1/schema.json",
+  "changelog": "@changesets/cli/changelog",
+  "commit": false,
+  "fixed": [],
+  "linked": [],
+  "access": "public",
+  "baseBranch": "main",
+  "updateInternalDependencies": "patch",
+  "ignore": []
+}
+```
+
+## Installation
+
+Users install extensions with:
+
+```bash
+pi install @scope/pi-my-extension
+```
+
+Pi reads the `pi` key from the package's `package.json` to discover extensions, skills, themes, and prompts.
+
+## Pre-publish Checklist
+
+- [ ] `peerDependencies` version range is correct (>= minimum supported version).
+- [ ] `description` is clear and concise.
+- [ ] `pi.extensions` paths are correct.
+- [ ] README documents what the extension does, required environment variables, and available tools/commands.
+- [ ] If wrapping a third-party API: extension handles missing API key gracefully (notification, not crash).
+- [ ] Extension works in all modes (Interactive, RPC, Print) or degrades gracefully.
+- [ ] `pnpm typecheck` passes.
