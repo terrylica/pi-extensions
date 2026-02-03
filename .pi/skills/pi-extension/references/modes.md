@@ -75,10 +75,10 @@ You do not need to check `ctx.hasUI` for:
 When a command uses `ctx.ui.custom()` for a rich TUI display, it must handle three tiers:
 
 ```typescript
-pi.registerCommand("stats", {
-  description: "Show session statistics",
+pi.registerCommand("quotas", {
+  description: "Show API quotas",
   handler: async (_args, ctx) => {
-    const data = gatherData();
+    const data = await fetchQuotas();
 
     // Tier 1: Print mode -- no UI at all
     if (!ctx.hasUI) {
@@ -88,25 +88,58 @@ pi.registerCommand("stats", {
 
     // Tier 2: Interactive mode -- full TUI component
     const result = await ctx.ui.custom<void>((tui, theme, _kb, done) => {
-      return new MyDisplayComponent(theme, data, () => done(undefined));
+      return new QuotasDisplay(theme, data, () => done(undefined));
     });
 
-    // Tier 3: RPC mode -- custom() returned undefined, fall back
+    // Tier 3: RPC mode -- custom() returned undefined, fall back to dialog methods
     if (result === undefined) {
-      pi.sendMessage({
-        customType: "my-stats",
-        content: formatPlain(data),
-        display: true,
-        details: data,
-      });
+      ctx.ui.notify(formatPlain(data), "info");
     }
   },
 });
 ```
 
-The RPC fallback can use `sendMessage` (for persistent session messages), simpler dialog methods (select, input, confirm), or `notify` (for transient feedback). Choose based on the UX goal.
+Since `select`, `confirm`, `input`, and `notify` all work in RPC mode (forwarded to the host via JSON protocol), use them as the RPC fallback. Choose based on the UX:
 
-See `references/messages.md` for `sendMessage` and `registerMessageRenderer` details.
+- **`notify`**: Transient feedback or displaying data. Best for most display-only commands.
+- **`select`**: When the custom component is a picker/selector. The RPC host presents a list.
+- **`confirm`**: When the custom component is a confirmation dialog (e.g., permission gate).
+- **Notify "requires interactive mode"**: When the custom component is too complex to reduce (e.g., settings editor, process manager).
+
+Use `sendMessage` + `registerMessageRenderer` only when the result must persist in session history. See `references/messages.md`.
+
+### Example: Selector Fallback
+
+```typescript
+const result = await ctx.ui.custom<string | null>((_tui, _theme, _kb, done) => {
+  return new FancyPicker(items, done);
+});
+
+// RPC fallback: use select dialog
+if (result === undefined) {
+  const selected = await ctx.ui.select("Pick an item", items.map(i => i.label));
+  // ... handle selected
+}
+```
+
+### Example: Confirmation Fallback
+
+```typescript
+// In a tool_call handler:
+if (!ctx.hasUI) {
+  return { block: true, reason: "No UI to confirm" };
+}
+
+const proceed = await ctx.ui.custom<boolean>((_tui, theme, _kb, done) => {
+  return new ConfirmDialog(theme, message, done);
+});
+
+// RPC fallback: custom() returns undefined (falsy), so !proceed blocks.
+// This is the correct safe default for confirmation gates.
+if (!proceed) {
+  return { block: true, reason: "Blocked" };
+}
+```
 
 ## Guidelines
 

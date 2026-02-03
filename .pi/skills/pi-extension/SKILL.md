@@ -84,7 +84,7 @@ When implementing, look at these existing extensions for patterns:
 1. **Execute parameter order**: `(toolCallId, params, signal, onUpdate, ctx)`. Signal before onUpdate.
 2. **Always use `onUpdate?.()`**: Optional chaining. The parameter can be `undefined`.
 3. **No `.js` in imports**: Use bare module paths (`./tools/my-tool`, not `./tools/my-tool.js`).
-4. **Mode awareness**: Every `ctx.ui.custom()` call needs an RPC fallback. Every `tool_call` hook with dialogs needs a `ctx.hasUI` check.
+4. **Mode awareness**: Every `ctx.ui.custom()` call needs an RPC fallback (use `select`/`confirm`/`notify` -- they work in RPC). Every `tool_call` hook with dialogs needs a `ctx.hasUI` check.
 5. **API key gating**: Check before registering tools that require the key. Providers handle missing keys internally via their `models()` function.
 6. **Tool naming**: Prefix with API name for third-party integrations (`linkup_web_search`). No prefix for internal tools (`get_current_time`).
 7. **peerDependencies**: Use `>=CURRENT_VERSION` range, not `*`.

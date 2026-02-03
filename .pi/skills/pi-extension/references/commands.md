@@ -53,14 +53,9 @@ pi.registerCommand("quotas", {
       return new QuotasDisplay(theme, quotas, () => done(undefined));
     });
 
-    // RPC mode: custom() returned undefined
+    // RPC mode: custom() returned undefined, fall back to dialog methods
     if (result === undefined) {
-      pi.sendMessage({
-        customType: "quotas",
-        content: formatQuotasPlain(quotas),
-        display: true,
-        details: quotas,
-      });
+      ctx.ui.notify(formatQuotasPlain(quotas), "info");
     }
   },
 });
