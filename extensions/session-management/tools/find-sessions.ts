@@ -110,9 +110,12 @@ Uses fast keyword search (ripgrep) across 2000+ session files.`,
       params: FindSessionsParamsType,
       _signal: AbortSignal | undefined,
       _onUpdate: unknown,
-      _ctx: ExtensionContext,
+      ctx: ExtensionContext,
     ): Promise<ExecuteResult> {
       const { query, cwd, after, before, limit } = params;
+
+      // Get current session ID to filter it out
+      const currentSessionId = ctx.sessionManager.getSessionId();
 
       // Build search options
       const searchOpts: SearchOptions = {
@@ -127,6 +130,8 @@ Uses fast keyword search (ripgrep) across 2000+ session files.`,
       let results: SessionSearchResult[] = [];
       try {
         results = await searchSessions(searchOpts);
+        // Filter out current session - users searching for sessions want to find other sessions, not the one they're in
+        results = results.filter((r) => r.id !== currentSessionId);
       } catch (err) {
         console.error("[find-sessions] Search error:", err);
         // Return empty results rather than failing
