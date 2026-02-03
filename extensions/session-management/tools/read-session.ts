@@ -168,7 +168,6 @@ Input the session ID (UUID or path) and what you want to learn about it.`,
       let resolvedPath: string | null = null;
       let resolvedModel: { provider: string; id: string } | undefined;
       let currentToolCalls: SubagentToolCall[] = [];
-      let spinnerFrame = 0;
 
       // Resolve session path
       resolvedPath = resolveSessionPath(sessionId);
@@ -182,7 +181,6 @@ Input the session ID (UUID or path) and what you want to learn about it.`,
             goal,
             resolvedPath: undefined,
             toolCalls: [],
-            spinnerFrame: 0,
             error,
           },
         };
@@ -202,7 +200,6 @@ Input the session ID (UUID or path) and what you want to learn about it.`,
             goal,
             resolvedPath,
             toolCalls: [],
-            spinnerFrame: 0,
             error,
           },
         };
@@ -210,24 +207,6 @@ Input the session ID (UUID or path) and what you want to learn about it.`,
 
       // Create session tools
       const sessionTools = createSessionTools(session);
-
-      // Set up spinner animation
-      const spinnerInterval = setInterval(() => {
-        spinnerFrame++;
-        if (currentToolCalls.some((tc) => tc.status === "running")) {
-          onUpdate?.({
-            content: [{ type: "text", text: "" }],
-            details: {
-              sessionId,
-              goal,
-              resolvedPath,
-              toolCalls: currentToolCalls,
-              spinnerFrame,
-              resolvedModel,
-            },
-          });
-        }
-      }, 80);
 
       try {
         const model = resolveModel(MODEL, ctx);
@@ -241,7 +220,6 @@ Input the session ID (UUID or path) and what you want to learn about it.`,
             goal,
             resolvedPath,
             toolCalls: currentToolCalls,
-            spinnerFrame,
             resolvedModel,
           },
         });
@@ -271,7 +249,6 @@ Input the session ID (UUID or path) and what you want to learn about it.`,
                 goal,
                 resolvedPath,
                 toolCalls: currentToolCalls,
-                spinnerFrame,
                 resolvedModel,
               },
             });
@@ -287,7 +264,6 @@ Input the session ID (UUID or path) and what you want to learn about it.`,
                 goal,
                 resolvedPath,
                 toolCalls: currentToolCalls,
-                spinnerFrame,
                 resolvedModel,
               },
             });
@@ -305,7 +281,7 @@ Input the session ID (UUID or path) and what you want to learn about it.`,
               goal,
               resolvedPath,
               toolCalls: finalToolCalls,
-              spinnerFrame,
+
               aborted: true,
               usage: result.usage,
               resolvedModel,
@@ -321,7 +297,7 @@ Input the session ID (UUID or path) and what you want to learn about it.`,
               goal,
               resolvedPath,
               toolCalls: finalToolCalls,
-              spinnerFrame,
+
               error: result.error,
               usage: result.usage,
               resolvedModel,
@@ -345,7 +321,7 @@ Input the session ID (UUID or path) and what you want to learn about it.`,
               goal,
               resolvedPath,
               toolCalls: finalToolCalls,
-              spinnerFrame,
+
               error,
               usage: result.usage,
               resolvedModel,
@@ -360,14 +336,12 @@ Input the session ID (UUID or path) and what you want to learn about it.`,
             goal,
             resolvedPath,
             toolCalls: finalToolCalls,
-            spinnerFrame,
             response: result.content,
             usage: result.usage,
             resolvedModel,
           },
         };
       } finally {
-        clearInterval(spinnerInterval);
       }
     },
 
@@ -401,15 +375,8 @@ Input the session ID (UUID or path) and what you want to learn about it.`,
         return new Text("", 0, 0);
       }
 
-      const {
-        toolCalls,
-        spinnerFrame,
-        response,
-        aborted,
-        error,
-        usage,
-        resolvedModel,
-      } = details;
+      const { toolCalls, response, aborted, error, usage, resolvedModel } =
+        details;
 
       const footer = new SubagentFooter(theme, {
         resolvedModel,
@@ -431,9 +398,7 @@ Input the session ID (UUID or path) and what you want to learn about it.`,
         fields.push(new MarkdownResponse(response, theme));
       } else {
         // Running state
-        fields.push(
-          new ToolCallList(toolCalls, toolCallFormatter, theme, spinnerFrame),
-        );
+        fields.push(new ToolCallList(toolCalls, toolCallFormatter, theme));
       }
 
       return new ToolDetails({ fields, footer }, options, theme);

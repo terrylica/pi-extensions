@@ -17,7 +17,6 @@ export interface ReadSessionDetails {
   goal: string;
   resolvedPath?: string;
   toolCalls: SubagentToolCall[];
-  spinnerFrame: number;
   response?: string;
   aborted?: boolean;
   error?: string;

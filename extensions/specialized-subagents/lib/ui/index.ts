@@ -4,7 +4,7 @@ export {
   renderStreamingStatus,
   renderSubagentCallHeader,
 } from "./renderer";
-export { getSpinnerFrame, INDICATOR, SPINNER_FRAMES } from "./spinner";
+export { INDICATOR } from "./spinner";
 export {
   formatCost,
   formatSubagentStats,

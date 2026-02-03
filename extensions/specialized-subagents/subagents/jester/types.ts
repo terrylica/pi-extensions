@@ -21,9 +21,6 @@ export interface JesterDetails {
   /** Tool calls made by the subagent (always empty for jester) */
   toolCalls: SubagentToolCall[];
 
-  /** Current spinner frame for animation */
-  spinnerFrame: number;
-
   /** The jester's response (for final result) */
   response?: string;
 

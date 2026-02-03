@@ -1,7 +1,7 @@
 import { getMarkdownTheme, type Theme } from "@mariozechner/pi-coding-agent";
 import { Container, Markdown, Text } from "@mariozechner/pi-tui";
 import type { SubagentToolCall, SubagentUsage } from "../types";
-import { getSpinnerFrame, INDICATOR } from "./spinner";
+import { INDICATOR } from "./spinner";
 import { formatSubagentStats, pluralize } from "./stats";
 import {
   formatToolCallExpanded,
@@ -50,25 +50,23 @@ export function renderSubagentCallHeader(
 }
 
 /**
- * Render streaming status (spinner + current tool + counts).
+ * Render streaming status (current tool + counts).
  */
 export function renderStreamingStatus(
   toolCalls: SubagentToolCall[],
-  spinnerFrame: number,
   theme: Theme,
 ): Container | Text {
   const currentTool = getCurrentRunningTool(toolCalls);
-  const spinner = getSpinnerFrame(spinnerFrame);
 
   if (!currentTool) {
-    // No tools yet, just show spinner
-    return new Text(`${spinner} thinking...`, 0, 0);
+    // No tools yet, just show thinking
+    return new Text(`  thinking...`, 0, 0);
   }
 
   const container = new Container();
 
   // Show current tool
-  const toolLine = formatToolCallExpanded(currentTool, spinnerFrame, theme);
+  const toolLine = formatToolCallExpanded(currentTool, theme);
   container.addChild(new Text(toolLine, 0, 0));
 
   // Show counts if multiple tools

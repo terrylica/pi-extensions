@@ -168,89 +168,58 @@ Pass relevant skills (e.g., 'ios-26', 'drizzle-orm') to provide specialized cont
 
       let resolvedModel: { provider: string; id: string } | undefined;
 
-      const spinnerFrame = 0;
+      const model = resolveModel(MODEL, ctx);
+      resolvedModel = { provider: model.provider, id: model.id };
 
-      // No spinner interval needed - Oracle's renderResult doesn't use spinnerFrame
-      // and toolCalls is always empty, so spinner updates produce no visible change.
-      const spinnerInterval: ReturnType<typeof setInterval> | undefined =
-        undefined;
+      // Publish resolved provider/model as early as possible for footer rendering.
+      onUpdate?.({
+        content: [{ type: "text", text: "" }],
+        details: {
+          _renderKey: toolCallId,
+          task,
+          context,
+          files,
+          skills: skillNames,
+          skillsResolved: resolvedSkills.length,
+          skillsNotFound:
+            notFoundSkills.length > 0 ? notFoundSkills : undefined,
+          toolCalls: [],
+          resolvedModel,
+        },
+      });
 
-      try {
-        const model = resolveModel(MODEL, ctx);
-        resolvedModel = { provider: model.provider, id: model.id };
+      // Format files if provided
+      let filesContent: string | undefined;
+      if (files && files.length > 0) {
+        filesContent = await formatFilesForContext(files, ctx.cwd);
+      }
 
-        // Publish resolved provider/model as early as possible for footer rendering.
-        onUpdate?.({
-          content: [{ type: "text", text: "" }],
-          details: {
-            _renderKey: toolCallId,
-            task,
-            context,
-            files,
-            skills: skillNames,
-            skillsResolved: resolvedSkills.length,
-            skillsNotFound:
-              notFoundSkills.length > 0 ? notFoundSkills : undefined,
-            toolCalls: [],
-            spinnerFrame,
-            resolvedModel,
+      let userMessage = buildUserMessage(args, filesContent);
+
+      // Append warning if skills not found
+      if (notFoundSkills.length > 0) {
+        userMessage += `\n\n**Note:** The following skills were not found and could not be loaded: ${notFoundSkills.join(", ")}`;
+      }
+
+      const result = await executeSubagent(
+        {
+          name: "oracle",
+          model,
+          systemPrompt: ORACLE_SYSTEM_PROMPT,
+          skills: resolvedSkills,
+          customTools: createOracleTools(),
+          thinkingLevel: "low",
+          logging: {
+            enabled: true,
+            debug: true,
           },
-        });
-
-        // Format files if provided
-        let filesContent: string | undefined;
-        if (files && files.length > 0) {
-          filesContent = await formatFilesForContext(files, ctx.cwd);
-        }
-
-        let userMessage = buildUserMessage(args, filesContent);
-
-        // Append warning if skills not found
-        if (notFoundSkills.length > 0) {
-          userMessage += `\n\n**Note:** The following skills were not found and could not be loaded: ${notFoundSkills.join(", ")}`;
-        }
-
-        const result = await executeSubagent(
-          {
-            name: "oracle",
-            model,
-            systemPrompt: ORACLE_SYSTEM_PROMPT,
-            skills: resolvedSkills,
-            customTools: createOracleTools(),
-            thinkingLevel: "low",
-            logging: {
-              enabled: true,
-              debug: true,
-            },
-          },
-          userMessage,
-          ctx,
-          // onTextUpdate
-          (_delta, accumulated) => {
-            onUpdate?.({
-              content: [{ type: "text", text: accumulated }],
-              details: {
-                _renderKey: toolCallId,
-                task,
-                context,
-                files,
-                skills: skillNames,
-                skillsResolved: resolvedSkills.length,
-                skillsNotFound:
-                  notFoundSkills.length > 0 ? notFoundSkills : undefined,
-                toolCalls: [],
-                spinnerFrame,
-                response: accumulated,
-                resolvedModel,
-              },
-            });
-          },
-          signal,
-        );
-
-        if (result.aborted) {
-          return {
-            content: [{ type: "text" as const, text: "Aborted" }],
+        },
+        userMessage,
+        ctx,
+        // onTextUpdate
+        (_delta, accumulated) => {
+          onUpdate?.({
+            content: [{ type: "text", text: accumulated }],
             details: {
               _renderKey: toolCallId,
               task,
@@ -261,21 +230,17 @@ Pass relevant skills (e.g., 'ios-26', 'drizzle-orm') to provide specialized cont
               skillsNotFound:
                 notFoundSkills.length > 0 ? notFoundSkills : undefined,
               toolCalls: [],
-              spinnerFrame,
-              aborted: true,
-              usage: result.usage,
+              response: accumulated,
               resolvedModel,
             },
-          };
-        }
+          });
+        },
+        signal,
+      );
 
-        // Throw on error so the tool call is marked as failed
-        if (result.error) {
-          throw new Error(result.error);
-        }
-
+      if (result.aborted) {
         return {
-          content: [{ type: "text" as const, text: result.content }],
+          content: [{ type: "text" as const, text: "Aborted" }],
           details: {
             _renderKey: toolCallId,
             task,
@@ -286,15 +251,35 @@ Pass relevant skills (e.g., 'ios-26', 'drizzle-orm') to provide specialized cont
             skillsNotFound:
               notFoundSkills.length > 0 ? notFoundSkills : undefined,
             toolCalls: [],
-            spinnerFrame,
-            response: result.content,
+            aborted: true,
             usage: result.usage,
             resolvedModel,
           },
         };
-      } finally {
-        if (spinnerInterval) clearInterval(spinnerInterval);
       }
+
+      // Throw on error so the tool call is marked as failed
+      if (result.error) {
+        throw new Error(result.error);
+      }
+
+      return {
+        content: [{ type: "text" as const, text: result.content }],
+        details: {
+          _renderKey: toolCallId,
+          task,
+          context,
+          files,
+          skills: skillNames,
+          skillsResolved: resolvedSkills.length,
+          skillsNotFound:
+            notFoundSkills.length > 0 ? notFoundSkills : undefined,
+          toolCalls: [],
+          response: result.content,
+          usage: result.usage,
+          resolvedModel,
+        },
+      };
     },
 
     renderCall(args, theme) {

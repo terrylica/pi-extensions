@@ -85,12 +85,6 @@ export function createJesterTool(): ToolDefinition<
       let resolvedModel: { provider: string; id: string } | undefined;
 
       const toolCalls: SubagentToolCall[] = [];
-      const spinnerFrame = 0;
-
-      // No spinner interval needed - Jester's renderResult doesn't use spinnerFrame
-      // and toolCalls is always empty, so spinner updates produce no visible change.
-      const spinnerInterval: ReturnType<typeof setInterval> | undefined =
-        undefined;
 
       try {
         const model = resolveModel(MODEL, ctx);
@@ -103,7 +97,6 @@ export function createJesterTool(): ToolDefinition<
             _renderKey: toolCallId,
             question,
             toolCalls,
-            spinnerFrame,
             resolvedModel,
           },
         });
@@ -135,7 +128,6 @@ export function createJesterTool(): ToolDefinition<
                 _renderKey: toolCallId,
                 question,
                 toolCalls,
-                spinnerFrame,
                 response: accumulated,
                 resolvedModel,
               },
@@ -151,7 +143,6 @@ export function createJesterTool(): ToolDefinition<
               _renderKey: toolCallId,
               question,
               toolCalls,
-              spinnerFrame,
               aborted: true,
               usage: result.usage,
               resolvedModel,
@@ -168,7 +159,6 @@ export function createJesterTool(): ToolDefinition<
               _renderKey: toolCallId,
               question,
               toolCalls,
-              spinnerFrame,
               error: result.error,
               usage: result.usage,
               resolvedModel,
@@ -182,7 +172,6 @@ export function createJesterTool(): ToolDefinition<
             _renderKey: toolCallId,
             question,
             toolCalls,
-            spinnerFrame,
             response: result.content,
             usage: result.usage,
             resolvedModel,
@@ -202,13 +191,10 @@ export function createJesterTool(): ToolDefinition<
             _renderKey: toolCallId,
             question,
             toolCalls,
-            spinnerFrame,
             error,
             resolvedModel,
           },
         };
-      } finally {
-        if (spinnerInterval) clearInterval(spinnerInterval);
       }
     },
 

@@ -65,12 +65,10 @@ export {
   formatToolCallCompact,
   formatToolCallExpanded,
   getCurrentRunningTool,
-  getSpinnerFrame,
   INDICATOR,
   type ModelRef,
   pluralize,
   renderDoneResult,
   renderStreamingStatus,
   renderSubagentCallHeader,
-  SPINNER_FRAMES,
 } from "./ui";

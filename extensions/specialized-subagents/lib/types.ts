@@ -130,8 +130,6 @@ export interface SubagentSkillDetails {
 export interface SubagentToolCallDetails {
   /** Tool calls made by the subagent */
   toolCalls: SubagentToolCall[];
-  /** Current spinner frame for animation */
-  spinnerFrame: number;
 }
 
 /** Response / completion state for rendering */

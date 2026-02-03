@@ -181,7 +181,6 @@ Pass relevant skills (e.g., 'ios-26', 'drizzle-orm') to provide specialized cont
             skillsNotFound:
               notFoundSkills.length > 0 ? notFoundSkills : undefined,
             toolCalls: [],
-            spinnerFrame: 0,
             error,
             cwd: ctx.cwd,
           },
@@ -203,7 +202,6 @@ Pass relevant skills (e.g., 'ios-26', 'drizzle-orm') to provide specialized cont
             skillsNotFound:
               notFoundSkills.length > 0 ? notFoundSkills : undefined,
             toolCalls: [],
-            spinnerFrame: 0,
             error,
             cwd: ctx.cwd,
           },
@@ -213,32 +211,6 @@ Pass relevant skills (e.g., 'ios-26', 'drizzle-orm') to provide specialized cont
       let resolvedModel: { provider: string; id: string } | undefined;
 
       let currentToolCalls: SubagentToolCall[] = [];
-      let spinnerFrame = 0;
-
-      // Set up spinner animation interval
-      const spinnerInterval = setInterval(() => {
-        spinnerFrame++;
-        if (currentToolCalls.some((tc) => tc.status === "running")) {
-          onUpdate?.({
-            content: [{ type: "text", text: "" }],
-            details: {
-              _renderKey: toolCallId,
-              task,
-              instructions,
-              files,
-              context,
-              skills: skillNames,
-              skillsResolved: resolvedSkills.length,
-              skillsNotFound:
-                notFoundSkills.length > 0 ? notFoundSkills : undefined,
-              toolCalls: currentToolCalls,
-              spinnerFrame,
-              resolvedModel,
-              cwd: ctx.cwd,
-            },
-          });
-        }
-      }, 80);
 
       try {
         const model = resolveModel(MODEL, ctx);
@@ -258,7 +230,6 @@ Pass relevant skills (e.g., 'ios-26', 'drizzle-orm') to provide specialized cont
             skillsNotFound:
               notFoundSkills.length > 0 ? notFoundSkills : undefined,
             toolCalls: currentToolCalls,
-            spinnerFrame,
             resolvedModel,
             cwd: ctx.cwd,
           },
@@ -311,7 +282,6 @@ Pass relevant skills (e.g., 'ios-26', 'drizzle-orm') to provide specialized cont
                 skillsNotFound:
                   notFoundSkills.length > 0 ? notFoundSkills : undefined,
                 toolCalls: currentToolCalls,
-                spinnerFrame,
                 resolvedModel,
                 cwd: ctx.cwd,
               },
@@ -334,7 +304,6 @@ Pass relevant skills (e.g., 'ios-26', 'drizzle-orm') to provide specialized cont
                 skillsNotFound:
                   notFoundSkills.length > 0 ? notFoundSkills : undefined,
                 toolCalls: currentToolCalls,
-                spinnerFrame,
                 resolvedModel,
                 cwd: ctx.cwd,
               },
@@ -359,7 +328,6 @@ Pass relevant skills (e.g., 'ios-26', 'drizzle-orm') to provide specialized cont
               skillsNotFound:
                 notFoundSkills.length > 0 ? notFoundSkills : undefined,
               toolCalls: finalToolCalls,
-              spinnerFrame,
               aborted: true,
               usage: result.usage,
               resolvedModel,
@@ -384,7 +352,6 @@ Pass relevant skills (e.g., 'ios-26', 'drizzle-orm') to provide specialized cont
               skillsNotFound:
                 notFoundSkills.length > 0 ? notFoundSkills : undefined,
               toolCalls: finalToolCalls,
-              spinnerFrame,
               error: result.error,
               usage: result.usage,
               resolvedModel,
@@ -415,7 +382,6 @@ Pass relevant skills (e.g., 'ios-26', 'drizzle-orm') to provide specialized cont
               skillsNotFound:
                 notFoundSkills.length > 0 ? notFoundSkills : undefined,
               toolCalls: finalToolCalls,
-              spinnerFrame,
               error,
               usage: result.usage,
               resolvedModel,
@@ -437,7 +403,6 @@ Pass relevant skills (e.g., 'ios-26', 'drizzle-orm') to provide specialized cont
             skillsNotFound:
               notFoundSkills.length > 0 ? notFoundSkills : undefined,
             toolCalls: finalToolCalls,
-            spinnerFrame,
             response: result.content,
             usage: result.usage,
             resolvedModel,
@@ -445,7 +410,6 @@ Pass relevant skills (e.g., 'ios-26', 'drizzle-orm') to provide specialized cont
           },
         };
       } finally {
-        clearInterval(spinnerInterval);
       }
     },
 
@@ -485,7 +449,6 @@ Pass relevant skills (e.g., 'ios-26', 'drizzle-orm') to provide specialized cont
       const {
         _renderKey,
         toolCalls,
-        spinnerFrame,
         response,
         aborted,
         error,
@@ -547,9 +510,7 @@ Pass relevant skills (e.g., 'ios-26', 'drizzle-orm') to provide specialized cont
         fields.push(mdResponse);
       } else {
         // Running state
-        fields.push(
-          new ToolCallList(toolCalls, formatToolCall, theme, spinnerFrame),
-        );
+        fields.push(new ToolCallList(toolCalls, formatToolCall, theme));
       }
 
       // ToolDetails - reuse or create

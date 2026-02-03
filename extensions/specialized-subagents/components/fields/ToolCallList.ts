@@ -2,7 +2,7 @@ import type { Theme } from "@mariozechner/pi-coding-agent";
 import type { Component } from "@mariozechner/pi-tui";
 import { visibleWidth, wrapTextWithAnsi } from "@mariozechner/pi-tui";
 import type { SubagentToolCall } from "../../lib/types";
-import { getSpinnerFrame, INDICATOR } from "../../lib/ui/spinner";
+import { INDICATOR } from "../../lib/ui/spinner";
 
 export type ToolCallFormatter = (tc: SubagentToolCall) => {
   label: string;
@@ -23,7 +23,6 @@ export class ToolCallList implements Component {
     private toolCalls: SubagentToolCall[],
     private formatter: ToolCallFormatter,
     private theme: Theme,
-    private spinnerFrame?: number,
   ) {}
 
   handleInput(_data: string): boolean {
@@ -43,7 +42,7 @@ export class ToolCallList implements Component {
     for (const tc of this.toolCalls) {
       const indicator =
         tc.status === "running"
-          ? getSpinnerFrame(this.spinnerFrame ?? 0)
+          ? " "
           : tc.status === "done"
             ? th.fg("success", INDICATOR.done)
             : th.fg("error", INDICATOR.error);

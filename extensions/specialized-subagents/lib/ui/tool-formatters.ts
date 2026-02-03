@@ -1,6 +1,6 @@
 import type { Theme } from "@mariozechner/pi-coding-agent";
 import type { SubagentToolCall } from "../types";
-import { getSpinnerFrame, INDICATOR } from "./spinner";
+import { INDICATOR } from "./spinner";
 
 /**
  * Truncate string with ellipsis.
@@ -57,18 +57,17 @@ export function formatToolCallCompact(
  * Format a tool call for expanded display with status indicator.
  *
  * Examples:
- * - "⣋ read src/auth.ts"
+ * - " read src/auth.ts"
  * - "✓ bash npm test"
  * - "✗ grep \"missing\" (file not found)"
  */
 export function formatToolCallExpanded(
   toolCall: SubagentToolCall,
-  spinnerFrame: number,
   _theme: Theme,
 ): string {
   const indicator =
     toolCall.status === "running"
-      ? getSpinnerFrame(spinnerFrame)
+      ? " "
       : toolCall.status === "done"
         ? INDICATOR.done
         : INDICATOR.error;
