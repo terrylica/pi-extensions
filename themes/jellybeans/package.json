@@ -17,7 +17,8 @@
     "themes": [
       "./jellybeans-mono.json",
       "./jellybeans-mono-light.json"
-    ]
+    ],
+    "image": "https://assets.aliou.me/pi-extensions/demos/pi-jellybeans-mono.png"
   },
   "publishConfig": {
     "access": "public"
