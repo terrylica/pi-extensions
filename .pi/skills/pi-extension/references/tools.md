@@ -51,6 +51,10 @@ onUpdate?.({ output: "partial result", details: { progress: 50 } });
 
 The `onUpdate` parameter can be `undefined`. Calling it without optional chaining will throw.
 
+## Tool Overrides and Delegation
+
+If you override a built-in tool or wrap another tool, audit any delegated `tool.execute(...)` calls during upgrades. These forwarders often pass through `signal`, `onUpdate`, or `ctx` and can silently break when the execute signature changes. Always recheck the delegate call parameter order and include optional parameters that the target tool expects.
+
 ## Return Value
 
 ```typescript
