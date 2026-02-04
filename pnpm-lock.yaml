@@ -72,7 +72,7 @@ importers:
   extensions/guardrails:
     dependencies:
       '@aliou/pi-utils-settings':
-        specifier: workspace:*
+        specifier: workspace:^0.1.0
         version: link:../../packages/settings
       '@aliou/sh':
         specifier: github:aliou/sh#v0.1.0
@@ -150,7 +150,7 @@ importers:
   extensions/toolchain:
     dependencies:
       '@aliou/pi-utils-settings':
-        specifier: workspace:*
+        specifier: workspace:^0.1.0
         version: link:../../packages/settings
       '@aliou/sh':
         specifier: github:aliou/sh#v0.1.0
