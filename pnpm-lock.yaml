@@ -75,8 +75,8 @@ importers:
         specifier: workspace:^0.1.0
         version: link:../../packages/settings
       '@aliou/sh':
-        specifier: github:aliou/sh#v0.1.0
-        version: https://codeload.github.com/aliou/sh/tar.gz/505141ab1d180435ae795a7307237b2ee506ffb4
+        specifier: ^0.1.0
+        version: 0.1.0
       '@mariozechner/pi-coding-agent':
         specifier: '>=0.51.0'
         version: 0.51.0(ws@8.19.0)(zod@3.25.76)
@@ -126,15 +126,6 @@ importers:
         specifier: '>=0.51.0'
         version: 0.51.0(ws@8.19.0)(zod@3.25.76)
 
-  extensions/settings-test:
-    dependencies:
-      '@aliou/pi-utils-settings':
-        specifier: workspace:*
-        version: link:../../packages/settings
-      '@mariozechner/pi-coding-agent':
-        specifier: '>=0.51.0'
-        version: 0.51.0(ws@8.19.0)(zod@3.25.76)
-
   extensions/specialized-subagents:
     dependencies:
       '@mariozechner/pi-coding-agent':
@@ -153,8 +144,8 @@ importers:
         specifier: workspace:^0.1.0
         version: link:../../packages/settings
       '@aliou/sh':
-        specifier: github:aliou/sh#v0.1.0
-        version: https://codeload.github.com/aliou/sh/tar.gz/505141ab1d180435ae795a7307237b2ee506ffb4
+        specifier: ^0.1.0
+        version: 0.1.0
       '@mariozechner/pi-coding-agent':
         specifier: '>=0.51.0'
         version: 0.51.0(ws@8.19.0)(zod@3.25.76)
@@ -171,9 +162,8 @@ importers:
 
 packages:
 
-  '@aliou/sh@https://codeload.github.com/aliou/sh/tar.gz/505141ab1d180435ae795a7307237b2ee506ffb4':
-    resolution: {tarball: https://codeload.github.com/aliou/sh/tar.gz/505141ab1d180435ae795a7307237b2ee506ffb4}
-    version: 0.1.0
+  '@aliou/sh@0.1.0':
+    resolution: {integrity: sha512-MtVSUqNAHK8a0yQdwv4ADlTIBnEg8bpFXcqp0PaxwqxhSWAxcIrpAIPbsc3CJnUK3R++BcgaxBZ5saicHtU+8Q==}
     engines: {node: '>=22'}
 
   '@anthropic-ai/sdk@0.71.2':
@@ -1896,7 +1886,7 @@ packages:
 
 snapshots:
 
-  '@aliou/sh@https://codeload.github.com/aliou/sh/tar.gz/505141ab1d180435ae795a7307237b2ee506ffb4': {}
+  '@aliou/sh@0.1.0': {}
 
   '@anthropic-ai/sdk@0.71.2(zod@3.25.76)':
     dependencies:
