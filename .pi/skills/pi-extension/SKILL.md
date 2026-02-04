@@ -34,7 +34,7 @@ import { truncateHead, highlightCode, getLanguageFromPath, DynamicBorder, Border
    - **Tools** (LLM-callable): Read `references/tools.md`.
    - **Commands** (user-invoked): Read `references/commands.md`.
    - **Providers** (LLM backends): Read `references/providers.md`.
-   - **Hooks** (event handlers): Read `references/hooks.md`.
+   - **Hooks** (event handlers): Read `references/hooks.md`. Includes both `tool_call` blocking hooks and spawn hooks for transparent command rewriting via `createBashTool`.
 4. Read `references/modes.md` for mode-awareness guidelines. Every extension must handle Interactive, RPC, and Print modes.
 5. If the extension displays rich UI: Read `references/components.md` for TUI components and `references/messages.md` for message display patterns.
 6. If the extension tracks state: Read `references/state.md`.
@@ -54,7 +54,7 @@ import { truncateHead, highlightCode, getLanguageFromPath, DynamicBorder, Border
 |---|---|
 | `references/structure.md` | Project layout, package.json, tsconfig, entry point, API key pattern, imports |
 | `references/tools.md` | Tool registration, execute signature, parameters, streaming, rendering, naming |
-| `references/hooks.md` | Events, blocking/cancelling, input transformation, system prompt modification |
+| `references/hooks.md` | Events, blocking/cancelling, input transformation, system prompt modification, bash spawn hooks (command rewriting) |
 | `references/commands.md` | Command registration, three-tier pattern, component extraction |
 | `references/components.md` | TUI components (pi-tui + pi-coding-agent), custom(), theme styling, keyboard handling |
 | `references/providers.md` | Provider registration, model definition, compat field, API key gating |
@@ -77,6 +77,7 @@ When implementing, look at these existing extensions for patterns:
 **Monorepo extensions (simpler structure):**
 - `extensions/defaults/` in this repo: Simple tool registration (get_current_time).
 - `extensions/guardrails/` in this repo: Event hooks (tool_call blocking).
+- `extensions/toolchain/` in this repo: Bash spawn hooks (command rewriting via `createBashTool`) combined with tool_call blockers.
 - `extensions/processes/` in this repo: Multi-action tool with StringEnum parameters.
 
 ## Critical Rules

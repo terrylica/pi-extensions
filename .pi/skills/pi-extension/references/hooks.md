@@ -139,6 +139,77 @@ pi.on("before_agent_start", async (_event, ctx) => {
 
 The system prompt is reset each turn, so modifications in `before_agent_start` are not cumulative.
 
+## Bash Spawn Hook (Command Rewriting)
+
+The `createBashTool` function lets you replace the built-in bash tool with one that transparently rewrites commands before shell execution. This is different from `tool_call` blocking -- the agent never sees that the command was rewritten.
+
+Use spawn hooks when you have a clear rewrite target (e.g. `npm` -> `pnpm`). Use `tool_call` blocking when you need to stop a command entirely or show a confirmation dialog.
+
+```typescript
+import { createBashTool, type BashSpawnHook, type BashSpawnContext } from "@mariozechner/pi-coding-agent";
+
+export default function (pi: ExtensionAPI) {
+  const bashTool = createBashTool(process.cwd(), {
+    spawnHook: ({ command, cwd, env }: BashSpawnContext): BashSpawnContext => ({
+      command: command.replace(/^npm /, "pnpm "),
+      cwd,
+      env: { ...env, CUSTOM_VAR: "1" },
+    }),
+  });
+
+  pi.registerTool({ ...bashTool });
+}
+```
+
+### BashSpawnContext
+
+The spawn hook receives and returns a `BashSpawnContext`:
+
+```typescript
+interface BashSpawnContext {
+  command: string;        // The shell command to execute
+  cwd: string;            // Working directory
+  env: NodeJS.ProcessEnv; // Environment variables
+}
+```
+
+You can modify any of these fields. The hook runs after pi's own processing but before the shell spawns.
+
+### Key Points
+
+- **Replaces the built-in bash tool.** When you call `pi.registerTool()` with a tool named `"bash"`, it replaces the default. Only one extension should do this.
+- **Transparent to the agent.** The agent sees the original command in the tool call UI but gets the output of the rewritten command.
+- **Execution order with tool_call hooks.** `tool_call` event hooks (blockers) run first. If a blocker returns `{ block: true }`, the spawn hook never fires. This means you can combine blocking hooks for commands that should be stopped entirely with spawn hooks for commands that should be rewritten.
+- **Prefer AST-based rewrites over regex.** A false positive rewrite corrupts a command silently. Use `@aliou/sh` or similar shell parsers to identify command names in the AST, then do surgical string replacement at the identified positions. If the parse fails, return the command unchanged.
+- **Compose multiple rewriters.** Chain rewriter functions that each transform the context:
+
+```typescript
+const rewriters: ((ctx: BashSpawnContext) => BashSpawnContext)[] = [
+  createPackageManagerRewriter(config),
+  createGitRebaseRewriter(),
+];
+
+const spawnHook = (ctx: BashSpawnContext) => {
+  let result = ctx;
+  for (const rewrite of rewriters) {
+    result = rewrite(result);
+  }
+  return result;
+};
+
+const bashTool = createBashTool(process.cwd(), { spawnHook });
+pi.registerTool({ ...bashTool });
+```
+
+### When to Use What
+
+| Pattern | Use When | Agent Sees |
+|---|---|---|
+| `tool_call` hook + `{ block: true }` | Command must be stopped entirely | Block reason (retries with correct command) |
+| `tool_call` hook + `ctx.ui.confirm()` | User confirmation needed | Block reason if denied |
+| Spawn hook (command rewrite) | Clear 1:1 rewrite target exists | Output of rewritten command (transparent) |
+| Spawn hook (env injection) | Need to set env vars for specific commands | Output with injected env (transparent) |
+
 ## Multiple Handlers
 
 Multiple extensions can register handlers for the same event. They execute in registration order. For blocking events (`tool_call`, `session_before_switch`, etc.), the first handler to return a blocking/cancelling result wins.
