@@ -13,6 +13,12 @@ importers:
 
   .:
     dependencies:
+      '@aliou/pi-utils-settings':
+        specifier: ^0.1.0
+        version: 0.1.0(@mariozechner/pi-coding-agent@0.51.0(ws@8.19.0)(zod@3.25.76))
+      '@aliou/sh':
+        specifier: ^0.1.0
+        version: 0.1.0
       better-sqlite3:
         specifier: ^12.6.2
         version: 12.6.2
@@ -72,8 +78,8 @@ importers:
   extensions/guardrails:
     dependencies:
       '@aliou/pi-utils-settings':
-        specifier: workspace:^0.1.0
-        version: link:../../packages/settings
+        specifier: ^0.1.0
+        version: 0.1.0(@mariozechner/pi-coding-agent@0.51.0(ws@8.19.0)(zod@3.25.76))
       '@aliou/sh':
         specifier: ^0.1.0
         version: 0.1.0
@@ -141,8 +147,8 @@ importers:
   extensions/toolchain:
     dependencies:
       '@aliou/pi-utils-settings':
-        specifier: workspace:^0.1.0
-        version: link:../../packages/settings
+        specifier: ^0.1.0
+        version: 0.1.0(@mariozechner/pi-coding-agent@0.51.0(ws@8.19.0)(zod@3.25.76))
       '@aliou/sh':
         specifier: ^0.1.0
         version: 0.1.0
@@ -161,6 +167,11 @@ importers:
   themes/jellybeans: {}
 
 packages:
+
+  '@aliou/pi-utils-settings@0.1.0':
+    resolution: {integrity: sha512-dTlPTB4PSv3VzVIV8A8Bdvir5L4Jt2cvnxC3UD+NDzKjGCsQhL6WCS3gpghXrQI8I8/gHxnYtaKKTuxYH42f1A==}
+    peerDependencies:
+      '@mariozechner/pi-coding-agent': '>=0.51.0'
 
   '@aliou/sh@0.1.0':
     resolution: {integrity: sha512-MtVSUqNAHK8a0yQdwv4ADlTIBnEg8bpFXcqp0PaxwqxhSWAxcIrpAIPbsc3CJnUK3R++BcgaxBZ5saicHtU+8Q==}
@@ -1885,6 +1896,10 @@ packages:
     resolution: {integrity: sha512-gzUt/qt81nXsFGKIFcC3YnfEAx5NkunCfnDlvuBSSFS02bcXu4Lmea0AFIUwbLWxWPx3d9p8S5QoaujKcNQxcQ==}
 
 snapshots:
+
+  '@aliou/pi-utils-settings@0.1.0(@mariozechner/pi-coding-agent@0.51.0(ws@8.19.0)(zod@3.25.76))':
+    dependencies:
+      '@mariozechner/pi-coding-agent': 0.51.0(ws@8.19.0)(zod@3.25.76)
 
   '@aliou/sh@0.1.0': {}
 
