@@ -23,4 +23,6 @@ const DEFAULT_CONFIG: ResolvedSessionManagementConfig = {
 export const configLoader = new ConfigLoader<
   SessionManagementConfig,
   ResolvedSessionManagementConfig
->("breadcrumbs", DEFAULT_CONFIG);
+>("breadcrumbs", DEFAULT_CONFIG, {
+  scopes: ["global"],
+});

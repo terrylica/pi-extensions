@@ -14,8 +14,8 @@ importers:
   .:
     dependencies:
       '@aliou/pi-utils-settings':
-        specifier: ^0.1.0
-        version: 0.1.0(@mariozechner/pi-coding-agent@0.51.0(ws@8.19.0)(zod@3.25.76))
+        specifier: ^0.2.0
+        version: 0.2.0(@mariozechner/pi-coding-agent@0.51.0(ws@8.19.0)(zod@3.25.76))
       '@aliou/sh':
         specifier: ^0.1.0
         version: 0.1.0
@@ -63,8 +63,8 @@ importers:
   extensions/breadcrumbs:
     dependencies:
       '@aliou/pi-utils-settings':
-        specifier: ^0.1.0
-        version: 0.1.0(@mariozechner/pi-coding-agent@0.51.0(ws@8.19.0)(zod@3.25.76))
+        specifier: ^0.2.0
+        version: 0.2.0(@mariozechner/pi-coding-agent@0.51.0(ws@8.19.0)(zod@3.25.76))
       '@mariozechner/pi-coding-agent':
         specifier: '>=0.51.0'
         version: 0.51.0(ws@8.19.0)(zod@3.25.76)
@@ -87,8 +87,8 @@ importers:
   extensions/guardrails:
     dependencies:
       '@aliou/pi-utils-settings':
-        specifier: ^0.1.0
-        version: 0.1.0(@mariozechner/pi-coding-agent@0.51.0(ws@8.19.0)(zod@3.25.76))
+        specifier: ^0.2.0
+        version: 0.2.0(@mariozechner/pi-coding-agent@0.51.0(ws@8.19.0)(zod@3.25.76))
       '@aliou/sh':
         specifier: ^0.1.0
         version: 0.1.0
@@ -150,8 +150,8 @@ importers:
   extensions/toolchain:
     dependencies:
       '@aliou/pi-utils-settings':
-        specifier: ^0.1.0
-        version: 0.1.0(@mariozechner/pi-coding-agent@0.51.0(ws@8.19.0)(zod@3.25.76))
+        specifier: ^0.2.0
+        version: 0.2.0(@mariozechner/pi-coding-agent@0.51.0(ws@8.19.0)(zod@3.25.76))
       '@aliou/sh':
         specifier: ^0.1.0
         version: 0.1.0
@@ -171,8 +171,8 @@ importers:
 
 packages:
 
-  '@aliou/pi-utils-settings@0.1.0':
-    resolution: {integrity: sha512-dTlPTB4PSv3VzVIV8A8Bdvir5L4Jt2cvnxC3UD+NDzKjGCsQhL6WCS3gpghXrQI8I8/gHxnYtaKKTuxYH42f1A==}
+  '@aliou/pi-utils-settings@0.2.0':
+    resolution: {integrity: sha512-far9moyB7zR9Ha9BUedhA/vFV6xTe+INdh4m6dme5LWl1aLtJHY8BIJxVtIO//wv5FZx1RNVzgm9DKSYp8CI7g==}
     peerDependencies:
       '@mariozechner/pi-coding-agent': '>=0.51.0'
 
@@ -1900,7 +1900,7 @@ packages:
 
 snapshots:
 
-  '@aliou/pi-utils-settings@0.1.0(@mariozechner/pi-coding-agent@0.51.0(ws@8.19.0)(zod@3.25.76))':
+  '@aliou/pi-utils-settings@0.2.0(@mariozechner/pi-coding-agent@0.51.0(ws@8.19.0)(zod@3.25.76))':
     dependencies:
       '@mariozechner/pi-coding-agent': 0.51.0(ws@8.19.0)(zod@3.25.76)
 

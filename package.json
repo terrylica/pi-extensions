@@ -28,7 +28,7 @@
     "release": "pnpm changeset publish"
   },
   "dependencies": {
-    "@aliou/pi-utils-settings": "^0.1.0",
+    "@aliou/pi-utils-settings": "^0.2.0",
     "@aliou/sh": "^0.1.0",
     "better-sqlite3": "^12.6.2",
     "yaml": "^2.8.2"

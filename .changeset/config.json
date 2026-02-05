@@ -6,6 +6,6 @@
   "linked": [],
   "access": "public",
   "baseBranch": "main",
-  "updateInternalDependencies": "major",
+  "updateInternalDependencies": "minor",
   "ignore": []
 }
