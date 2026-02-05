@@ -10,7 +10,6 @@ import type {
   AssistantMessage,
   TextContent,
   ToolCall,
-  ToolResultMessage,
   UserMessage,
 } from "@mariozechner/pi-ai";
 import type {
@@ -93,11 +92,10 @@ export function readCurrentSessionContent(
         lines.push(`## Assistant\n\n${text}`);
       }
     } else if (msg.role === "toolResult") {
-      const toolResultMsg = msg as ToolResultMessage;
-      const formatted = formatToolResult(toolResultMsg);
-      if (formatted) {
-        lines.push(`## Tool Result\n\n${formatted}`);
-      }
+      // Skip tool results - they add noise without useful summary.
+      // The tool call itself (name + args) is already captured above.
+      // Including raw output bloats context and causes verbatim copying.
+      void msg;
     }
   }
 
@@ -142,34 +140,4 @@ function formatArgs(args: Record<string, unknown>): string {
       return `${key}: ${JSON.stringify(value)}`;
     })
     .join(", ");
-}
-
-/**
- * Maximum characters for tool result content before truncation.
- */
-const MAX_TOOL_RESULT_LENGTH = 2000;
-
-/**
- * Format a tool result message for inclusion in session content.
- * Truncates large results to avoid bloating the extraction context.
- */
-function formatToolResult(msg: ToolResultMessage): string | null {
-  const toolName = msg.toolName ?? "unknown";
-  let content = "";
-
-  for (const block of msg.content) {
-    if (block.type === "text") {
-      content += block.text;
-    }
-  }
-
-  if (!content.trim()) return null;
-
-  // Truncate if too long
-  const isTruncated = content.length > MAX_TOOL_RESULT_LENGTH;
-  const displayContent = isTruncated
-    ? `${content.slice(0, MAX_TOOL_RESULT_LENGTH)}...\n\n[truncated, showing first ${MAX_TOOL_RESULT_LENGTH} chars]`
-    : content;
-
-  return `**${toolName}:**\n${displayContent}`;
 }
