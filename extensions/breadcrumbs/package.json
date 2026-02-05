@@ -1,10 +1,13 @@
 {
-  "name": "@aliou/pi-session-management",
+  "name": "@aliou/pi-breadcrumbs",
   "private": true,
   "pi": {
     "extensions": [
       "./index.ts"
     ]
+  },
+  "dependencies": {
+    "@aliou/pi-utils-settings": "^0.1.0"
   },
   "peerDependencies": {
     "@mariozechner/pi-coding-agent": ">=0.51.0"

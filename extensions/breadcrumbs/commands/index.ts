@@ -1,7 +1,10 @@
 import type { ExtensionAPI } from "@mariozechner/pi-coding-agent";
 import { copyToClipboard } from "@mariozechner/pi-coding-agent";
+import { setupHandoffCommand } from "./handoff";
 
 export function setupSessionCommands(pi: ExtensionAPI) {
+  setupHandoffCommand(pi);
+
   pi.registerCommand("session:copy-path", {
     description: "Copy the current session file path to clipboard",
     handler: async (_args, ctx) => {
