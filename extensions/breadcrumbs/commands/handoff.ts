@@ -9,8 +9,14 @@
 import { complete, type Message } from "@mariozechner/pi-ai";
 import type { ExtensionAPI } from "@mariozechner/pi-coding-agent";
 import { BorderedLoader } from "@mariozechner/pi-coding-agent";
-import { extractMentionedFiles } from "../lib/context-extractor";
-import { readCurrentSessionContent } from "../lib/session-content-reader";
+import {
+  extractFilesFromSessionEntries,
+  extractMentionedFiles,
+} from "../lib/context-extractor";
+import {
+  readCurrentSessionContent,
+  readRawSessionContent,
+} from "../lib/session-content-reader";
 
 /**
  * System prompt for the context extraction LLM call.
@@ -61,7 +67,7 @@ export function setupHandoffCommand(pi: ExtensionAPI) {
         return;
       }
 
-      // Read session content
+      // Read session content (both formatted and raw)
       const sessionContent = readCurrentSessionContent(ctx.sessionManager);
       if (!sessionContent) {
         ctx.ui.notify(
@@ -71,7 +77,17 @@ export function setupHandoffCommand(pi: ExtensionAPI) {
         return;
       }
 
-      const mentionedFiles = extractMentionedFiles(sessionContent, ctx.cwd);
+      const rawContent = readRawSessionContent(ctx.sessionManager);
+
+      // Extract mentioned files from both text patterns and tool call arguments
+      const filesFromText = extractMentionedFiles(sessionContent, ctx.cwd);
+      const filesFromTools = rawContent
+        ? extractFilesFromSessionEntries(rawContent, ctx.cwd)
+        : [];
+      const mentionedFiles = Array.from(
+        new Set([...filesFromText, ...filesFromTools]),
+      ).sort();
+
       const currentSessionFile = ctx.sessionManager.getSessionFile();
       const parentSessionId = ctx.sessionManager.getSessionId() ?? "unknown";
 
@@ -138,7 +154,19 @@ export function setupHandoffCommand(pi: ExtensionAPI) {
       }
 
       // Build the full handoff message
-      const handoffMessage = `Continuing from session ${parentSessionId}. Use read_session to access full history if needed.\n\n${extractedContent}\n\n## Goal\n\n${goal}`;
+      const handoffMessage = `Continuing from session ${parentSessionId}.
+
+**Important:** The context below is a summary. If you need more details (full plans, code examples, ASCII diagrams, or reasoning), read the parent session's final messages:
+
+\`\`\`
+read_session({ sessionId: "${parentSessionId}", goal: "Get the last assistant message with the full plan and context" })
+\`\`\`
+
+${extractedContent}
+
+## Goal
+
+${goal}`;
 
       // Let user review and edit the handoff prompt
       const editedPrompt = await ctx.ui.editor(
@@ -150,6 +178,12 @@ export function setupHandoffCommand(pi: ExtensionAPI) {
         ctx.ui.notify("Handoff cancelled", "info");
         return;
       }
+
+      // Emit marker in parent session before creating new session
+      pi.appendEntry("handoff", {
+        goal,
+        timestamp: new Date().toISOString(),
+      });
 
       // Create new session with parent tracking
       const newSessionResult = await ctx.newSession({

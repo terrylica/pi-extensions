@@ -10,6 +10,7 @@ import type {
   AssistantMessage,
   TextContent,
   ToolCall,
+  ToolResultMessage,
   UserMessage,
 } from "@mariozechner/pi-ai";
 import type {
@@ -18,6 +19,27 @@ import type {
   SessionMessageEntry,
 } from "@mariozechner/pi-coding-agent";
 import { parseSessionEntries } from "@mariozechner/pi-coding-agent";
+
+/**
+ * Read the raw JSONL content from the current session file.
+ *
+ * Returns null if:
+ * - No session file exists (ephemeral session)
+ * - Session file is empty or unreadable
+ */
+export function readRawSessionContent(
+  sessionManager: ExtensionContext["sessionManager"],
+): string | null {
+  const sessionFile = sessionManager.getSessionFile();
+  if (!sessionFile) return null;
+
+  try {
+    const raw = readFileSync(sessionFile, "utf-8");
+    return raw.trim() ? raw : null;
+  } catch {
+    return null;
+  }
+}
 
 /**
  * Read the current session file and return a text representation
@@ -31,17 +53,8 @@ import { parseSessionEntries } from "@mariozechner/pi-coding-agent";
 export function readCurrentSessionContent(
   sessionManager: ExtensionContext["sessionManager"],
 ): string | null {
-  const sessionFile = sessionManager.getSessionFile();
-  if (!sessionFile) return null;
-
-  let raw: string;
-  try {
-    raw = readFileSync(sessionFile, "utf-8");
-  } catch {
-    return null;
-  }
-
-  if (!raw.trim()) return null;
+  const raw = readRawSessionContent(sessionManager);
+  if (!raw) return null;
 
   const entries = parseSessionEntries(raw);
   if (entries.length === 0) return null;
@@ -80,8 +93,11 @@ export function readCurrentSessionContent(
         lines.push(`## Assistant\n\n${text}`);
       }
     } else if (msg.role === "toolResult") {
-      // Skip tool results to keep content focused on conversation flow.
-      // File paths are already captured from tool calls.
+      const toolResultMsg = msg as ToolResultMessage;
+      const formatted = formatToolResult(toolResultMsg);
+      if (formatted) {
+        lines.push(`## Tool Result\n\n${formatted}`);
+      }
     }
   }
 
@@ -126,4 +142,34 @@ function formatArgs(args: Record<string, unknown>): string {
       return `${key}: ${JSON.stringify(value)}`;
     })
     .join(", ");
+}
+
+/**
+ * Maximum characters for tool result content before truncation.
+ */
+const MAX_TOOL_RESULT_LENGTH = 2000;
+
+/**
+ * Format a tool result message for inclusion in session content.
+ * Truncates large results to avoid bloating the extraction context.
+ */
+function formatToolResult(msg: ToolResultMessage): string | null {
+  const toolName = msg.toolName ?? "unknown";
+  let content = "";
+
+  for (const block of msg.content) {
+    if (block.type === "text") {
+      content += block.text;
+    }
+  }
+
+  if (!content.trim()) return null;
+
+  // Truncate if too long
+  const isTruncated = content.length > MAX_TOOL_RESULT_LENGTH;
+  const displayContent = isTruncated
+    ? `${content.slice(0, MAX_TOOL_RESULT_LENGTH)}...\n\n[truncated, showing first ${MAX_TOOL_RESULT_LENGTH} chars]`
+    : content;
+
+  return `**${toolName}:**\n${displayContent}`;
 }

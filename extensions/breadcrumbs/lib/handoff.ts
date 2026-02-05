@@ -11,8 +11,14 @@ import type {
   ExtensionCommandContext,
   ExtensionContext,
 } from "@mariozechner/pi-coding-agent";
-import { extractMentionedFiles } from "./context-extractor";
-import { readCurrentSessionContent } from "./session-content-reader";
+import {
+  extractFilesFromSessionEntries,
+  extractMentionedFiles,
+} from "./context-extractor";
+import {
+  readCurrentSessionContent,
+  readRawSessionContent,
+} from "./session-content-reader";
 
 /**
  * Result of a successful handoff.
@@ -64,7 +70,7 @@ export async function extractHandoffContext(
   goal: string,
   ctx: ExtensionContext,
 ): Promise<{ message: string; filesExtracted: number; contextLength: number }> {
-  // Read session content
+  // Read session content (both formatted and raw)
   const sessionContent = readCurrentSessionContent(ctx.sessionManager);
   if (!sessionContent) {
     throw new Error(
@@ -72,8 +78,18 @@ export async function extractHandoffContext(
     );
   }
 
-  // Extract mentioned files from session
-  const mentionedFiles = extractMentionedFiles(sessionContent, ctx.cwd);
+  const rawContent = readRawSessionContent(ctx.sessionManager);
+
+  // Extract mentioned files from both text patterns and tool call arguments
+  const filesFromText = extractMentionedFiles(sessionContent, ctx.cwd);
+  const filesFromTools = rawContent
+    ? extractFilesFromSessionEntries(rawContent, ctx.cwd)
+    : [];
+
+  // Merge and deduplicate
+  const mentionedFiles = Array.from(
+    new Set([...filesFromText, ...filesFromTools]),
+  ).sort();
 
   if (!ctx.model) {
     throw new Error("No model selected");
@@ -136,6 +152,12 @@ export async function executeHandoff(
   const { message, filesExtracted, contextLength } =
     await extractHandoffContext(goal, ctx);
 
+  // Emit marker in parent session before creating new session
+  pi.appendEntry("handoff", {
+    goal,
+    timestamp: new Date().toISOString(),
+  });
+
   // Create new session with parent tracking
   const result = await ctx.newSession({
     parentSession: currentSessionFile,
@@ -168,7 +190,13 @@ function buildHandoffMessage(
   goal: string,
   extractedContext: string,
 ): string {
-  return `Continuing from session ${parentSessionId}. Use read_session to access full history if needed.
+  return `Continuing from session ${parentSessionId}.
+
+**Important:** The context below is a summary. If you need more details (full plans, code examples, ASCII diagrams, or reasoning), read the parent session's final messages:
+
+\`\`\`
+read_session({ sessionId: "${parentSessionId}", goal: "Get the last assistant message with the full plan and context" })
+\`\`\`
 
 ${extractedContext}
 
