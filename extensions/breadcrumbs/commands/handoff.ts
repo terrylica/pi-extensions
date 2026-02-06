@@ -6,7 +6,7 @@
  * prompt in an editor for review before the new session is created.
  */
 
-import { complete, type Message } from "@mariozechner/pi-ai";
+import { type Message, stream } from "@mariozechner/pi-ai";
 import type { ExtensionAPI } from "@mariozechner/pi-coding-agent";
 import { BorderedLoader } from "@mariozechner/pi-coding-agent";
 import {
@@ -143,8 +143,8 @@ export function setupHandoffCommand(pi: ExtensionAPI) {
               `User message: ${JSON.stringify(userMessage.content).length} chars`,
             );
 
-            await logger?.log("Calling complete()...");
-            const response = await complete(
+            await logger?.log("Starting stream...");
+            const eventStream = stream(
               model,
               {
                 systemPrompt: EXTRACTION_SYSTEM_PROMPT,
@@ -152,8 +152,24 @@ export function setupHandoffCommand(pi: ExtensionAPI) {
               },
               { apiKey, signal: loader.signal },
             );
+
+            // Stream and log the response
+            let accumulated = "";
+            for await (const event of eventStream) {
+              if (event.type === "text_delta") {
+                accumulated += event.delta;
+                // Log delta to stream file
+                await logger?.logStreamDelta(event.delta);
+                // Log progress periodically (every ~500 chars)
+                if (accumulated.length % 500 < event.delta.length) {
+                  await logger?.log(`Streaming: ${accumulated.length} chars`);
+                }
+              }
+            }
+
+            const response = await eventStream.result();
             await logger?.log(
-              `complete() returned, stopReason: ${response.stopReason}`,
+              `Stream complete, stopReason: ${response.stopReason}`,
             );
 
             if (response.stopReason === "aborted") {

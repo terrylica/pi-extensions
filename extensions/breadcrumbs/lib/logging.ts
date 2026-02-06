@@ -43,25 +43,32 @@ function formatTimestamp(): string {
 export interface HandoffLogger {
   runId: string;
   logPath: string;
+  streamPath: string;
   log(message: string): Promise<void>;
   logData(label: string, data: unknown): Promise<void>;
+  /** Log a text delta to the stream file */
+  logStreamDelta(delta: string): Promise<void>;
   close(): Promise<void>;
 }
 
 class HandoffLoggerImpl implements HandoffLogger {
   public readonly runId: string;
   public readonly logPath: string;
+  public readonly streamPath: string;
   private handle: fs.FileHandle | null = null;
+  private streamHandle: fs.FileHandle | null = null;
 
   constructor(runId: string, logDir: string) {
     this.runId = runId;
     this.logPath = path.join(logDir, "handoff.log");
+    this.streamPath = path.join(logDir, "response.txt");
   }
 
   async init(): Promise<void> {
     const dir = path.dirname(this.logPath);
     await fs.mkdir(dir, { recursive: true });
     this.handle = await fs.open(this.logPath, "a");
+    this.streamHandle = await fs.open(this.streamPath, "a");
     await this.log("Handoff started");
   }
 
@@ -81,6 +88,12 @@ class HandoffLoggerImpl implements HandoffLogger {
     }
   }
 
+  async logStreamDelta(delta: string): Promise<void> {
+    if (this.streamHandle) {
+      await this.streamHandle.write(delta);
+    }
+  }
+
   async close(): Promise<void> {
     await this.log("Handoff finished");
     try {
@@ -88,7 +101,13 @@ class HandoffLoggerImpl implements HandoffLogger {
     } catch {
       /* best effort */
     }
+    try {
+      await this.streamHandle?.close();
+    } catch {
+      /* best effort */
+    }
     this.handle = null;
+    this.streamHandle = null;
   }
 }
 
