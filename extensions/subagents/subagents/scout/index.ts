@@ -1,5 +1,8 @@
 /**
- * Reviewer subagent - code review feedback on diffs.
+ * Scout subagent - web research and URL fetching.
+ *
+ * Takes a URL and/or query with a prompt, and returns a detailed
+ * answer based on fetched information.
  */
 
 import type {
@@ -10,12 +13,7 @@ import type {
   ToolDefinition,
   ToolRenderResultOptions,
 } from "@mariozechner/pi-coding-agent";
-import {
-  createBashTool,
-  createReadOnlyTools,
-  getMarkdownTheme,
-  type Theme,
-} from "@mariozechner/pi-coding-agent";
+import { getMarkdownTheme, type Theme } from "@mariozechner/pi-coding-agent";
 import { Markdown, Text } from "@mariozechner/pi-tui";
 import { Type } from "@sinclair/typebox";
 import {
@@ -29,49 +27,87 @@ import {
   ToolPreview,
   type ToolPreviewField,
 } from "../../components";
+import { getSubagentModelConfig } from "../../config";
 import { executeSubagent, resolveModel, resolveSkillsByName } from "../../lib";
 import type { SubagentToolCall } from "../../lib/types";
-import { MODEL } from "./config";
-import { REVIEWER_SYSTEM_PROMPT } from "./system-prompt";
-import { createReviewerToolFormatter } from "./tool-formatter";
-import { createReviewerTools } from "./tools";
-import type { ReviewerDetails, ReviewerInput } from "./types";
+import { SCOUT_SYSTEM_PROMPT } from "./system-prompt";
+import { formatScoutToolCall } from "./tool-formatter";
+import { createScoutTools } from "./tools";
+import type { ScoutDetails, ScoutInput } from "./types";
 
-/** System prompt guidance for reviewer tool usage */
-export const REVIEWER_GUIDANCE = `
-## Reviewer
+/** System prompt guidance for scout tool usage */
+export const SCOUT_GUIDANCE = `
+## Scout
 
-Use reviewer for fast, high-signal code review feedback on diffs. It acts like a senior reviewer: calls out risks, correctness issues, test gaps, and maintainability concerns.
+Use scout for web research and GitHub codebase exploration. It can fetch URLs, search the web, and deeply explore GitHub repositories.
+
+**When to use:**
+- Fetching content from URLs (articles, documentation, webpages)
+- Searching the web for information
+- Exploring GitHub repositories (code, structure, commits, issues, PRs)
+- Understanding how open-source projects work
+- Finding implementations across codebases
+- Analyzing code evolution through commit history
+
+**When NOT to use:**
+- Local codebase search (use lookout instead)
+- Testing API endpoints (use curl instead)
+- Making POST/PUT/DELETE requests
 
 **Inputs:**
-- \`diff\`: Freeform description of what to review (e.g., "staged changes", "last commit", "changes in src/auth/")
-- \`focus\`: Optional focus area (security, performance, style, general)
-- \`context\`: Optional description of the change intent
+- \`url\`: Specific URL to fetch
+- \`query\`: Search query for web or GitHub research
+- \`repo\`: GitHub repository to focus on (owner/repo format)
+- \`prompt\`: Question to answer based on fetched content
 
-**Behavior:**
-- Parse \`diff\` to determine the right git diff command
-- Only flag issues introduced in the diff
-- Avoid nitpicks unless style-only feedback requested
+At least one of url, query, or repo is required.
 
-**Output format:**
-Summary, Findings with [P0-P3], Verdict.
+**Note:** Scout always provides LLM-analyzed responses. For raw markdown content without analysis, use the \`web_fetch\` tool instead.
+
+**Examples:**
+- Fetch a URL: \`{ url: "https://example.com/docs", prompt: "What is the API rate limit?" }\`
+- Web search: \`{ query: "typescript best practices 2025", prompt: "Summarize the top 3 practices" }\`
+- Explore repo: \`{ repo: "facebook/react", prompt: "how is useState implemented?" }\`
+- GitHub search: \`{ query: "useState implementation", repo: "facebook/react", prompt: "explain the implementation" }\`
+- Issue/PR: \`{ url: "https://github.com/owner/repo/issues/123", prompt: "what is the current status?" }\`
+
+**Repository mappings:**
+Some npm packages are published under a different owner than the actual GitHub repository:
+- All repositories starting with \`mariozechner/pi-*\` are located in \`badlogic/pi-mono\` monorepo
+
+When you need to research a package like \`@mariozechner/pi-coding-agent\` or \`@mariozechner/pi-tui\`, use \`badlogic/pi-mono\` as the repository and search within the monorepo for the relevant package code.
+
+**GitHub capabilities:**
+- Read files and list directories
+- Search code across repositories
+- Search commits by message, author, or path
+- View commit diffs
+- List/filter issues and PRs in a repository
+- Fetch individual issues and PRs with comments
+- View PR diffs (changed files with patches)
+- View PR reviews and inline code comments
+- Compare branches, tags, or commits
 `;
 
 const parameters = Type.Object({
-  diff: Type.String({
-    description:
-      "Freeform description of what to review (e.g., staged changes, last commit, changes in src/auth/)",
+  url: Type.Optional(
+    Type.String({
+      description: "Specific URL to fetch content from",
+    }),
+  ),
+  query: Type.Optional(
+    Type.String({
+      description: "Search query for web or GitHub research",
+    }),
+  ),
+  repo: Type.Optional(
+    Type.String({
+      description: "GitHub repository to focus on (owner/repo format)",
+    }),
+  ),
+  prompt: Type.String({
+    description: "What to analyze or answer based on the fetched content.",
   }),
-  focus: Type.Optional(
-    Type.String({
-      description: "Focus area: security, performance, style, or general",
-    }),
-  ),
-  context: Type.Optional(
-    Type.String({
-      description: "What the change is trying to achieve",
-    }),
-  ),
   skills: Type.Optional(
     Type.Array(Type.String(), {
       description:
@@ -81,26 +117,30 @@ const parameters = Type.Object({
 });
 
 /** Build the user message for the subagent based on inputs */
-function buildUserMessage(input: ReviewerInput): string {
+function buildUserMessage(input: ScoutInput): string {
   const parts: string[] = [];
 
-  parts.push(`Diff scope: ${input.diff}`);
-
-  if (input.focus) {
-    parts.push(`Focus: ${input.focus}`);
+  if (input.url) {
+    parts.push(`URL to fetch: ${input.url}`);
   }
 
-  if (input.context) {
-    parts.push(`Context: ${input.context}`);
+  if (input.query) {
+    parts.push(`Search query: ${input.query}`);
   }
+
+  if (input.repo) {
+    parts.push(`GitHub repository to explore: ${input.repo}`);
+  }
+
+  parts.push(`\nQuestion/Task: ${input.prompt}`);
 
   return parts.join("\n");
 }
 
-/** Create the reviewer tool definition for use in extensions */
-export function createReviewerTool(): ToolDefinition<
+/** Create the scout tool definition for use in extensions */
+export function createScoutTool(): ToolDefinition<
   typeof parameters,
-  ReviewerDetails
+  ScoutDetails
 > {
   // Render cache for reusing components across updates
   const renderCache = new Map<
@@ -113,14 +153,22 @@ export function createReviewerTool(): ToolDefinition<
   >();
 
   return {
-    name: "reviewer",
-    label: "Reviewer",
-    description: `Code review agent that analyzes diffs and returns structured feedback.
+    name: "scout",
+    label: "Scout",
+    description: `Research assistant for web content and GitHub codebase exploration.
 
-Inputs:
-- diff: Freeform description of what to review (e.g., staged changes, last commit, changes in src/auth/)
-- focus: Optional focus area (security, performance, style, general)
-- context: Optional description of the change intent
+Inputs (at least one of url, query, or repo required):
+- url: Specific URL to fetch
+- query: Search query for web or GitHub research
+- repo: GitHub repository to focus on (owner/repo format)
+- prompt: Question to answer based on content
+
+Use cases:
+- Fetch a URL: { url: "https://...", prompt: "What is the API rate limit?" }
+- Web search: { query: "how to...", prompt: "Summarize best practices" }
+- Explore repo: { repo: "facebook/react", prompt: "how is useState implemented?" }
+- GitHub search: { query: "useState", repo: "facebook/react", prompt: "explain implementation" }
+- Fetch issue/PR: { url: "https://github.com/owner/repo/issues/123", prompt: "what is the status?" }
 
 Pass relevant skills (e.g., 'ios-26', 'drizzle-orm') to provide specialized context for the task.`,
 
@@ -128,12 +176,12 @@ Pass relevant skills (e.g., 'ios-26', 'drizzle-orm') to provide specialized cont
 
     async execute(
       toolCallId: string,
-      args: ReviewerInput,
+      args: ScoutInput,
       signal: AbortSignal | undefined,
-      onUpdate: AgentToolUpdateCallback<ReviewerDetails> | undefined,
+      onUpdate: AgentToolUpdateCallback<ScoutDetails> | undefined,
       ctx: ExtensionContext,
     ) {
-      const { diff, focus, context, skills: skillNames } = args;
+      const { url, query, repo, prompt, skills: skillNames } = args;
 
       // Resolve skills if provided
       let resolvedSkills: Skill[] = [];
@@ -145,23 +193,23 @@ Pass relevant skills (e.g., 'ios-26', 'drizzle-orm') to provide specialized cont
         notFoundSkills = result.notFound;
       }
 
-      // Validate: diff is required
-      if (!diff) {
-        const error = "Diff scope is required.";
+      // Validate: at least one of url, query, or repo required
+      if (!url && !query && !repo) {
+        const error = "At least one of 'url', 'query', or 'repo' is required.";
         return {
           content: [{ type: "text" as const, text: `Error: ${error}` }],
           details: {
             _renderKey: toolCallId,
-            diff: "",
-            focus,
-            context,
+            url,
+            query,
+            repo,
+            prompt,
             skills: skillNames,
             skillsResolved: resolvedSkills.length,
             skillsNotFound:
               notFoundSkills.length > 0 ? notFoundSkills : undefined,
             toolCalls: [],
             error,
-            cwd: ctx.cwd,
           },
         };
       }
@@ -171,7 +219,12 @@ Pass relevant skills (e.g., 'ios-26', 'drizzle-orm') to provide specialized cont
       let currentToolCalls: SubagentToolCall[] = [];
 
       try {
-        const model = resolveModel(MODEL, ctx);
+        const modelConfig = getSubagentModelConfig("scout");
+        const model = resolveModel(
+          modelConfig.provider,
+          modelConfig.model,
+          ctx,
+        );
         resolvedModel = { provider: model.provider, id: model.id };
 
         // Publish resolved provider/model as early as possible for footer rendering.
@@ -179,16 +232,16 @@ Pass relevant skills (e.g., 'ios-26', 'drizzle-orm') to provide specialized cont
           content: [{ type: "text", text: "" }],
           details: {
             _renderKey: toolCallId,
-            diff,
-            focus,
-            context,
+            url,
+            query,
+            repo,
+            prompt,
             skills: skillNames,
             skillsResolved: resolvedSkills.length,
             skillsNotFound:
               notFoundSkills.length > 0 ? notFoundSkills : undefined,
             toolCalls: currentToolCalls,
             resolvedModel,
-            cwd: ctx.cwd,
           },
         });
 
@@ -199,20 +252,14 @@ Pass relevant skills (e.g., 'ios-26', 'drizzle-orm') to provide specialized cont
           userMessage += `\n\n**Note:** The following skills were not found and could not be loaded: ${notFoundSkills.join(", ")}`;
         }
 
-        const bashTool = createBashTool(ctx.cwd) as ReturnType<
-          typeof createReadOnlyTools
-        >[number];
-        const tools = [...createReadOnlyTools(ctx.cwd), bashTool];
-
         const result = await executeSubagent(
           {
-            name: "reviewer",
+            name: "scout",
             model,
-            systemPrompt: REVIEWER_SYSTEM_PROMPT,
+            systemPrompt: SCOUT_SYSTEM_PROMPT,
             skills: resolvedSkills,
-            tools,
-            customTools: createReviewerTools(),
-            thinkingLevel: "low",
+            customTools: createScoutTools(),
+            thinkingLevel: "off",
             logging: {
               enabled: true,
               debug: true,
@@ -226,16 +273,16 @@ Pass relevant skills (e.g., 'ios-26', 'drizzle-orm') to provide specialized cont
               content: [{ type: "text", text: "" }],
               details: {
                 _renderKey: toolCallId,
-                diff,
-                focus,
-                context,
+                url,
+                query,
+                repo,
+                prompt,
                 skills: skillNames,
                 skillsResolved: resolvedSkills.length,
                 skillsNotFound:
                   notFoundSkills.length > 0 ? notFoundSkills : undefined,
                 toolCalls: currentToolCalls,
                 resolvedModel,
-                cwd: ctx.cwd,
               },
             });
           },
@@ -247,16 +294,16 @@ Pass relevant skills (e.g., 'ios-26', 'drizzle-orm') to provide specialized cont
               content: [{ type: "text", text: "" }],
               details: {
                 _renderKey: toolCallId,
-                diff,
-                focus,
-                context,
+                url,
+                query,
+                repo,
+                prompt,
                 skills: skillNames,
                 skillsResolved: resolvedSkills.length,
                 skillsNotFound:
                   notFoundSkills.length > 0 ? notFoundSkills : undefined,
                 toolCalls: currentToolCalls,
                 resolvedModel,
-                cwd: ctx.cwd,
               },
             });
           },
@@ -270,9 +317,10 @@ Pass relevant skills (e.g., 'ios-26', 'drizzle-orm') to provide specialized cont
             content: [{ type: "text" as const, text: "Aborted" }],
             details: {
               _renderKey: toolCallId,
-              diff,
-              focus,
-              context,
+              url,
+              query,
+              repo,
+              prompt,
               skills: skillNames,
               skillsResolved: resolvedSkills.length,
               skillsNotFound:
@@ -281,7 +329,6 @@ Pass relevant skills (e.g., 'ios-26', 'drizzle-orm') to provide specialized cont
               aborted: true,
               usage: result.usage,
               resolvedModel,
-              cwd: ctx.cwd,
             },
           };
         }
@@ -293,9 +340,10 @@ Pass relevant skills (e.g., 'ios-26', 'drizzle-orm') to provide specialized cont
             ],
             details: {
               _renderKey: toolCallId,
-              diff,
-              focus,
-              context,
+              url,
+              query,
+              repo,
+              prompt,
               skills: skillNames,
               skillsResolved: resolvedSkills.length,
               skillsNotFound:
@@ -304,7 +352,6 @@ Pass relevant skills (e.g., 'ios-26', 'drizzle-orm') to provide specialized cont
               error: result.error,
               usage: result.usage,
               resolvedModel,
-              cwd: ctx.cwd,
             },
           };
         }
@@ -322,9 +369,10 @@ Pass relevant skills (e.g., 'ios-26', 'drizzle-orm') to provide specialized cont
             content: [{ type: "text" as const, text: `Error: ${error}` }],
             details: {
               _renderKey: toolCallId,
-              diff,
-              focus,
-              context,
+              url,
+              query,
+              repo,
+              prompt,
               skills: skillNames,
               skillsResolved: resolvedSkills.length,
               skillsNotFound:
@@ -333,7 +381,6 @@ Pass relevant skills (e.g., 'ios-26', 'drizzle-orm') to provide specialized cont
               error,
               usage: result.usage,
               resolvedModel,
-              cwd: ctx.cwd,
             },
           };
         }
@@ -342,9 +389,10 @@ Pass relevant skills (e.g., 'ios-26', 'drizzle-orm') to provide specialized cont
           content: [{ type: "text" as const, text: result.content }],
           details: {
             _renderKey: toolCallId,
-            diff,
-            focus,
-            context,
+            url,
+            query,
+            repo,
+            prompt,
             skills: skillNames,
             skillsResolved: resolvedSkills.length,
             skillsNotFound:
@@ -353,7 +401,6 @@ Pass relevant skills (e.g., 'ios-26', 'drizzle-orm') to provide specialized cont
             response: result.content,
             usage: result.usage,
             resolvedModel,
-            cwd: ctx.cwd,
           },
         };
       } finally {
@@ -361,16 +408,18 @@ Pass relevant skills (e.g., 'ios-26', 'drizzle-orm') to provide specialized cont
     },
 
     renderCall(args, theme) {
-      const fields: ToolPreviewField[] = [{ label: "Diff", value: args.diff }];
-      if (args.focus) fields.push({ label: "Focus", value: args.focus });
-      if (args.context) fields.push({ label: "Context", value: args.context });
+      const fields: ToolPreviewField[] = [];
+      if (args.url) fields.push({ label: "URL", value: args.url });
+      if (args.query) fields.push({ label: "Query", value: args.query });
+      if (args.repo) fields.push({ label: "Repo", value: args.repo });
+      if (args.prompt) fields.push({ label: "Prompt", value: args.prompt });
       if (args.skills?.length)
         fields.push({ label: "Skills", value: args.skills.join(", ") });
-      return new ToolPreview({ title: "Reviewer", fields }, theme);
+      return new ToolPreview({ title: "Scout", fields }, theme);
     },
 
     renderResult(
-      result: AgentToolResult<ReviewerDetails>,
+      result: AgentToolResult<ScoutDetails>,
       options: ToolRenderResultOptions,
       theme: Theme,
     ) {
@@ -399,7 +448,6 @@ Pass relevant skills (e.g., 'ios-26', 'drizzle-orm') to provide specialized cont
         error,
         usage,
         resolvedModel,
-        cwd,
       } = details;
 
       const renderKey = _renderKey ?? "_default_";
@@ -420,7 +468,6 @@ Pass relevant skills (e.g., 'ios-26', 'drizzle-orm') to provide specialized cont
 
       // Build fields based on state
       const fields: ToolDetailsField[] = [];
-      const formatToolCall = createReviewerToolFormatter(cwd);
 
       if (aborted) {
         fields.push({ label: "Status", value: "Aborted" });
@@ -428,8 +475,8 @@ Pass relevant skills (e.g., 'ios-26', 'drizzle-orm') to provide specialized cont
         fields.push({ label: "Error", value: error });
       } else if (response) {
         // Done state
-        fields.push(new ToolCallSummary(toolCalls, formatToolCall, theme));
-        fields.push(new FailedToolCalls(toolCalls, formatToolCall, theme));
+        fields.push(new ToolCallSummary(toolCalls, formatScoutToolCall, theme));
+        fields.push(new FailedToolCalls(toolCalls, formatScoutToolCall, theme));
 
         if (mdResponse) {
           mdResponse.setContent(response);
@@ -439,7 +486,7 @@ Pass relevant skills (e.g., 'ios-26', 'drizzle-orm') to provide specialized cont
         fields.push(mdResponse);
       } else {
         // Running state
-        fields.push(new ToolCallList(toolCalls, formatToolCall, theme));
+        fields.push(new ToolCallList(toolCalls, formatScoutToolCall, theme));
       }
 
       // ToolDetails - reuse or create
@@ -463,13 +510,13 @@ Pass relevant skills (e.g., 'ios-26', 'drizzle-orm') to provide specialized cont
   };
 }
 
-/** Execute the reviewer subagent directly (without tool wrapper) */
-export async function executeReviewer(
-  input: ReviewerInput,
+/** Execute the scout subagent directly (without tool wrapper) */
+export async function executeScout(
+  input: ScoutInput,
   ctx: ExtensionContext,
-  onUpdate?: AgentToolUpdateCallback<ReviewerDetails>,
+  onUpdate?: AgentToolUpdateCallback<ScoutDetails>,
   signal?: AbortSignal,
-): Promise<AgentToolResult<ReviewerDetails>> {
-  const tool = createReviewerTool();
+): Promise<AgentToolResult<ScoutDetails>> {
+  const tool = createScoutTool();
   return tool.execute("direct", input, signal, onUpdate, ctx);
 }

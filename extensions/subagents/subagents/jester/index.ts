@@ -21,9 +21,9 @@ import {
   ToolPreview,
   type ToolPreviewField,
 } from "../../components";
+import { getSubagentModelConfig } from "../../config";
 import { executeSubagent, resolveModel } from "../../lib";
 import type { SubagentToolCall } from "../../lib/types";
-import { MODEL } from "./config";
 import { JESTER_SYSTEM_PROMPT } from "./system-prompt";
 import type { JesterDetails, JesterInput } from "./types";
 
@@ -87,7 +87,12 @@ export function createJesterTool(): ToolDefinition<
       const toolCalls: SubagentToolCall[] = [];
 
       try {
-        const model = resolveModel(MODEL, ctx);
+        const modelConfig = getSubagentModelConfig("jester");
+        const model = resolveModel(
+          modelConfig.provider,
+          modelConfig.model,
+          ctx,
+        );
         resolvedModel = { provider: model.provider, id: model.id };
 
         // Publish resolved provider/model as early as possible for footer rendering.

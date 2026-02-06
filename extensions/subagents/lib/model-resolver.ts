@@ -1,30 +1,30 @@
 /**
  * Model resolution helper for subagents.
  *
- * All subagents use OpenRouter exclusively. Resolution is a direct lookup
- * by model ID + provider.
+ * Resolves a model by provider + ID from the model registry.
  */
 
 import type { Model } from "@mariozechner/pi-ai";
 import type { ExtensionContext } from "@mariozechner/pi-coding-agent";
-import { PROVIDER } from "./constants";
 
 /**
- * Find a model by ID from OpenRouter.
+ * Find a model by provider and ID.
  *
- * @param modelId - OpenRouter model ID (e.g., "anthropic/claude-haiku-4.5")
+ * @param provider - Provider name (e.g., "openrouter", "anthropic", "openai-codex")
+ * @param modelId - Model ID (e.g., "anthropic/claude-haiku-4.5")
  * @param ctx - Extension context with modelRegistry
  * @returns The resolved model
- * @throws Error if model not found or OpenRouter API key not configured
+ * @throws Error if model not found or API key not configured
  */
 export function resolveModel(
+  provider: string,
   modelId: string,
   ctx: ExtensionContext,
   // biome-ignore lint/suspicious/noExplicitAny: Model type requires any for generic API
 ): Model<any> {
   const available = ctx.modelRegistry.getAvailable();
   const model = available.find(
-    (m) => m.id === modelId && m.provider === PROVIDER,
+    (m) => m.id === modelId && m.provider === provider,
   );
 
   if (model) {
@@ -34,14 +34,14 @@ export function resolveModel(
   // Check if the model exists but the API key is missing
   const all = ctx.modelRegistry.getAll();
   const existsWithoutKey = all.some(
-    (m) => m.id === modelId && m.provider === PROVIDER,
+    (m) => m.id === modelId && m.provider === provider,
   );
 
   if (existsWithoutKey) {
     throw new Error(
-      `Model "${modelId}" exists on OpenRouter but no valid API key is configured. Set the OPENROUTER_API_KEY environment variable.`,
+      `Model "${modelId}" exists on ${provider} but no valid API key is configured.`,
     );
   }
 
-  throw new Error(`Model "${modelId}" not found on OpenRouter.`);
+  throw new Error(`Model "${modelId}" not found on provider "${provider}".`);
 }

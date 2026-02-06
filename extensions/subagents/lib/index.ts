@@ -26,8 +26,6 @@ export {
   type ParsedGitHubUrl,
   parseGitHubUrl,
 } from "./clients";
-// Constants
-export { PROVIDER } from "./constants";
 // Core executor
 export { executeSubagent, filterThinkingTags } from "./executor";
 // Logging

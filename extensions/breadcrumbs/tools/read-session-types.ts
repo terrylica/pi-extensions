@@ -5,7 +5,7 @@
 import type {
   SubagentToolCall,
   SubagentUsage,
-} from "../../specialized-subagents/lib/types";
+} from "../../subagents/lib/types";
 
 export interface ReadSessionInput {
   sessionId: string;

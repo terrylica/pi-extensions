@@ -54,7 +54,7 @@ Standalone extensions published to npm. Install individually with `pi install np
 | processes | Background process management | [README](extensions/processes/README.md) |
 | providers | Providers and usage dashboard (rate limits, session stats) | [README](extensions/providers/README.md) |
 | breadcrumbs | Session history tools (search, extract info, handoff) | [README](extensions/breadcrumbs/README.md) |
-| specialized-subagents | Framework for spawning specialized subagents (scout, oracle, reviewer, etc.) | [README](extensions/specialized-subagents/README.md) |
+| subagents | Framework for spawning specialized subagents (scout, oracle, reviewer, etc.) | [README](extensions/subagents/README.md) |
 | the-dumb-zone | Context window degradation warning | [README](extensions/the-dumb-zone/README.md) |
 
 ## Themes

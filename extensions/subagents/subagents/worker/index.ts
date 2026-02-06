@@ -1,8 +1,8 @@
 /**
- * Lookout subagent - local codebase search by functionality or concept.
+ * Worker subagent - focused implementation agent for well-defined tasks.
  *
- * Uses osgrep for semantic search combined with Pi's built-in tools
- * (grep, find, read, ls) for comprehensive code discovery.
+ * Sandboxed to specific files. Reads, edits, writes, and runs bash for
+ * verification. Does not search or explore the codebase.
  */
 
 import type {
@@ -14,67 +14,86 @@ import type {
   ToolRenderResultOptions,
 } from "@mariozechner/pi-coding-agent";
 import {
-  createReadOnlyTools,
+  createBashTool,
+  createEditTool,
+  type createReadOnlyTools,
+  createReadTool,
+  createWriteTool,
   getMarkdownTheme,
   type Theme,
 } from "@mariozechner/pi-coding-agent";
 import { Markdown, Text } from "@mariozechner/pi-tui";
 import { Type } from "@sinclair/typebox";
 import {
-  FailedToolCalls,
+  FileList,
+  MarkdownField,
   MarkdownResponse,
   SubagentFooter,
   ToolCallList,
-  ToolCallSummary,
   ToolDetails,
   type ToolDetailsField,
   ToolPreview,
   type ToolPreviewField,
 } from "../../components";
+import { getSubagentModelConfig } from "../../config";
 import { executeSubagent, resolveModel, resolveSkillsByName } from "../../lib";
 import type { SubagentToolCall } from "../../lib/types";
-import { MODEL } from "./config";
-import { LOOKOUT_SYSTEM_PROMPT } from "./system-prompt";
-import { createLookoutToolFormatter } from "./tool-formatter";
-import { createLookoutTools } from "./tools";
-import type { LookoutDetails, LookoutInput } from "./types";
+import { pluralize } from "../../lib/ui/stats";
+import { WORKER_SYSTEM_PROMPT } from "./system-prompt";
+import { createWorkerToolFormatter } from "./tool-formatter";
+import type { WorkerDetails, WorkerInput } from "./types";
 
-/** System prompt guidance for lookout tool usage */
-export const LOOKOUT_GUIDANCE = `
-## Lookout - Local Code Search
+/** System prompt guidance for worker tool usage */
+export const WORKER_GUIDANCE = `
+## Worker
 
-Use the \`lookout\` tool to find code by functionality or concept in the local codebase.
+Delegate implementation work to the worker instead of doing it yourself when the task is well-defined and the files are known. The worker is a focused implementation agent: it reads, edits, writes files and runs verification commands. It is sandboxed to the files you provide.
 
-**When to use:**
-- Locate code by behavior: "Where do we validate JWT tokens?"
-- Find implementations: "Which module handles retry logic?"
-- Understand code flow: "How does the auth flow work?"
+**You SHOULD delegate to the worker when:**
+- You already know which files need to change and what the change is
+- The task is implementation, not exploration or planning
+- Examples: migrating files to TypeScript, adding documentation, adding error handling, applying a refactoring pattern, fixing a known bug in specific files
 
-**When NOT to use:**
-- Known file path or existing doc/plan -> use \`read\` directly
-- Simple exact string search -> use \`grep\` directly
-- Planning, strategy, or request for an implementation plan -> use \`oracle\`
-- External/web research -> use \`scout\` instead
+**You should NOT delegate to the worker when:**
+- You need to explore or search the codebase first (use lookout or scout)
+- The scope is unclear or you don't know which files are involved
+- The task is architectural planning (use oracle)
+
+**Inputs:**
+- \`task\`: Short description (~50 chars, for display only, not sent to the worker)
+- \`instructions\`: Full instructions for the worker (be specific and complete)
+- \`files\`: Array of file paths the worker should operate on
+- \`context\`: Optional background info (e.g., patterns to follow, constraints)
+- \`skills\`: Optional skill names for specialized context
+
+**After the worker completes:** Review its output yourself. If the worker did not run verification (e.g., typecheck, tests, lint), do it yourself and fix any issues.
 
 **Example:**
 \`\`\`json
-{ "query": "Where is the database connection pool configured?" }
-\`\`\`
-
-**Custom directory:** Pass \`cwd\` to search a specific directory instead of the current project:
-\`\`\`json
-{ "query": "auth implementation", "cwd": "/path/to/other/project" }
+{
+  "task": "Convert helpers.js to TypeScript",
+  "instructions": "Convert this file from JavaScript to TypeScript. Add proper type annotations for all function parameters and return types. Use generics where appropriate.",
+  "files": ["src/utils/helpers.js"],
+  "context": "Follow the typing patterns used in src/utils/types.ts"
+}
 \`\`\`
 `;
 
 const parameters = Type.Object({
-  query: Type.String({
-    description: "Search query describing what to find in the codebase",
+  task: Type.String({
+    description:
+      "Short description of the task (~50 chars, for display only, not sent to the worker)",
   }),
-  cwd: Type.Optional(
+  instructions: Type.String({
+    description: "Full instructions for the worker (be specific and complete)",
+  }),
+  files: Type.Array(Type.String(), {
+    description: "Files the worker should operate on",
+  }),
+  context: Type.Optional(
     Type.String({
       description:
-        "Working directory to search in (defaults to current project directory)",
+        "Optional background info (e.g., patterns to follow, constraints)",
     }),
   ),
   skills: Type.Optional(
@@ -85,10 +104,24 @@ const parameters = Type.Object({
   ),
 });
 
-/** Create the lookout tool definition for use in extensions */
-export function createLookoutTool(): ToolDefinition<
+/** Build the user message for the subagent based on inputs */
+function buildUserMessage(input: WorkerInput): string {
+  const parts: string[] = [];
+
+  parts.push(`## Instructions\n${input.instructions}`);
+  parts.push(`## Files\n${input.files.map((f) => `- ${f}`).join("\n")}`);
+
+  if (input.context) {
+    parts.push(`## Context\n${input.context}`);
+  }
+
+  return parts.join("\n\n");
+}
+
+/** Create the worker tool definition for use in extensions */
+export function createWorkerTool(): ToolDefinition<
   typeof parameters,
-  LookoutDetails
+  WorkerDetails
 > {
   // Render cache for reusing components across updates
   const renderCache = new Map<
@@ -101,26 +134,26 @@ export function createLookoutTool(): ToolDefinition<
   >();
 
   return {
-    name: "lookout",
-    label: "Lookout",
-    description: `Local codebase search by functionality or concept.
+    name: "worker",
+    label: "Worker",
+    description: `Focused implementation agent for well-defined tasks on specific files.
 
-Uses semantic search (osgrep) + grep/find for comprehensive code discovery.
-Returns relevant files with line ranges.
+The worker reads, edits, writes files and runs bash for verification. It is sandboxed to the files you provide. It does not search or explore the codebase.
 
-Example: { "query": "where do we handle authentication" }
+Use for: file migrations, adding docs/types, applying refactoring patterns, adding error handling, fixing known bugs in specific files.
 
 Pass relevant skills (e.g., 'ios-26', 'drizzle-orm') to provide specialized context for the task.`,
+
     parameters,
 
     async execute(
       toolCallId: string,
-      args: LookoutInput,
+      args: WorkerInput,
       signal: AbortSignal | undefined,
-      onUpdate: AgentToolUpdateCallback<LookoutDetails> | undefined,
+      onUpdate: AgentToolUpdateCallback<WorkerDetails> | undefined,
       ctx: ExtensionContext,
     ) {
-      const { query, cwd: customCwd, skills: skillNames } = args;
+      const { task, instructions, files, context, skills: skillNames } = args;
 
       // Resolve skills if provided
       let resolvedSkills: Skill[] = [];
@@ -132,71 +165,106 @@ Pass relevant skills (e.g., 'ios-26', 'drizzle-orm') to provide specialized cont
         notFoundSkills = result.notFound;
       }
 
-      // Validate: query is required
-      if (!query) {
-        const error = "Query is required.";
+      // Validate: instructions and files are required
+      if (!instructions) {
+        const error = "Instructions are required.";
         return {
           content: [{ type: "text" as const, text: `Error: ${error}` }],
           details: {
             _renderKey: toolCallId,
-            query: "",
+            task,
+            instructions: "",
+            files,
+            context,
             skills: skillNames,
             skillsResolved: resolvedSkills.length,
             skillsNotFound:
               notFoundSkills.length > 0 ? notFoundSkills : undefined,
             toolCalls: [],
             error,
-            cwd: customCwd ?? ctx.cwd,
+            cwd: ctx.cwd,
           },
         };
       }
 
-      // Use custom cwd if provided, otherwise use context cwd
-      const workingDir = customCwd ?? ctx.cwd;
+      if (!files || files.length === 0) {
+        const error = "At least one file is required.";
+        return {
+          content: [{ type: "text" as const, text: `Error: ${error}` }],
+          details: {
+            _renderKey: toolCallId,
+            task,
+            instructions,
+            files: [],
+            context,
+            skills: skillNames,
+            skillsResolved: resolvedSkills.length,
+            skillsNotFound:
+              notFoundSkills.length > 0 ? notFoundSkills : undefined,
+            toolCalls: [],
+            error,
+            cwd: ctx.cwd,
+          },
+        };
+      }
 
       let resolvedModel: { provider: string; id: string } | undefined;
 
       let currentToolCalls: SubagentToolCall[] = [];
 
       try {
-        const model = resolveModel(MODEL, ctx);
+        const modelConfig = getSubagentModelConfig("worker");
+        const model = resolveModel(
+          modelConfig.provider,
+          modelConfig.model,
+          ctx,
+        );
         resolvedModel = { provider: model.provider, id: model.id };
 
-        // Publish resolved provider/model as early as possible for footer rendering.
+        // Publish resolved provider/model as early as possible
         onUpdate?.({
           content: [{ type: "text", text: "" }],
           details: {
             _renderKey: toolCallId,
-            query,
+            task,
+            instructions,
+            files,
+            context,
             skills: skillNames,
             skillsResolved: resolvedSkills.length,
             skillsNotFound:
               notFoundSkills.length > 0 ? notFoundSkills : undefined,
             toolCalls: currentToolCalls,
             resolvedModel,
-            cwd: workingDir,
+            cwd: ctx.cwd,
           },
         });
 
-        // Replace {cwd} in system prompt with working directory
-        const systemPrompt = LOOKOUT_SYSTEM_PROMPT.replace("{cwd}", workingDir);
-
-        let userMessage = query;
+        let userMessage = buildUserMessage(args);
 
         // Append warning if skills not found
         if (notFoundSkills.length > 0) {
           userMessage += `\n\n**Note:** The following skills were not found and could not be loaded: ${notFoundSkills.join(", ")}`;
         }
 
+        // Sandboxed tools: read, edit, write, bash. No grep/find/ls.
+        type BuiltinTool = ReturnType<typeof createReadOnlyTools>[number];
+        const tools: BuiltinTool[] = [
+          createReadTool(ctx.cwd) as BuiltinTool,
+          createEditTool(ctx.cwd) as BuiltinTool,
+          createWriteTool(ctx.cwd) as BuiltinTool,
+          createBashTool(ctx.cwd) as BuiltinTool,
+        ];
+
         const result = await executeSubagent(
           {
-            name: "lookout",
+            name: "worker",
             model,
-            systemPrompt,
+            systemPrompt: WORKER_SYSTEM_PROMPT,
             skills: resolvedSkills,
-            tools: createReadOnlyTools(workingDir), // grep, find, read, ls
-            customTools: createLookoutTools(workingDir), // semantic_search
-            thinkingLevel: "off",
+            tools,
+            customTools: [],
+            thinkingLevel: "low",
             logging: {
               enabled: true,
               debug: true,
@@ -210,14 +278,17 @@ Pass relevant skills (e.g., 'ios-26', 'drizzle-orm') to provide specialized cont
               content: [{ type: "text", text: "" }],
               details: {
                 _renderKey: toolCallId,
-                query,
+                task,
+                instructions,
+                files,
+                context,
                 skills: skillNames,
                 skillsResolved: resolvedSkills.length,
                 skillsNotFound:
                   notFoundSkills.length > 0 ? notFoundSkills : undefined,
                 toolCalls: currentToolCalls,
                 resolvedModel,
-                cwd: workingDir,
+                cwd: ctx.cwd,
               },
             });
           },
@@ -229,14 +300,17 @@ Pass relevant skills (e.g., 'ios-26', 'drizzle-orm') to provide specialized cont
               content: [{ type: "text", text: "" }],
               details: {
                 _renderKey: toolCallId,
-                query,
+                task,
+                instructions,
+                files,
+                context,
                 skills: skillNames,
                 skillsResolved: resolvedSkills.length,
                 skillsNotFound:
                   notFoundSkills.length > 0 ? notFoundSkills : undefined,
                 toolCalls: currentToolCalls,
                 resolvedModel,
-                cwd: workingDir,
+                cwd: ctx.cwd,
               },
             });
           },
@@ -250,7 +324,10 @@ Pass relevant skills (e.g., 'ios-26', 'drizzle-orm') to provide specialized cont
             content: [{ type: "text" as const, text: "Aborted" }],
             details: {
               _renderKey: toolCallId,
-              query,
+              task,
+              instructions,
+              files,
+              context,
               skills: skillNames,
               skillsResolved: resolvedSkills.length,
               skillsNotFound:
@@ -259,7 +336,7 @@ Pass relevant skills (e.g., 'ios-26', 'drizzle-orm') to provide specialized cont
               aborted: true,
               usage: result.usage,
               resolvedModel,
-              cwd: workingDir,
+              cwd: ctx.cwd,
             },
           };
         }
@@ -271,7 +348,10 @@ Pass relevant skills (e.g., 'ios-26', 'drizzle-orm') to provide specialized cont
             ],
             details: {
               _renderKey: toolCallId,
-              query,
+              task,
+              instructions,
+              files,
+              context,
               skills: skillNames,
               skillsResolved: resolvedSkills.length,
               skillsNotFound:
@@ -280,7 +360,7 @@ Pass relevant skills (e.g., 'ios-26', 'drizzle-orm') to provide specialized cont
               error: result.error,
               usage: result.usage,
               resolvedModel,
-              cwd: workingDir,
+              cwd: ctx.cwd,
             },
           };
         }
@@ -298,7 +378,10 @@ Pass relevant skills (e.g., 'ios-26', 'drizzle-orm') to provide specialized cont
             content: [{ type: "text" as const, text: `Error: ${error}` }],
             details: {
               _renderKey: toolCallId,
-              query,
+              task,
+              instructions,
+              files,
+              context,
               skills: skillNames,
               skillsResolved: resolvedSkills.length,
               skillsNotFound:
@@ -307,7 +390,7 @@ Pass relevant skills (e.g., 'ios-26', 'drizzle-orm') to provide specialized cont
               error,
               usage: result.usage,
               resolvedModel,
-              cwd: workingDir,
+              cwd: ctx.cwd,
             },
           };
         }
@@ -316,7 +399,10 @@ Pass relevant skills (e.g., 'ios-26', 'drizzle-orm') to provide specialized cont
           content: [{ type: "text" as const, text: result.content }],
           details: {
             _renderKey: toolCallId,
-            query,
+            task,
+            instructions,
+            files,
+            context,
             skills: skillNames,
             skillsResolved: resolvedSkills.length,
             skillsNotFound:
@@ -325,7 +411,7 @@ Pass relevant skills (e.g., 'ios-26', 'drizzle-orm') to provide specialized cont
             response: result.content,
             usage: result.usage,
             resolvedModel,
-            cwd: workingDir,
+            cwd: ctx.cwd,
           },
         };
       } finally {
@@ -333,17 +419,18 @@ Pass relevant skills (e.g., 'ios-26', 'drizzle-orm') to provide specialized cont
     },
 
     renderCall(args, theme) {
-      const fields: ToolPreviewField[] = [
-        { label: "Query", value: args.query },
-      ];
-      if (args.cwd) fields.push({ label: "Directory", value: args.cwd });
-      if (args.skills?.length)
+      const fields: ToolPreviewField[] = [{ label: "Task", value: args.task }];
+
+      // Only add optional fields if present
+      if (args.skills?.length) {
         fields.push({ label: "Skills", value: args.skills.join(", ") });
-      return new ToolPreview({ title: "Lookout", fields }, theme);
+      }
+
+      return new ToolPreview({ title: "Worker", fields }, theme);
     },
 
     renderResult(
-      result: AgentToolResult<LookoutDetails>,
+      result: AgentToolResult<WorkerDetails>,
       options: ToolRenderResultOptions,
       theme: Theme,
     ) {
@@ -372,8 +459,13 @@ Pass relevant skills (e.g., 'ios-26', 'drizzle-orm') to provide specialized cont
         error,
         usage,
         resolvedModel,
+        files,
+        instructions,
         cwd,
       } = details;
+
+      // Counts
+      const doneCount = toolCalls.filter((tc) => tc.status === "done").length;
 
       const renderKey = _renderKey ?? "_default_";
       const cached = renderCache.get(renderKey);
@@ -393,16 +485,27 @@ Pass relevant skills (e.g., 'ios-26', 'drizzle-orm') to provide specialized cont
 
       // Build fields based on state
       const fields: ToolDetailsField[] = [];
-      const formatToolCall = createLookoutToolFormatter(cwd);
+      const formatToolCall = createWorkerToolFormatter(cwd);
 
+      // Instructions
+      fields.push(new MarkdownField("Instructions", instructions, theme));
+
+      // State-specific fields
       if (aborted) {
-        fields.push({ label: "Status", value: "Aborted" });
+        const suffix =
+          doneCount > 0
+            ? ` (${doneCount} ${pluralize(doneCount, "tool call")} completed)`
+            : "";
+        fields.push({
+          label: "Status",
+          value: theme.fg("warning", "Aborted") + theme.fg("muted", suffix),
+        });
       } else if (error) {
         fields.push({ label: "Error", value: error });
       } else if (response) {
         // Done state
-        fields.push(new ToolCallSummary(toolCalls, formatToolCall, theme));
-        fields.push(new FailedToolCalls(toolCalls, formatToolCall, theme));
+        fields.push(new FileList(files, theme, cwd));
+        fields.push(new ToolCallList(toolCalls, formatToolCall, theme));
 
         if (mdResponse) {
           mdResponse.setContent(response);
@@ -413,24 +516,6 @@ Pass relevant skills (e.g., 'ios-26', 'drizzle-orm') to provide specialized cont
       } else {
         // Running state
         fields.push(new ToolCallList(toolCalls, formatToolCall, theme));
-
-        // Show indexing progress when collapsed
-        const indexingCall = toolCalls.find(
-          (tc) =>
-            tc.toolName === "semantic_search" &&
-            tc.status === "running" &&
-            tc.partialResult &&
-            (tc.partialResult.details as { indexing?: boolean } | undefined)
-              ?.indexing === true,
-        );
-        const indexingText = indexingCall?.partialResult?.content?.[0]?.text;
-        if (indexingText) {
-          fields.push({
-            label: "Status",
-            value: indexingText,
-            showCollapsed: true,
-          });
-        }
       }
 
       // ToolDetails - reuse or create
@@ -454,13 +539,13 @@ Pass relevant skills (e.g., 'ios-26', 'drizzle-orm') to provide specialized cont
   };
 }
 
-/** Execute the lookout subagent directly (without tool wrapper) */
-export async function executeLookout(
-  input: LookoutInput,
+/** Execute the worker subagent directly (without tool wrapper) */
+export async function executeWorker(
+  input: WorkerInput,
   ctx: ExtensionContext,
-  onUpdate?: AgentToolUpdateCallback<LookoutDetails>,
+  onUpdate?: AgentToolUpdateCallback<WorkerDetails>,
   signal?: AbortSignal,
-): Promise<AgentToolResult<LookoutDetails>> {
-  const tool = createLookoutTool();
+): Promise<AgentToolResult<WorkerDetails>> {
+  const tool = createWorkerTool();
   return tool.execute("direct", input, signal, onUpdate, ctx);
 }

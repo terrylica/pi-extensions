@@ -1,8 +1,5 @@
 /**
- * Worker subagent - focused implementation agent for well-defined tasks.
- *
- * Sandboxed to specific files. Reads, edits, writes, and runs bash for
- * verification. Does not search or explore the codebase.
+ * Reviewer subagent - code review feedback on diffs.
  */
 
 import type {
@@ -15,85 +12,64 @@ import type {
 } from "@mariozechner/pi-coding-agent";
 import {
   createBashTool,
-  createEditTool,
-  type createReadOnlyTools,
-  createReadTool,
-  createWriteTool,
+  createReadOnlyTools,
   getMarkdownTheme,
   type Theme,
 } from "@mariozechner/pi-coding-agent";
 import { Markdown, Text } from "@mariozechner/pi-tui";
 import { Type } from "@sinclair/typebox";
 import {
-  FileList,
-  MarkdownField,
+  FailedToolCalls,
   MarkdownResponse,
   SubagentFooter,
   ToolCallList,
+  ToolCallSummary,
   ToolDetails,
   type ToolDetailsField,
   ToolPreview,
   type ToolPreviewField,
 } from "../../components";
+import { getSubagentModelConfig } from "../../config";
 import { executeSubagent, resolveModel, resolveSkillsByName } from "../../lib";
 import type { SubagentToolCall } from "../../lib/types";
-import { pluralize } from "../../lib/ui/stats";
-import { MODEL } from "./config";
-import { WORKER_SYSTEM_PROMPT } from "./system-prompt";
-import { createWorkerToolFormatter } from "./tool-formatter";
-import type { WorkerDetails, WorkerInput } from "./types";
+import { REVIEWER_SYSTEM_PROMPT } from "./system-prompt";
+import { createReviewerToolFormatter } from "./tool-formatter";
+import { createReviewerTools } from "./tools";
+import type { ReviewerDetails, ReviewerInput } from "./types";
 
-/** System prompt guidance for worker tool usage */
-export const WORKER_GUIDANCE = `
-## Worker
+/** System prompt guidance for reviewer tool usage */
+export const REVIEWER_GUIDANCE = `
+## Reviewer
 
-Delegate implementation work to the worker instead of doing it yourself when the task is well-defined and the files are known. The worker is a focused implementation agent: it reads, edits, writes files and runs verification commands. It is sandboxed to the files you provide.
-
-**You SHOULD delegate to the worker when:**
-- You already know which files need to change and what the change is
-- The task is implementation, not exploration or planning
-- Examples: migrating files to TypeScript, adding documentation, adding error handling, applying a refactoring pattern, fixing a known bug in specific files
-
-**You should NOT delegate to the worker when:**
-- You need to explore or search the codebase first (use lookout or scout)
-- The scope is unclear or you don't know which files are involved
-- The task is architectural planning (use oracle)
+Use reviewer for fast, high-signal code review feedback on diffs. It acts like a senior reviewer: calls out risks, correctness issues, test gaps, and maintainability concerns.
 
 **Inputs:**
-- \`task\`: Short description (~50 chars, for display only, not sent to the worker)
-- \`instructions\`: Full instructions for the worker (be specific and complete)
-- \`files\`: Array of file paths the worker should operate on
-- \`context\`: Optional background info (e.g., patterns to follow, constraints)
-- \`skills\`: Optional skill names for specialized context
+- \`diff\`: Freeform description of what to review (e.g., "staged changes", "last commit", "changes in src/auth/")
+- \`focus\`: Optional focus area (security, performance, style, general)
+- \`context\`: Optional description of the change intent
 
-**After the worker completes:** Review its output yourself. If the worker did not run verification (e.g., typecheck, tests, lint), do it yourself and fix any issues.
+**Behavior:**
+- Parse \`diff\` to determine the right git diff command
+- Only flag issues introduced in the diff
+- Avoid nitpicks unless style-only feedback requested
 
-**Example:**
-\`\`\`json
-{
-  "task": "Convert helpers.js to TypeScript",
-  "instructions": "Convert this file from JavaScript to TypeScript. Add proper type annotations for all function parameters and return types. Use generics where appropriate.",
-  "files": ["src/utils/helpers.js"],
-  "context": "Follow the typing patterns used in src/utils/types.ts"
-}
-\`\`\`
+**Output format:**
+Summary, Findings with [P0-P3], Verdict.
 `;
 
 const parameters = Type.Object({
-  task: Type.String({
+  diff: Type.String({
     description:
-      "Short description of the task (~50 chars, for display only, not sent to the worker)",
+      "Freeform description of what to review (e.g., staged changes, last commit, changes in src/auth/)",
   }),
-  instructions: Type.String({
-    description: "Full instructions for the worker (be specific and complete)",
-  }),
-  files: Type.Array(Type.String(), {
-    description: "Files the worker should operate on",
-  }),
+  focus: Type.Optional(
+    Type.String({
+      description: "Focus area: security, performance, style, or general",
+    }),
+  ),
   context: Type.Optional(
     Type.String({
-      description:
-        "Optional background info (e.g., patterns to follow, constraints)",
+      description: "What the change is trying to achieve",
     }),
   ),
   skills: Type.Optional(
@@ -105,23 +81,26 @@ const parameters = Type.Object({
 });
 
 /** Build the user message for the subagent based on inputs */
-function buildUserMessage(input: WorkerInput): string {
+function buildUserMessage(input: ReviewerInput): string {
   const parts: string[] = [];
 
-  parts.push(`## Instructions\n${input.instructions}`);
-  parts.push(`## Files\n${input.files.map((f) => `- ${f}`).join("\n")}`);
+  parts.push(`Diff scope: ${input.diff}`);
 
-  if (input.context) {
-    parts.push(`## Context\n${input.context}`);
+  if (input.focus) {
+    parts.push(`Focus: ${input.focus}`);
   }
 
-  return parts.join("\n\n");
+  if (input.context) {
+    parts.push(`Context: ${input.context}`);
+  }
+
+  return parts.join("\n");
 }
 
-/** Create the worker tool definition for use in extensions */
-export function createWorkerTool(): ToolDefinition<
+/** Create the reviewer tool definition for use in extensions */
+export function createReviewerTool(): ToolDefinition<
   typeof parameters,
-  WorkerDetails
+  ReviewerDetails
 > {
   // Render cache for reusing components across updates
   const renderCache = new Map<
@@ -134,13 +113,14 @@ export function createWorkerTool(): ToolDefinition<
   >();
 
   return {
-    name: "worker",
-    label: "Worker",
-    description: `Focused implementation agent for well-defined tasks on specific files.
+    name: "reviewer",
+    label: "Reviewer",
+    description: `Code review agent that analyzes diffs and returns structured feedback.
 
-The worker reads, edits, writes files and runs bash for verification. It is sandboxed to the files you provide. It does not search or explore the codebase.
-
-Use for: file migrations, adding docs/types, applying refactoring patterns, adding error handling, fixing known bugs in specific files.
+Inputs:
+- diff: Freeform description of what to review (e.g., staged changes, last commit, changes in src/auth/)
+- focus: Optional focus area (security, performance, style, general)
+- context: Optional description of the change intent
 
 Pass relevant skills (e.g., 'ios-26', 'drizzle-orm') to provide specialized context for the task.`,
 
@@ -148,12 +128,12 @@ Pass relevant skills (e.g., 'ios-26', 'drizzle-orm') to provide specialized cont
 
     async execute(
       toolCallId: string,
-      args: WorkerInput,
+      args: ReviewerInput,
       signal: AbortSignal | undefined,
-      onUpdate: AgentToolUpdateCallback<WorkerDetails> | undefined,
+      onUpdate: AgentToolUpdateCallback<ReviewerDetails> | undefined,
       ctx: ExtensionContext,
     ) {
-      const { task, instructions, files, context, skills: skillNames } = args;
+      const { diff, focus, context, skills: skillNames } = args;
 
       // Resolve skills if provided
       let resolvedSkills: Skill[] = [];
@@ -165,37 +145,15 @@ Pass relevant skills (e.g., 'ios-26', 'drizzle-orm') to provide specialized cont
         notFoundSkills = result.notFound;
       }
 
-      // Validate: instructions and files are required
-      if (!instructions) {
-        const error = "Instructions are required.";
+      // Validate: diff is required
+      if (!diff) {
+        const error = "Diff scope is required.";
         return {
           content: [{ type: "text" as const, text: `Error: ${error}` }],
           details: {
             _renderKey: toolCallId,
-            task,
-            instructions: "",
-            files,
-            context,
-            skills: skillNames,
-            skillsResolved: resolvedSkills.length,
-            skillsNotFound:
-              notFoundSkills.length > 0 ? notFoundSkills : undefined,
-            toolCalls: [],
-            error,
-            cwd: ctx.cwd,
-          },
-        };
-      }
-
-      if (!files || files.length === 0) {
-        const error = "At least one file is required.";
-        return {
-          content: [{ type: "text" as const, text: `Error: ${error}` }],
-          details: {
-            _renderKey: toolCallId,
-            task,
-            instructions,
-            files: [],
+            diff: "",
+            focus,
             context,
             skills: skillNames,
             skillsResolved: resolvedSkills.length,
@@ -213,17 +171,21 @@ Pass relevant skills (e.g., 'ios-26', 'drizzle-orm') to provide specialized cont
       let currentToolCalls: SubagentToolCall[] = [];
 
       try {
-        const model = resolveModel(MODEL, ctx);
+        const modelConfig = getSubagentModelConfig("reviewer");
+        const model = resolveModel(
+          modelConfig.provider,
+          modelConfig.model,
+          ctx,
+        );
         resolvedModel = { provider: model.provider, id: model.id };
 
-        // Publish resolved provider/model as early as possible
+        // Publish resolved provider/model as early as possible for footer rendering.
         onUpdate?.({
           content: [{ type: "text", text: "" }],
           details: {
             _renderKey: toolCallId,
-            task,
-            instructions,
-            files,
+            diff,
+            focus,
             context,
             skills: skillNames,
             skillsResolved: resolvedSkills.length,
@@ -242,23 +204,19 @@ Pass relevant skills (e.g., 'ios-26', 'drizzle-orm') to provide specialized cont
           userMessage += `\n\n**Note:** The following skills were not found and could not be loaded: ${notFoundSkills.join(", ")}`;
         }
 
-        // Sandboxed tools: read, edit, write, bash. No grep/find/ls.
-        type BuiltinTool = ReturnType<typeof createReadOnlyTools>[number];
-        const tools: BuiltinTool[] = [
-          createReadTool(ctx.cwd) as BuiltinTool,
-          createEditTool(ctx.cwd) as BuiltinTool,
-          createWriteTool(ctx.cwd) as BuiltinTool,
-          createBashTool(ctx.cwd) as BuiltinTool,
-        ];
+        const bashTool = createBashTool(ctx.cwd) as ReturnType<
+          typeof createReadOnlyTools
+        >[number];
+        const tools = [...createReadOnlyTools(ctx.cwd), bashTool];
 
         const result = await executeSubagent(
           {
-            name: "worker",
+            name: "reviewer",
             model,
-            systemPrompt: WORKER_SYSTEM_PROMPT,
+            systemPrompt: REVIEWER_SYSTEM_PROMPT,
             skills: resolvedSkills,
             tools,
-            customTools: [],
+            customTools: createReviewerTools(),
             thinkingLevel: "low",
             logging: {
               enabled: true,
@@ -273,9 +231,8 @@ Pass relevant skills (e.g., 'ios-26', 'drizzle-orm') to provide specialized cont
               content: [{ type: "text", text: "" }],
               details: {
                 _renderKey: toolCallId,
-                task,
-                instructions,
-                files,
+                diff,
+                focus,
                 context,
                 skills: skillNames,
                 skillsResolved: resolvedSkills.length,
@@ -295,9 +252,8 @@ Pass relevant skills (e.g., 'ios-26', 'drizzle-orm') to provide specialized cont
               content: [{ type: "text", text: "" }],
               details: {
                 _renderKey: toolCallId,
-                task,
-                instructions,
-                files,
+                diff,
+                focus,
                 context,
                 skills: skillNames,
                 skillsResolved: resolvedSkills.length,
@@ -319,9 +275,8 @@ Pass relevant skills (e.g., 'ios-26', 'drizzle-orm') to provide specialized cont
             content: [{ type: "text" as const, text: "Aborted" }],
             details: {
               _renderKey: toolCallId,
-              task,
-              instructions,
-              files,
+              diff,
+              focus,
               context,
               skills: skillNames,
               skillsResolved: resolvedSkills.length,
@@ -343,9 +298,8 @@ Pass relevant skills (e.g., 'ios-26', 'drizzle-orm') to provide specialized cont
             ],
             details: {
               _renderKey: toolCallId,
-              task,
-              instructions,
-              files,
+              diff,
+              focus,
               context,
               skills: skillNames,
               skillsResolved: resolvedSkills.length,
@@ -373,9 +327,8 @@ Pass relevant skills (e.g., 'ios-26', 'drizzle-orm') to provide specialized cont
             content: [{ type: "text" as const, text: `Error: ${error}` }],
             details: {
               _renderKey: toolCallId,
-              task,
-              instructions,
-              files,
+              diff,
+              focus,
               context,
               skills: skillNames,
               skillsResolved: resolvedSkills.length,
@@ -394,9 +347,8 @@ Pass relevant skills (e.g., 'ios-26', 'drizzle-orm') to provide specialized cont
           content: [{ type: "text" as const, text: result.content }],
           details: {
             _renderKey: toolCallId,
-            task,
-            instructions,
-            files,
+            diff,
+            focus,
             context,
             skills: skillNames,
             skillsResolved: resolvedSkills.length,
@@ -414,18 +366,16 @@ Pass relevant skills (e.g., 'ios-26', 'drizzle-orm') to provide specialized cont
     },
 
     renderCall(args, theme) {
-      const fields: ToolPreviewField[] = [{ label: "Task", value: args.task }];
-
-      // Only add optional fields if present
-      if (args.skills?.length) {
+      const fields: ToolPreviewField[] = [{ label: "Diff", value: args.diff }];
+      if (args.focus) fields.push({ label: "Focus", value: args.focus });
+      if (args.context) fields.push({ label: "Context", value: args.context });
+      if (args.skills?.length)
         fields.push({ label: "Skills", value: args.skills.join(", ") });
-      }
-
-      return new ToolPreview({ title: "Worker", fields }, theme);
+      return new ToolPreview({ title: "Reviewer", fields }, theme);
     },
 
     renderResult(
-      result: AgentToolResult<WorkerDetails>,
+      result: AgentToolResult<ReviewerDetails>,
       options: ToolRenderResultOptions,
       theme: Theme,
     ) {
@@ -454,13 +404,8 @@ Pass relevant skills (e.g., 'ios-26', 'drizzle-orm') to provide specialized cont
         error,
         usage,
         resolvedModel,
-        files,
-        instructions,
         cwd,
       } = details;
-
-      // Counts
-      const doneCount = toolCalls.filter((tc) => tc.status === "done").length;
 
       const renderKey = _renderKey ?? "_default_";
       const cached = renderCache.get(renderKey);
@@ -480,27 +425,16 @@ Pass relevant skills (e.g., 'ios-26', 'drizzle-orm') to provide specialized cont
 
       // Build fields based on state
       const fields: ToolDetailsField[] = [];
-      const formatToolCall = createWorkerToolFormatter(cwd);
+      const formatToolCall = createReviewerToolFormatter(cwd);
 
-      // Instructions
-      fields.push(new MarkdownField("Instructions", instructions, theme));
-
-      // State-specific fields
       if (aborted) {
-        const suffix =
-          doneCount > 0
-            ? ` (${doneCount} ${pluralize(doneCount, "tool call")} completed)`
-            : "";
-        fields.push({
-          label: "Status",
-          value: theme.fg("warning", "Aborted") + theme.fg("muted", suffix),
-        });
+        fields.push({ label: "Status", value: "Aborted" });
       } else if (error) {
         fields.push({ label: "Error", value: error });
       } else if (response) {
         // Done state
-        fields.push(new FileList(files, theme, cwd));
-        fields.push(new ToolCallList(toolCalls, formatToolCall, theme));
+        fields.push(new ToolCallSummary(toolCalls, formatToolCall, theme));
+        fields.push(new FailedToolCalls(toolCalls, formatToolCall, theme));
 
         if (mdResponse) {
           mdResponse.setContent(response);
@@ -534,13 +468,13 @@ Pass relevant skills (e.g., 'ios-26', 'drizzle-orm') to provide specialized cont
   };
 }
 
-/** Execute the worker subagent directly (without tool wrapper) */
-export async function executeWorker(
-  input: WorkerInput,
+/** Execute the reviewer subagent directly (without tool wrapper) */
+export async function executeReviewer(
+  input: ReviewerInput,
   ctx: ExtensionContext,
-  onUpdate?: AgentToolUpdateCallback<WorkerDetails>,
+  onUpdate?: AgentToolUpdateCallback<ReviewerDetails>,
   signal?: AbortSignal,
-): Promise<AgentToolResult<WorkerDetails>> {
-  const tool = createWorkerTool();
+): Promise<AgentToolResult<ReviewerDetails>> {
+  const tool = createReviewerTool();
   return tool.execute("direct", input, signal, onUpdate, ctx);
 }

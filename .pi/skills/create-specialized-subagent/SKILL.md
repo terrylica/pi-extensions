@@ -1,18 +1,18 @@
 ---
 name: create-specialized-subagent
-description: Create specialized subagents within the specialized-subagents extension. Use when asked to create a new subagent like scout, librarian, oracle, etc.
+description: Create specialized subagents within the subagents extension. Use when asked to create a new subagent like scout, librarian, oracle, etc.
 ---
 
 # Create Specialized Subagent
 
-Create subagents within `extensions/specialized-subagents/subagents/`.
+Create subagents within `extensions/subagents/subagents/`.
 
 Subagents are autonomous agents with their own tools, system prompt, and model. They run as Pi tools, streaming progress and rendering results.
 
 ## Directory Structure
 
 ```
-extensions/specialized-subagents/subagents/<name>/
+extensions/subagents/subagents/<name>/
 ├── index.ts          # Main tool definition (createXxxTool, executeXxx, XXX_GUIDANCE)
 ├── config.ts         # Model config, provider constants
 ├── system-prompt.ts  # System prompt string
@@ -119,7 +119,7 @@ Exports:
 
 ## Registration
 
-In `extensions/specialized-subagents/index.ts`:
+In `extensions/subagents/index.ts`:
 
 1. Import the tool and guidance
 2. Add guidance to `SUBAGENT_GUIDANCES` array
@@ -132,7 +132,7 @@ See the existing registration pattern in the file.
 
 If your subagent requires external API keys, validate them at extension load time. This prevents the extension from loading if required keys are missing.
 
-Add your required keys to `checkApiKeys()` in `extensions/specialized-subagents/index.ts`. See the existing implementation for the pattern.
+Add your required keys to `checkApiKeys()` in `extensions/subagents/index.ts`. See the existing implementation for the pattern.
 
 ## Checklist
 
@@ -152,7 +152,7 @@ Add your required keys to `checkApiKeys()` in `extensions/specialized-subagents/
    - Pass `skills: resolvedSkills` to executeSubagent
    - Include skill info in all details returns
    - Show skills in renderCall if provided
-8. Register in `extensions/specialized-subagents/index.ts`
+8. Register in `extensions/subagents/index.ts`
 9. Run `pnpm typecheck`
 
 ## Key Points
@@ -199,4 +199,4 @@ pi.events.emit(NOTIFICATION_EVENT, {
 ## Reference
 
 Refer to the scout subagent for complete implementation:
-- [subagents/scout/](../../extensions/specialized-subagents/subagents/scout/)
+- [subagents/scout/](../../extensions/subagents/subagents/scout/)

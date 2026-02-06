@@ -28,12 +28,12 @@ import {
   type ToolDetailsField,
   ToolPreview,
   type ToolPreviewField,
-} from "../../specialized-subagents/components";
+} from "../../subagents/components";
 import {
   executeSubagent,
   resolveModel,
   type SubagentToolCall,
-} from "../../specialized-subagents/lib";
+} from "../../subagents/lib";
 import {
   createSessionTools,
   loadSession,
@@ -209,7 +209,7 @@ Input the session ID (UUID or path) and what you want to learn about it.`,
       const sessionTools = createSessionTools(session);
 
       try {
-        const model = resolveModel(MODEL, ctx);
+        const model = resolveModel("openrouter", MODEL, ctx);
         resolvedModel = { provider: model.provider, id: model.id };
 
         // Publish resolved model early

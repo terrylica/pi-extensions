@@ -1,4 +1,6 @@
 import type { ExtensionAPI } from "@mariozechner/pi-coding-agent";
+import { registerSubagentsSettings } from "./commands/settings-command";
+import { configLoader } from "./config";
 import { createWebFetchTool } from "./lib/tools";
 import { createJesterTool, JESTER_GUIDANCE } from "./subagents/jester";
 import { createLookoutTool, LOOKOUT_GUIDANCE } from "./subagents/lookout";
@@ -8,7 +10,7 @@ import { createScoutTool, SCOUT_GUIDANCE } from "./subagents/scout";
 import { createWorkerTool, WORKER_GUIDANCE } from "./subagents/worker";
 
 /**
- * Specialized Subagents Extension
+ * Subagents Extension
  *
  * Provides specialized subagents with custom tools:
  * - scout: Web research and GitHub codebase exploration
@@ -65,15 +67,21 @@ const SUBAGENT_GUIDANCES = [
   SKILLS_GUIDANCE,
 ];
 
-export default function (pi: ExtensionAPI) {
+export default async function (pi: ExtensionAPI) {
+  // Load config
+  await configLoader.load();
+
   // Don't hard-fail extension load on missing API keys.
   // This keeps no-external-deps tools (e.g. jester) easy to test.
   const missing = checkApiKeys();
   if (missing.length > 0) {
     console.warn(
-      `specialized-subagents: missing env vars (${missing.join(", ")}). Some tools may fail when invoked.`,
+      `subagents: missing env vars (${missing.join(", ")}). Some tools may fail when invoked.`,
     );
   }
+
+  // Register settings command
+  registerSubagentsSettings(pi);
 
   // Register subagent tools
   pi.registerTool(createScoutTool());
