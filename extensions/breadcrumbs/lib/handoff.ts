@@ -5,6 +5,7 @@
  * with the extracted context as the initial message.
  */
 
+import { randomUUID } from "node:crypto";
 import { complete, type Message } from "@mariozechner/pi-ai";
 import type {
   ExtensionAPI,
@@ -15,6 +16,11 @@ import {
   extractFilesFromSessionEntries,
   extractMentionedFiles,
 } from "./context-extractor";
+import {
+  HANDOFF_MARKER_CUSTOM_TYPE,
+  type HandoffMarkerDetails,
+  patchHandoffMarker,
+} from "./handoff-marker";
 import {
   readCurrentSessionContent,
   readRawSessionContent,
@@ -150,15 +156,28 @@ export async function executeHandoff(
   const { message, filesExtracted, contextLength } =
     await extractHandoffContext(goal, ctx);
 
-  // Emit marker in parent session before creating new session
-  pi.appendEntry("handoff", {
-    goal,
-    timestamp: new Date().toISOString(),
-  });
+  // Generate placeholder for the handoff marker
+  const placeholder = `__handoff_${randomUUID()}__`;
+  // Send handoff marker to parent session with placeholder
+  pi.sendMessage<HandoffMarkerDetails>(
+    {
+      customType: HANDOFF_MARKER_CUSTOM_TYPE,
+      content: "",
+      display: true,
+      details: { targetSessionId: placeholder, goal },
+    },
+    { triggerTurn: false },
+  );
 
   // Create new session with parent tracking
   const result = await ctx.newSession({
     parentSession: currentSessionFile,
+    setup: async (sm) => {
+      const newSessionId = sm.getSessionId();
+      if (currentSessionFile && newSessionId) {
+        patchHandoffMarker(currentSessionFile, placeholder, newSessionId);
+      }
+    },
   });
 
   if (result.cancelled) {
@@ -167,10 +186,6 @@ export async function executeHandoff(
 
   // Send the handoff message to the new session
   pi.sendUserMessage(message);
-
-  // Update parent session name is not possible after newSession
-  // (we're now in the new session), but we can set the new session name
-  pi.setSessionName(`Handoff: ${goal.slice(0, 50)}`);
 
   return {
     goal,

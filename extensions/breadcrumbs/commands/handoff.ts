@@ -6,6 +6,7 @@
  * prompt in an editor for review before the new session is created.
  */
 
+import { randomUUID } from "node:crypto";
 import { createRunLogger, type SubagentLogger } from "@aliou/pi-agent-kit";
 import { type Message, stream } from "@mariozechner/pi-ai";
 import type { ExtensionAPI } from "@mariozechner/pi-coding-agent";
@@ -14,6 +15,11 @@ import {
   extractFilesFromSessionEntries,
   extractMentionedFiles,
 } from "../lib/context-extractor";
+import {
+  HANDOFF_MARKER_CUSTOM_TYPE,
+  type HandoffMarkerDetails,
+  patchHandoffMarker,
+} from "../lib/handoff-marker";
 import {
   readCurrentSessionContent,
   readRawSessionContent,
@@ -224,32 +230,30 @@ ${extractedContent}
 
 ${goal}`;
 
-      await log("Opening editor for review...");
-
-      // Let user review and edit the handoff prompt
-      const editedPrompt = await ctx.ui.editor(
-        "Edit handoff prompt",
-        handoffMessage,
-      );
-
-      if (editedPrompt === undefined) {
-        await log("User cancelled in editor");
-        await logger?.close();
-        ctx.ui.notify("Handoff cancelled", "info");
-        return;
-      }
-
       await log("Creating new session...");
 
-      // Emit marker in parent session before creating new session
-      pi.appendEntry("handoff", {
-        goal,
-        timestamp: new Date().toISOString(),
-      });
+      // Generate placeholder for the handoff marker
+      const placeholder = `__handoff_${randomUUID()}__`;
+      // Send handoff marker to parent session with placeholder
+      pi.sendMessage<HandoffMarkerDetails>(
+        {
+          customType: HANDOFF_MARKER_CUSTOM_TYPE,
+          content: "",
+          display: true,
+          details: { targetSessionId: placeholder, goal },
+        },
+        { triggerTurn: false },
+      );
 
       // Create new session with parent tracking
       const newSessionResult = await ctx.newSession({
         parentSession: currentSessionFile,
+        setup: async (sm) => {
+          const newSessionId = sm.getSessionId();
+          if (currentSessionFile && newSessionId) {
+            patchHandoffMarker(currentSessionFile, placeholder, newSessionId);
+          }
+        },
       });
 
       if (newSessionResult.cancelled) {
@@ -259,9 +263,8 @@ ${goal}`;
         return;
       }
 
-      // Set the handoff prompt in the editor and name the session
-      ctx.ui.setEditorText(editedPrompt);
-      pi.setSessionName(`Handoff: ${goal.slice(0, 50)}`);
+      // Set the handoff prompt in the editor for the user to review/submit
+      ctx.ui.setEditorText(handoffMessage);
 
       await log("Handoff complete");
       await logger?.close();
