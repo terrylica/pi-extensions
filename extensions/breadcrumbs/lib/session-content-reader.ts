@@ -121,7 +121,8 @@ export function readCurrentSessionContent(
 
     // Work backwards from the end (most recent messages)
     for (let i = lines.length - 1; i >= 0; i--) {
-      const line = lines[i]!;
+      const line = lines[i];
+      if (!line) continue;
       const lineLength = line.length + separator.length;
 
       if (totalLength + lineLength > MAX_SESSION_CONTENT_CHARS) {

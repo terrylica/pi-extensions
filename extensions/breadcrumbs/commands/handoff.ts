@@ -13,6 +13,7 @@ import {
   extractFilesFromSessionEntries,
   extractMentionedFiles,
 } from "../lib/context-extractor";
+import { createHandoffLogger, type HandoffLogger } from "../lib/logging";
 import {
   readCurrentSessionContent,
   readRawSessionContent,
@@ -65,19 +66,36 @@ export function setupHandoffCommand(pi: ExtensionAPI) {
         return;
       }
 
+      // Create logger for debugging
+      let logger: HandoffLogger | null = null;
+      try {
+        logger = await createHandoffLogger(ctx.cwd);
+      } catch {
+        // Logging is optional, continue without it
+      }
+
+      await logger?.log(`Goal: ${goal}`);
+      await logger?.log(`Session ID: ${ctx.sessionManager.getSessionId()}`);
+
       // Read session content (both formatted and raw)
+      await logger?.log("Reading session content...");
       const sessionContent = readCurrentSessionContent(ctx.sessionManager);
       if (!sessionContent) {
+        await logger?.log("ERROR: No session content");
+        await logger?.close();
         ctx.ui.notify(
           "No session content to hand off (ephemeral or empty session)",
           "error",
         );
         return;
       }
+      await logger?.log(`Session content: ${sessionContent.length} chars`);
 
       const rawContent = readRawSessionContent(ctx.sessionManager);
+      await logger?.log(`Raw content: ${rawContent?.length ?? 0} chars`);
 
       // Extract mentioned files from both text patterns and tool call arguments
+      await logger?.log("Extracting mentioned files...");
       const filesFromText = extractMentionedFiles(sessionContent, ctx.cwd);
       const filesFromTools = rawContent
         ? extractFilesFromSessionEntries(rawContent, ctx.cwd)
@@ -85,12 +103,15 @@ export function setupHandoffCommand(pi: ExtensionAPI) {
       const mentionedFiles = Array.from(
         new Set([...filesFromText, ...filesFromTools]),
       ).sort();
+      await logger?.log(`Found ${mentionedFiles.length} files`);
 
       const currentSessionFile = ctx.sessionManager.getSessionFile();
       const parentSessionId = ctx.sessionManager.getSessionId() ?? "unknown";
 
       // Generate handoff prompt with a loader UI
       const model = ctx.model;
+      await logger?.log(`Starting LLM extraction with model: ${model.name}`);
+
       const extractedContent = await ctx.ui.custom<string | null>(
         (tui, theme, _kb, done) => {
           const loader = new BorderedLoader(
@@ -98,10 +119,15 @@ export function setupHandoffCommand(pi: ExtensionAPI) {
             theme,
             "Extracting handoff context...",
           );
-          loader.onAbort = () => done(null);
+          loader.onAbort = () => {
+            logger?.log("Aborted by user").catch(() => {});
+            done(null);
+          };
 
           const doExtract = async () => {
+            await logger?.log("Getting API key...");
             const apiKey = await ctx.modelRegistry.getApiKey(model);
+            await logger?.log("API key obtained");
 
             const userMessage: Message = {
               role: "user",
@@ -113,7 +139,11 @@ export function setupHandoffCommand(pi: ExtensionAPI) {
               ],
               timestamp: Date.now(),
             };
+            await logger?.log(
+              `User message: ${JSON.stringify(userMessage.content).length} chars`,
+            );
 
+            await logger?.log("Calling complete()...");
             const response = await complete(
               model,
               {
@@ -121,6 +151,9 @@ export function setupHandoffCommand(pi: ExtensionAPI) {
                 messages: [userMessage],
               },
               { apiKey, signal: loader.signal },
+            );
+            await logger?.log(
+              `complete() returned, stopReason: ${response.stopReason}`,
             );
 
             if (response.stopReason === "aborted") {
@@ -136,8 +169,15 @@ export function setupHandoffCommand(pi: ExtensionAPI) {
           };
 
           doExtract()
-            .then(done)
+            .then((result) => {
+              logger
+                ?.log(`Extraction complete: ${result?.length ?? 0} chars`)
+                .catch(() => {});
+              done(result);
+            })
             .catch((err) => {
+              const errorMsg = err instanceof Error ? err.message : String(err);
+              logger?.log(`ERROR: ${errorMsg}`).catch(() => {});
               console.error("Handoff extraction failed:", err);
               done(null);
             });
@@ -147,9 +187,13 @@ export function setupHandoffCommand(pi: ExtensionAPI) {
       );
 
       if (extractedContent === null) {
+        await logger?.log("Extraction returned null (cancelled or error)");
+        await logger?.close();
         ctx.ui.notify("Handoff cancelled", "info");
         return;
       }
+
+      await logger?.log(`Extracted content: ${extractedContent.length} chars`);
 
       // Build the full handoff message
       const handoffMessage = `Continuing from session ${parentSessionId}.
@@ -166,6 +210,8 @@ ${extractedContent}
 
 ${goal}`;
 
+      await logger?.log("Opening editor for review...");
+
       // Let user review and edit the handoff prompt
       const editedPrompt = await ctx.ui.editor(
         "Edit handoff prompt",
@@ -173,9 +219,13 @@ ${goal}`;
       );
 
       if (editedPrompt === undefined) {
+        await logger?.log("User cancelled in editor");
+        await logger?.close();
         ctx.ui.notify("Handoff cancelled", "info");
         return;
       }
+
+      await logger?.log("Creating new session...");
 
       // Emit marker in parent session before creating new session
       pi.appendEntry("handoff", {
@@ -189,6 +239,8 @@ ${goal}`;
       });
 
       if (newSessionResult.cancelled) {
+        await logger?.log("Session creation cancelled");
+        await logger?.close();
         ctx.ui.notify("Session creation cancelled", "info");
         return;
       }
@@ -196,6 +248,10 @@ ${goal}`;
       // Set the handoff prompt in the editor and name the session
       ctx.ui.setEditorText(editedPrompt);
       pi.setSessionName(`Handoff: ${goal.slice(0, 50)}`);
+
+      await logger?.log("Handoff complete");
+      await logger?.close();
+
       ctx.ui.notify("Handoff ready -- review and submit.", "info");
     },
   });
