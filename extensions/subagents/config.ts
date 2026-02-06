@@ -32,6 +32,7 @@ export interface SubagentModelConfig {
 }
 
 export interface SubagentsConfig {
+  debug?: boolean;
   subagents?: Partial<Record<SubagentName, SubagentModelConfig>>;
 }
 
@@ -41,10 +42,12 @@ export interface ResolvedSubagentModelConfig {
 }
 
 export interface ResolvedSubagentsConfig {
+  debug: boolean;
   subagents: Record<SubagentName, ResolvedSubagentModelConfig>;
 }
 
 const DEFAULT_CONFIG: ResolvedSubagentsConfig = {
+  debug: false,
   subagents: {
     scout: { provider: "openrouter", model: "anthropic/claude-haiku-4.5" },
     lookout: {
@@ -65,7 +68,7 @@ export const configLoader = new ConfigLoader<
   SubagentsConfig,
   ResolvedSubagentsConfig
 >("subagents", DEFAULT_CONFIG, {
-  scopes: ["global"],
+  scopes: ["global", "memory"],
 });
 
 /** Get the resolved model config for a subagent. */
@@ -73,4 +76,9 @@ export function getSubagentModelConfig(
   name: SubagentName,
 ): ResolvedSubagentModelConfig {
   return configLoader.getConfig().subagents[name];
+}
+
+/** Whether debug logging is enabled for subagents. */
+export function isDebugEnabled(): boolean {
+  return configLoader.getConfig().debug;
 }

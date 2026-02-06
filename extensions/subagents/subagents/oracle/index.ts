@@ -26,7 +26,7 @@ import {
   ToolPreview,
   type ToolPreviewField,
 } from "../../components";
-import { getSubagentModelConfig } from "../../config";
+import { getSubagentModelConfig, isDebugEnabled } from "../../config";
 import { executeSubagent, resolveModel, resolveSkillsByName } from "../../lib";
 import { ORACLE_SYSTEM_PROMPT } from "./system-prompt";
 import { createOracleTools } from "./tools";
@@ -212,7 +212,7 @@ Pass relevant skills (e.g., 'ios-26', 'drizzle-orm') to provide specialized cont
           thinkingLevel: "low",
           logging: {
             enabled: true,
-            debug: true,
+            debug: isDebugEnabled(),
           },
         },
         userMessage,

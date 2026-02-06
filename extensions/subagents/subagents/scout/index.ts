@@ -27,7 +27,7 @@ import {
   ToolPreview,
   type ToolPreviewField,
 } from "../../components";
-import { getSubagentModelConfig } from "../../config";
+import { getSubagentModelConfig, isDebugEnabled } from "../../config";
 import { executeSubagent, resolveModel, resolveSkillsByName } from "../../lib";
 import type { SubagentToolCall } from "../../lib/types";
 import { SCOUT_SYSTEM_PROMPT } from "./system-prompt";
@@ -262,7 +262,7 @@ Pass relevant skills (e.g., 'ios-26', 'drizzle-orm') to provide specialized cont
             thinkingLevel: "off",
             logging: {
               enabled: true,
-              debug: true,
+              debug: isDebugEnabled(),
             },
           },
           userMessage,

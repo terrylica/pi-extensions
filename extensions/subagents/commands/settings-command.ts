@@ -81,7 +81,22 @@ export function registerSubagentsSettings(pi: ExtensionAPI): void {
       tabConfig: SubagentsConfig | null,
       resolved: ResolvedSubagentsConfig,
     ): SettingsSection[] => {
-      return SUBAGENT_NAMES.map((name) => {
+      const generalSection: SettingsSection = {
+        label: "General",
+        items: [
+          {
+            id: "debug",
+            label: "Debug logging",
+            description:
+              "Write raw events to debug.jsonl for each subagent run",
+            currentValue:
+              (tabConfig?.debug ?? resolved.debug) ? "enabled" : "disabled",
+            values: ["enabled", "disabled"],
+          },
+        ],
+      };
+
+      const subagentSections = SUBAGENT_NAMES.map((name) => {
         const ui = SUBAGENT_UI[name];
         const currentProvider = (tabConfig?.subagents?.[name]?.provider ??
           resolved.subagents[name].provider) as SupportedProvider;
@@ -115,6 +130,8 @@ export function registerSubagentsSettings(pi: ExtensionAPI): void {
           ],
         };
       });
+
+      return [generalSection, ...subagentSections];
     },
     onSettingChange: (
       id: string,
