@@ -15,11 +15,25 @@ export function createTool(
   return {
     name: "ask_user",
     label: "Ask User",
-    description: `Gather user input during task execution through structured multiple-choice questions.
-Present 1-4 questions at once, each with 2-4 predefined options.
-Users can always choose "Other" to provide custom text (automatic).
+    description: `Gather user input through structured multiple-choice questions.
+
+Present 1-4 questions, each with 2-4 predefined options.
+Users can always choose "Other" to provide custom text.
 Supports single-select or multi-select mode.
-Use to clarify requirements, preferences, or implementation choices.`,
+
+WHEN TO USE:
+- Genuine ambiguity where no option is clearly better
+- Irreversible actions (destructive changes, publishing, deploying)
+- User explicitly asked to be consulted before deciding
+- Multiple valid architectural approaches with real trade-offs
+
+WHEN NOT TO USE:
+- You can make a reasonable default choice -- just do it
+- Low-stakes decisions (formatting, variable names, file organization)
+- Yes/no confirmations for routine actions
+- Information you could find by reading the codebase or docs
+
+Prefer making a decision and letting the user correct you over asking. Most questions slow the user down more than a wrong guess.`,
 
     parameters: AskUserQuestionParams,
 
