@@ -6,35 +6,33 @@ import type {
   Theme,
 } from "@mariozechner/pi-coding-agent";
 import { type Component, truncateToWidth } from "@mariozechner/pi-tui";
+import {
+  configLoader,
+  getProviderSettings,
+  PROVIDER_DISPLAY_NAMES,
+  type ProviderKey,
+} from "../config";
 import { fetchClaudeRateLimits } from "../rate-limits/claude";
 import { fetchCodexRateLimits } from "../rate-limits/codex";
 import { fetchOpencodeRateLimits } from "../rate-limits/opencode";
-import { fetchOpenRouterRateLimits } from "../rate-limits/openrouter";
 import type { ProviderRateLimits, RateLimitWindow } from "../types";
 
 const WIDGET_ID = "usage-bar";
 
-type ProviderKey =
-  | "anthropic"
-  | "openai-codex"
-  | "opencode"
-  | "openrouter-google"
-  | "openrouter-moonshot";
 type ClaudeModelFamily = "opus" | "sonnet" | null;
 
-const PROVIDER_DISPLAY_NAMES: Record<ProviderKey, string> = {
-  anthropic: "Claude",
-  "openai-codex": "Codex",
-  opencode: "Opencode",
-  "openrouter-google": "OpenRouter Gemini",
-  "openrouter-moonshot": "OpenRouter Moonshot",
-};
+// Thresholds (must match rate-limit-warning.ts)
+const WARNING_THRESHOLD = 80;
 
 // State
 let cachedLimits: ProviderRateLimits | null = null;
 let cachedProviderKey: ProviderKey | null = null;
-let refreshInterval: ReturnType<typeof setInterval> | null = null;
-let widgetVisible = true;
+let lastFetchTime: number | null = null;
+let forceVisible = false;
+
+function getRefreshIntervalMs(): number {
+  return configLoader.getConfig().refreshIntervalMinutes * 60 * 1000;
+}
 
 /**
  * Maps a model provider to the rate limit provider key.
@@ -46,9 +44,7 @@ function getProviderKey(model: Model<any> | undefined): ProviderKey | null {
   if (provider === "anthropic") return "anthropic";
   if (provider === "openai-codex") return "openai-codex";
   if (provider === "opencode") return "opencode";
-  if (provider === "oc" || provider === "oc/ant") return "opencode";
-  if (provider === "openrouter-google") return "openrouter-google";
-  if (provider === "openrouter-moonshot") return "openrouter-moonshot";
+
   return null;
 }
 
@@ -148,20 +144,6 @@ async function fetchProviderRateLimits(
       return fetchCodexRateLimits(authStorage, signal);
     case "opencode":
       return fetchOpencodeRateLimits(signal);
-    case "openrouter-google":
-      return fetchOpenRouterRateLimits(
-        authStorage,
-        "openrouter-google",
-        "OpenRouter Gemini",
-        signal,
-      );
-    case "openrouter-moonshot":
-      return fetchOpenRouterRateLimits(
-        authStorage,
-        "openrouter-moonshot",
-        "OpenRouter Moonshot",
-        signal,
-      );
     default:
       return null;
   }
@@ -426,24 +408,56 @@ class UsageBarWidget implements Component {
 }
 
 /**
- * Toggles the widget visibility.
+ * Computes whether the widget should be visible based on current data.
+ * Shows when any window's projected usage >= WARNING_THRESHOLD or there's an error.
  */
-export function toggleWidgetVisibility(ctx: ExtensionContext): boolean {
-  widgetVisible = !widgetVisible;
+function computeVisibility(
+  limits: ProviderRateLimits | null,
+  providerKey: ProviderKey,
+  modelFamily: ClaudeModelFamily,
+): boolean {
+  if (!limits) return false;
+  if (limits.error) return true;
+
+  const windows =
+    providerKey === "anthropic"
+      ? filterClaudeWindows(limits.windows, modelFamily)
+      : limits.windows;
+
+  for (const window of windows) {
+    const pacePercent = getPacePercent(window);
+    const projected = getProjectedPercent(window.usedPercent, pacePercent);
+    if (projected >= WARNING_THRESHOLD) return true;
+  }
+  return false;
+}
+
+/**
+ * Force-shows the widget (e.g. when a rate limit notification fires).
+ * Cleared on next successful refresh.
+ */
+export function forceShowWidget(ctx: ExtensionContext): void {
+  forceVisible = true;
   updateWidget(ctx);
-  return widgetVisible;
+}
+
+/**
+ * Re-evaluates widget visibility from current config/state.
+ * Call after changing memory config.
+ */
+export function refreshWidget(ctx: ExtensionContext): void {
+  updateWidget(ctx);
 }
 
 /**
  * Updates the widget display.
+ * Respects per-provider widget mode from config:
+ * - "always": always show
+ * - "never": never show
+ * - "warnings-only": show when usage is near limits, there's an error, or force-visible
  */
 function updateWidget(ctx: ExtensionContext): void {
   if (!ctx.hasUI) {
-    return;
-  }
-
-  if (!widgetVisible) {
-    ctx.ui.setWidget(WIDGET_ID, undefined);
     return;
   }
 
@@ -453,7 +467,29 @@ function updateWidget(ctx: ExtensionContext): void {
     return;
   }
 
+  const settings = getProviderSettings(providerKey);
   const modelFamily = getClaudeModelFamily(ctx.model);
+
+  let visible: boolean;
+  switch (settings.widget) {
+    case "always":
+      visible = true;
+      break;
+    case "never":
+      visible = false;
+      break;
+    case "warnings-only":
+      visible =
+        forceVisible ||
+        computeVisibility(cachedLimits, providerKey, modelFamily);
+      break;
+  }
+
+  if (!visible) {
+    ctx.ui.setWidget(WIDGET_ID, undefined);
+    return;
+  }
+
   const loading = !cachedLimits || cachedProviderKey !== providerKey;
 
   ctx.ui.setWidget(
@@ -471,15 +507,33 @@ function updateWidget(ctx: ExtensionContext): void {
 }
 
 /**
- * Fetches and caches rate limits, then updates the widget.
+ * Returns true if enough time has passed since the last fetch.
  */
-async function refreshRateLimits(ctx: ExtensionContext): Promise<void> {
+function shouldRefresh(): boolean {
+  if (!lastFetchTime) return true;
+  return Date.now() - lastFetchTime >= getRefreshIntervalMs();
+}
+
+/**
+ * Fetches and caches rate limits, then updates the widget.
+ * If `force` is false, skips the fetch when less than MIN_REFRESH_MS has elapsed.
+ */
+async function refreshRateLimits(
+  ctx: ExtensionContext,
+  force = false,
+): Promise<void> {
   if (!ctx.hasUI) return;
 
   const providerKey = getProviderKey(ctx.model);
   if (!providerKey) {
     cachedLimits = null;
     cachedProviderKey = null;
+    updateWidget(ctx);
+    return;
+  }
+
+  // Skip fetch if not enough time has passed (unless forced)
+  if (!force && !shouldRefresh()) {
     updateWidget(ctx);
     return;
   }
@@ -492,6 +546,9 @@ async function refreshRateLimits(ctx: ExtensionContext): Promise<void> {
     if (limits) {
       cachedLimits = limits;
       cachedProviderKey = providerKey;
+      lastFetchTime = Date.now();
+      // Clear force flag on successful refresh; visibility is now data-driven
+      forceVisible = false;
     }
   } catch {
     // Keep existing cache on error
@@ -500,43 +557,24 @@ async function refreshRateLimits(ctx: ExtensionContext): Promise<void> {
   updateWidget(ctx);
 }
 
-/**
- * Starts the periodic refresh interval.
- */
-function startRefreshInterval(ctx: ExtensionContext): void {
-  stopRefreshInterval();
-  refreshInterval = setInterval(() => {
-    refreshRateLimits(ctx).catch(() => {});
-  }, 60 * 1000);
-}
-
-/**
- * Stops the periodic refresh interval.
- */
-function stopRefreshInterval(): void {
-  if (refreshInterval) {
-    clearInterval(refreshInterval);
-    refreshInterval = null;
-  }
-}
-
 export function setupUsageBarHooks(pi: ExtensionAPI): void {
+  // Session start: always fetch (force), reset state
   pi.on("session_start", async (_event, ctx) => {
-    refreshRateLimits(ctx).catch(() => {});
-    startRefreshInterval(ctx);
+    lastFetchTime = null;
+    forceVisible = false;
+    refreshRateLimits(ctx, true).catch(() => {});
   });
 
+  // Model change: always fetch (force), reset cache
   pi.on("model_select", async (_event, ctx) => {
     cachedLimits = null;
     cachedProviderKey = null;
-    refreshRateLimits(ctx).catch(() => {});
+    lastFetchTime = null;
+    refreshRateLimits(ctx, true).catch(() => {});
   });
 
+  // After agent turn: fetch only if 5+ min since last fetch
   pi.on("agent_end", async (_event, ctx) => {
     refreshRateLimits(ctx).catch(() => {});
-  });
-
-  pi.on("session_shutdown", async () => {
-    stopRefreshInterval();
   });
 }

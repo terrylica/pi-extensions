@@ -4,10 +4,12 @@ import type {
   ExtensionAPI,
   ExtensionContext,
 } from "@mariozechner/pi-coding-agent";
+import { getProviderSettings, type ProviderKey } from "../config";
 import { fetchClaudeRateLimits } from "../rate-limits/claude";
 import { fetchCodexRateLimits } from "../rate-limits/codex";
 import type { ProviderRateLimits, RateLimitWindow } from "../types";
 import { formatResetTime } from "../utils";
+import { forceShowWidget } from "./usage-bar";
 
 const WARNING_THRESHOLD = 80;
 const ERROR_THRESHOLD = 90;
@@ -15,7 +17,6 @@ const CRITICAL_THRESHOLD = 100;
 const MIN_PACE_PERCENT = 5;
 const END_WINDOW_SUPPRESS_THRESHOLD = 90;
 
-type ProviderKey = "anthropic" | "openai-codex";
 type ClaudeModelFamily = "opus" | "sonnet" | null;
 
 /**
@@ -279,6 +280,10 @@ async function checkAndWarnRateLimits(
   const providerKey = getProviderKey(model);
   if (!providerKey) return;
 
+  // Skip if warnings are disabled for this provider
+  const settings = getProviderSettings(providerKey);
+  if (!settings.warnings) return;
+
   const authStorage = ctx.modelRegistry.authStorage;
 
   try {
@@ -307,6 +312,9 @@ async function checkAndWarnRateLimits(
       (entry) => entry.projectedPercent >= ERROR_THRESHOLD,
     );
     ctx.ui.notify(message, hasHighUsage ? "error" : "warning");
+
+    // Force the usage bar widget visible when a warning fires
+    forceShowWidget(ctx);
   } catch {
     // Silently ignore errors - this is non-blocking and should not impact the user
   }
