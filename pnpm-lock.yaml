@@ -99,12 +99,6 @@ importers:
         specifier: '>=0.51.0'
         version: 0.51.0(ws@8.19.0)(zod@3.25.76)
 
-  extensions/mac-app:
-    dependencies:
-      '@mariozechner/pi-coding-agent':
-        specifier: '>=0.51.0'
-        version: 0.51.0(ws@8.19.0)(zod@3.25.76)
-
   extensions/neovim:
     dependencies:
       '@mariozechner/pi-coding-agent':
