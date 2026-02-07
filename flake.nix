@@ -60,7 +60,7 @@
             lockfile-check = {
               enable = true;
               name = "lockfile check";
-              entry = "${pkgs.pnpm_10}/bin/pnpm install --frozen-lockfile";
+              entry = "${pkgs.pnpm_10}/bin/pnpm install --frozen-lockfile --ignore-scripts";
               files = "(package\\.json|pnpm-lock\\.yaml|pnpm-workspace\\.yaml)$";
               pass_filenames = false;
             };
