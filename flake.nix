@@ -57,6 +57,13 @@
               files = "\\.(ts|tsx|json)$";
               pass_filenames = false;
             };
+            lockfile-check = {
+              enable = true;
+              name = "lockfile check";
+              entry = "${pkgs.pnpm_10}/bin/pnpm install --frozen-lockfile";
+              files = "(package\\.json|pnpm-lock\\.yaml|pnpm-workspace\\.yaml)$";
+              pass_filenames = false;
+            };
             typecheck = {
               enable = true;
               name = "typecheck";
