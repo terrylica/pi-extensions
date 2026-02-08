@@ -11,13 +11,14 @@
 
 import { existsSync, readdirSync, statSync } from "node:fs";
 import { readFile } from "node:fs/promises";
-import { resolve } from "node:path";
+import { basename, resolve } from "node:path";
 
 export interface CatalogSkill {
   type: "skill";
   name: string;
   description: string;
   path: string;
+  scope: string;
 }
 
 export interface CatalogPackage {
@@ -25,6 +26,7 @@ export interface CatalogPackage {
   name: string;
   description: string;
   path: string;
+  skillPaths: string[];
 }
 
 export type CatalogEntry = CatalogSkill | CatalogPackage;
@@ -60,20 +62,23 @@ function listDirs(dir: string): string[] {
 async function tryCollect(
   dirPath: string,
   dirName: string,
+  parentDirName: string,
   entries: CatalogEntry[],
 ): Promise<boolean> {
+  const scope = parentDirName;
   const skillPath = resolve(dirPath, "SKILL.md");
   if (existsSync(skillPath)) {
     try {
       const content = await readFile(skillPath, "utf-8");
       const { name, description } = parseFrontmatter(content, dirName);
-      entries.push({ type: "skill", name, description, path: dirPath });
+      entries.push({ type: "skill", name, description, path: dirPath, scope });
     } catch {
       entries.push({
         type: "skill",
         name: dirName,
         description: "",
         path: dirPath,
+        scope,
       });
     }
     return true;
@@ -85,11 +90,18 @@ async function tryCollect(
       const content = await readFile(pkgPath, "utf-8");
       const pkg = JSON.parse(content) as Record<string, unknown>;
       if ("pi" in pkg) {
+        const pi = pkg.pi as Record<string, unknown>;
+        const skills = Array.isArray(pi.skills) ? pi.skills : [];
+        const skillPaths = skills
+          .filter((s): s is string => typeof s === "string")
+          .map((s) => resolve(dirPath, s.replace(/\/SKILL\.md$/, "")));
+
         entries.push({
           type: "package",
           name: (pkg.name as string) ?? dirName,
           description: (pkg.description as string) ?? "",
           path: dirPath,
+          skillPaths,
         });
         return true;
       }
@@ -109,7 +121,7 @@ async function scanDirectory(
   if (!existsSync(dir) || !statSync(dir).isDirectory()) return [];
 
   const entries: CatalogEntry[] = [];
-  await scanLevel(dir, entries, 0, maxDepth);
+  await scanLevel(dir, entries, 0, maxDepth, dir);
   return entries;
 }
 
@@ -118,16 +130,21 @@ async function scanLevel(
   entries: CatalogEntry[],
   depth: number,
   maxDepth: number,
+  catalogRoot: string,
 ): Promise<void> {
   if (depth >= maxDepth) return;
 
   for (const child of listDirs(dir)) {
     const childPath = resolve(dir, child);
 
-    const found = await tryCollect(childPath, child, entries);
+    // The scope is the parent directory name (basename of dir)
+    // But use empty string if dir is the catalog root
+    const parentDirName = dir === catalogRoot ? "" : basename(dir);
+
+    const found = await tryCollect(childPath, child, parentDirName, entries);
     if (found) continue;
 
-    await scanLevel(childPath, entries, depth + 1, maxDepth);
+    await scanLevel(childPath, entries, depth + 1, maxDepth, catalogRoot);
   }
 }
 
