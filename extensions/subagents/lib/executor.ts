@@ -68,7 +68,7 @@ export async function executeSubagent(
     cwd: ctx.cwd,
     agentDir,
     settingsManager,
-    noExtensions: !config.extensionPaths?.length,
+    noExtensions: true,
     additionalExtensionPaths: config.extensionPaths ?? [],
     noPromptTemplates: true,
     noThemes: true,
