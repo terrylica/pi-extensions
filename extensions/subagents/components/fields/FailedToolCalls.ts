@@ -36,6 +36,43 @@ export class FailedToolCalls implements Component {
         `${th.fg("error", INDICATOR.error)} ${text}`,
       );
       lines.push(...line.render(width));
+
+      // Add error message if available
+      if (tc.error) {
+        // Parse error if it's JSON-stringified result object
+        let errorText = tc.error;
+        try {
+          const parsed = JSON.parse(tc.error);
+          if (parsed.content?.[0]?.text) {
+            errorText = parsed.content[0].text;
+
+            // Try to extract clean error from API error messages
+            // e.g., "Exa API error (402): {...}" -> extract the JSON error field
+            const apiErrorMatch = errorText.match(/API error \(\d+\): ({.+})$/);
+            if (apiErrorMatch?.[1]) {
+              try {
+                const apiError = JSON.parse(apiErrorMatch[1]);
+                if (apiError.error) {
+                  errorText = apiError.error;
+                }
+              } catch {
+                // Failed to parse API error, keep original
+              }
+            }
+          }
+        } catch {
+          // Not JSON, use as-is
+        }
+
+        // Truncate very long errors
+        if (errorText.length > 150) {
+          errorText = errorText.slice(0, 147) + "...";
+        }
+
+        // Indent error message
+        const errorLine = new TruncatedText(`  ${th.fg("dim", errorText)}`);
+        lines.push(...errorLine.render(width));
+      }
     }
     return lines;
   }

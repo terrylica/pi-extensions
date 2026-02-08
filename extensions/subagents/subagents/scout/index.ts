@@ -385,8 +385,60 @@ Pass relevant skills (e.g., 'ios-26', 'drizzle-orm') to provide specialized cont
           };
         }
 
+        // Check for failed tool calls and append notification
+        const failedTools = finalToolCalls.filter(
+          (tc) => tc.status === "error",
+        );
+        let finalContent = result.content;
+
+        if (failedTools.length > 0) {
+          finalContent += "\n\n---\n\n";
+          finalContent += `**Note:** ${failedTools.length} tool call${failedTools.length > 1 ? "s" : ""} failed:\n\n`;
+
+          for (const tc of failedTools) {
+            finalContent += `- **${tc.toolName}**`;
+
+            // Extract clean error message
+            if (tc.error) {
+              let errorText = tc.error;
+              try {
+                const parsed = JSON.parse(tc.error);
+                if (parsed.content?.[0]?.text) {
+                  errorText = parsed.content[0].text;
+
+                  // Extract clean error from API responses
+                  const apiErrorMatch = errorText.match(
+                    /API error \(\d+\): ({.+})$/,
+                  );
+                  if (apiErrorMatch?.[1]) {
+                    try {
+                      const apiError = JSON.parse(apiErrorMatch[1]);
+                      if (apiError.error) {
+                        errorText = apiError.error;
+                      }
+                    } catch {
+                      // Keep original
+                    }
+                  }
+                }
+              } catch {
+                // Keep original
+              }
+
+              // Truncate long errors
+              if (errorText.length > 120) {
+                errorText = errorText.slice(0, 117) + "...";
+              }
+
+              finalContent += `: ${errorText}`;
+            }
+
+            finalContent += "\n";
+          }
+        }
+
         return {
-          content: [{ type: "text" as const, text: result.content }],
+          content: [{ type: "text" as const, text: finalContent }],
           details: {
             _renderKey: toolCallId,
             url,

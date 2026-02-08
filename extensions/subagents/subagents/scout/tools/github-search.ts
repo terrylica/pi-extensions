@@ -28,7 +28,7 @@ Supports GitHub code search syntax including:
 - Extension filters: \`extension:ts\`
 - Filename filters: \`filename:package.json\`
 
-Requires: GITHUB_TOKEN environment variable`,
+Requires: SCOUT_GITHUB_TOKEN environment variable`,
 
   parameters,
 
