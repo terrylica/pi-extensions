@@ -1,10 +1,12 @@
 import {
+  FuzzySelector,
   registerSettingsCommand,
   type SettingsSection,
 } from "@aliou/pi-utils-settings";
-import type {
-  ExtensionAPI,
-  ModelRegistry,
+import {
+  type ExtensionAPI,
+  getSettingsListTheme,
+  type ModelRegistry,
 } from "@mariozechner/pi-coding-agent";
 import {
   configLoader,
@@ -125,7 +127,15 @@ export function registerSubagentsSettings(pi: ExtensionAPI): void {
               label: "Model",
               description: `Model for ${ui.label}`,
               currentValue: currentModel,
-              values: modelValues,
+              submenu: (currentValue: string, done: (v?: string) => void) =>
+                new FuzzySelector({
+                  label: `Select model for ${ui.label}`,
+                  items: modelValues,
+                  currentValue,
+                  theme: getSettingsListTheme(),
+                  onSelect: (value) => done(value),
+                  onDone: () => done(),
+                }),
             },
           ],
         };
