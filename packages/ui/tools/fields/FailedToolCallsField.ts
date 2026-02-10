@@ -20,6 +20,7 @@ export class FailedToolCallsField<
   invalidate(): void {}
 
   render(width: number): string[] {
+    if (!this.toolCalls) return [];
     const failed = this.toolCalls.filter(
       (toolCall) => toolCall.status === "error",
     );

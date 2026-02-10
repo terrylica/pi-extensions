@@ -13,6 +13,9 @@ importers:
 
   .:
     dependencies:
+      '@aliou/pi-linkup':
+        specifier: ^0.4.0
+        version: 0.4.0(@mariozechner/pi-ai@0.51.0(ws@8.19.0)(zod@3.25.76))(@mariozechner/pi-coding-agent@0.51.0(ws@8.19.0)(zod@3.25.76))
       '@aliou/pi-utils-settings':
         specifier: ^0.2.0
         version: 0.2.0(@mariozechner/pi-coding-agent@0.51.0(ws@8.19.0)(zod@3.25.76))
@@ -74,6 +77,9 @@ importers:
       '@aliou/pi-utils-ui':
         specifier: workspace:^
         version: link:../../packages/ui
+      '@aliou/sesame':
+        specifier: ^0.2.0
+        version: 0.2.0(@mariozechner/pi-coding-agent@0.51.0(ws@8.19.0)(zod@3.25.76))
       '@mariozechner/pi-coding-agent':
         specifier: '>=0.51.0'
         version: 0.51.0(ws@8.19.0)(zod@3.25.76)
@@ -255,6 +261,13 @@ packages:
     resolution: {integrity: sha512-far9moyB7zR9Ha9BUedhA/vFV6xTe+INdh4m6dme5LWl1aLtJHY8BIJxVtIO//wv5FZx1RNVzgm9DKSYp8CI7g==}
     peerDependencies:
       '@mariozechner/pi-coding-agent': '>=0.51.0'
+
+  '@aliou/sesame@0.2.0':
+    resolution: {integrity: sha512-rmga7+v97k+yQRxzJxxx33WK9bARc4XN3cqZwNtixkj4TyS30ZsrDC8mHXX6EpqyxKODttMVeLz8zwsT5np1aQ==}
+    engines: {node: '>=22.5.0'}
+    hasBin: true
+    peerDependencies:
+      '@mariozechner/pi-coding-agent': '*'
 
   '@aliou/sh@0.1.0':
     resolution: {integrity: sha512-MtVSUqNAHK8a0yQdwv4ADlTIBnEg8bpFXcqp0PaxwqxhSWAxcIrpAIPbsc3CJnUK3R++BcgaxBZ5saicHtU+8Q==}
@@ -1991,6 +2004,10 @@ snapshots:
       '@mariozechner/pi-coding-agent': 0.51.0(ws@8.19.0)(zod@3.25.76)
 
   '@aliou/pi-utils-settings@0.2.0(@mariozechner/pi-coding-agent@0.51.0(ws@8.19.0)(zod@3.25.76))':
+    dependencies:
+      '@mariozechner/pi-coding-agent': 0.51.0(ws@8.19.0)(zod@3.25.76)
+
+  '@aliou/sesame@0.2.0(@mariozechner/pi-coding-agent@0.51.0(ws@8.19.0)(zod@3.25.76))':
     dependencies:
       '@mariozechner/pi-coding-agent': 0.51.0(ws@8.19.0)(zod@3.25.76)
 

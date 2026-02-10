@@ -20,7 +20,7 @@ export class ToolCallSummaryField<
   invalidate(): void {}
 
   render(width: number): string[] {
-    if (this.toolCalls.length === 0) return [];
+    if (!this.toolCalls || this.toolCalls.length === 0) return [];
 
     const th = this.theme;
     const names = this.toolCalls.map(

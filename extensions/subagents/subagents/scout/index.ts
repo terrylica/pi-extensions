@@ -5,6 +5,7 @@
  * answer based on fetched information.
  */
 
+import { existsSync } from "node:fs";
 import path from "node:path";
 import {
   createRenderCache,
@@ -35,6 +36,18 @@ import { SCOUT_SYSTEM_PROMPT } from "./system-prompt";
 import { formatScoutToolCall } from "./tool-formatter";
 import { createScoutTools } from "./tools";
 import type { ScoutDetails, ScoutInput } from "./types";
+
+/** Walk up from `startDir` to find `@aliou/pi-linkup` in node_modules. */
+function findPiLinkup(startDir: string): string {
+  let dir = startDir;
+  const root = path.parse(dir).root;
+  while (dir !== root) {
+    const candidate = path.join(dir, "node_modules", "@aliou", "pi-linkup");
+    if (existsSync(candidate)) return candidate;
+    dir = path.dirname(dir);
+  }
+  throw new Error("@aliou/pi-linkup not found in any parent node_modules");
+}
 
 /** System prompt guidance for scout tool usage */
 export const SCOUT_GUIDANCE = `
@@ -259,12 +272,7 @@ Pass relevant skills (e.g., 'ios-26', 'drizzle-orm') to provide specialized cont
             model,
             systemPrompt: SCOUT_SYSTEM_PROMPT,
             skills: resolvedSkills,
-            extensionPaths: [
-              path.resolve(
-                import.meta.dirname,
-                "../../node_modules/@aliou/pi-linkup",
-              ),
-            ],
+            extensionPaths: [findPiLinkup(import.meta.dirname)],
             customTools: createScoutTools(),
             thinkingLevel: "off",
             logging: {
