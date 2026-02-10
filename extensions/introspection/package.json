@@ -11,6 +11,9 @@
     "pi-extension",
     "pi"
   ],
+  "dependencies": {
+    "@aliou/pi-utils-ui": "workspace:^"
+  },
   "peerDependencies": {
     "@mariozechner/pi-coding-agent": ">=0.51.0"
   }

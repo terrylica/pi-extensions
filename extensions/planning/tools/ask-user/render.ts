@@ -1,3 +1,4 @@
+import { ToolCallHeader } from "@aliou/pi-utils-ui";
 import type {
   AgentToolResult,
   Theme,
@@ -10,19 +11,19 @@ import type { Answer, AskUserQuestionDetails, Question } from "./types";
 
 type Params = Static<typeof AskUserQuestionParams>;
 
-export function renderCall(args: Params, theme: Theme): Text {
+export function renderCall(args: Params, theme: Theme) {
   const count = args.questions?.length ?? 0;
   const plural = count === 1 ? "question" : "questions";
+  const headers = args.questions?.map((q: Question) => q.header).join(",");
 
-  let text = theme.fg("toolTitle", theme.bold("ask_user "));
-
-  if (args.questions?.length) {
-    const headers = args.questions.map((q: Question) => q.header).join(", ");
-    text += theme.fg("accent", `[${headers}] `);
-  }
-  text += theme.fg("muted", `${count} ${plural}`);
-
-  return new Text(text, 0, 0);
+  return new ToolCallHeader(
+    {
+      toolName: "Ask User",
+      mainArg: `${count} ${plural}`,
+      optionArgs: headers ? [{ label: "headers", value: headers }] : undefined,
+    },
+    theme,
+  );
 }
 
 export function renderResult(

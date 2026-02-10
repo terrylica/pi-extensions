@@ -2,6 +2,15 @@
  * Jester subagent - generates random, creative, and unexpected content. No tools.
  */
 
+import {
+  createRenderCache,
+  MarkdownResponse,
+  renderToolTextFallback,
+  SubagentFooter,
+  ToolCallHeader,
+  ToolDetails,
+  type ToolDetailsField,
+} from "@aliou/pi-utils-ui";
 import type {
   AgentToolResult,
   AgentToolUpdateCallback,
@@ -10,17 +19,7 @@ import type {
   ToolDefinition,
   ToolRenderResultOptions,
 } from "@mariozechner/pi-coding-agent";
-import { Text } from "@mariozechner/pi-tui";
 import { Type } from "@sinclair/typebox";
-
-import {
-  MarkdownResponse,
-  SubagentFooter,
-  ToolDetails,
-  type ToolDetailsField,
-  ToolPreview,
-  type ToolPreviewField,
-} from "../../components";
 import { getSubagentModelConfig, isDebugEnabled } from "../../config";
 import { executeSubagent, resolveModel } from "../../lib";
 import type { SubagentToolCall } from "../../lib/types";
@@ -57,7 +56,7 @@ export function createJesterTool(): ToolDefinition<
   JesterDetails
 > {
   // Render cache for reusing components across updates
-  const renderCache = new Map<
+  const renderCache = createRenderCache<
     string,
     {
       toolDetails: ToolDetails;
@@ -204,11 +203,15 @@ export function createJesterTool(): ToolDefinition<
     },
 
     renderCall(args, theme) {
-      const fields: ToolPreviewField[] = [];
-      if (args.question) {
-        fields.push({ label: "Q", value: args.question });
-      }
-      return new ToolPreview({ title: "Jester", fields }, theme);
+      const question = args.question?.trim() ?? "";
+
+      return new ToolCallHeader(
+        {
+          toolName: "Jester",
+          mainArg: question,
+        },
+        theme,
+      );
     },
 
     renderResult(
@@ -219,9 +222,7 @@ export function createJesterTool(): ToolDefinition<
       const { details } = result;
 
       if (!details) {
-        const text = result.content[0];
-        const content = text?.type === "text" ? text.text : "";
-        return new Text(content || "", 0, 0);
+        return renderToolTextFallback(result, theme);
       }
 
       const {

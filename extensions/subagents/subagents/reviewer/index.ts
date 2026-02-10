@@ -2,6 +2,18 @@
  * Reviewer subagent - code review feedback on diffs.
  */
 
+import {
+  createRenderCache,
+  FailedToolCalls,
+  MarkdownResponse,
+  renderToolTextFallback,
+  SubagentFooter,
+  ToolCallHeader,
+  ToolCallList,
+  ToolCallSummary,
+  ToolDetails,
+  type ToolDetailsField,
+} from "@aliou/pi-utils-ui";
 import type {
   AgentToolResult,
   AgentToolUpdateCallback,
@@ -13,22 +25,9 @@ import type {
 import {
   createBashTool,
   createReadOnlyTools,
-  getMarkdownTheme,
   type Theme,
 } from "@mariozechner/pi-coding-agent";
-import { Markdown, Text } from "@mariozechner/pi-tui";
 import { Type } from "@sinclair/typebox";
-import {
-  FailedToolCalls,
-  MarkdownResponse,
-  SubagentFooter,
-  ToolCallList,
-  ToolCallSummary,
-  ToolDetails,
-  type ToolDetailsField,
-  ToolPreview,
-  type ToolPreviewField,
-} from "../../components";
 import { getSubagentModelConfig, isDebugEnabled } from "../../config";
 import { executeSubagent, resolveModel, resolveSkillsByName } from "../../lib";
 import type { SubagentToolCall } from "../../lib/types";
@@ -103,7 +102,7 @@ export function createReviewerTool(): ToolDefinition<
   ReviewerDetails
 > {
   // Render cache for reusing components across updates
-  const renderCache = new Map<
+  const renderCache = createRenderCache<
     string,
     {
       toolDetails: ToolDetails;
@@ -366,12 +365,28 @@ Pass relevant skills (e.g., 'ios-26', 'drizzle-orm') to provide specialized cont
     },
 
     renderCall(args, theme) {
-      const fields: ToolPreviewField[] = [{ label: "Diff", value: args.diff }];
-      if (args.focus) fields.push({ label: "Focus", value: args.focus });
-      if (args.context) fields.push({ label: "Context", value: args.context });
-      if (args.skills?.length)
-        fields.push({ label: "Skills", value: args.skills.join(", ") });
-      return new ToolPreview({ title: "Reviewer", fields }, theme);
+      const diff = args.diff?.trim() ?? "";
+      const shortDiff = diff.length > 80 ? `${diff.slice(0, 77)}...` : diff;
+
+      return new ToolCallHeader(
+        {
+          toolName: "Reviewer",
+          mainArg: shortDiff,
+          optionArgs: [
+            ...(args.focus ? [{ label: "focus", value: args.focus }] : []),
+            ...(args.skills?.length
+              ? [{ label: "skills", value: args.skills.join(",") }]
+              : []),
+          ],
+          longArgs: [
+            ...(diff.length > 80 ? [{ label: "diff", value: diff }] : []),
+            ...(args.context
+              ? [{ label: "context", value: args.context }]
+              : []),
+          ],
+        },
+        theme,
+      );
     },
 
     renderResult(
@@ -383,17 +398,7 @@ Pass relevant skills (e.g., 'ios-26', 'drizzle-orm') to provide specialized cont
 
       // Fallback if details missing
       if (!details) {
-        const text = result.content[0];
-        const content = text?.type === "text" ? text.text : "";
-        if (content) {
-          try {
-            const mdTheme = getMarkdownTheme();
-            return new Markdown(content, 0, 0, mdTheme);
-          } catch {
-            return new Text(content, 0, 0);
-          }
-        }
-        return new Text("", 0, 0);
+        return renderToolTextFallback(result, theme);
       }
 
       const {

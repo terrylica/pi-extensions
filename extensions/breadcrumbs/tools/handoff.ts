@@ -5,6 +5,7 @@
  * to a focused subtask, or when the user requests a handoff.
  */
 
+import { ToolCallHeader } from "@aliou/pi-utils-ui";
 import type {
   AgentToolResult,
   ExtensionAPI,
@@ -124,11 +125,26 @@ Example goals:
       }
     },
 
-    renderCall(args: HandoffParamsType, theme: Theme): Text {
-      const title = theme.fg("toolTitle", theme.bold("handoff"));
-      const goalPreview =
-        args.goal.length > 60 ? `${args.goal.slice(0, 60)}...` : args.goal;
-      return new Text(`${title} ${theme.fg("accent", goalPreview)}`, 0, 0);
+    renderCall(args: HandoffParamsType, theme: Theme) {
+      const goal = args.goal.trim();
+      const shortGoal = goal.length > 80 ? `${goal.slice(0, 77)}...` : goal;
+
+      return new ToolCallHeader(
+        {
+          toolName: "Handoff",
+          mainArg: shortGoal,
+          longArgs:
+            goal.length > 80
+              ? [
+                  {
+                    label: "goal",
+                    value: goal,
+                  },
+                ]
+              : undefined,
+        },
+        theme,
+      );
     },
 
     renderResult(

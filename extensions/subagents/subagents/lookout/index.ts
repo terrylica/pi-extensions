@@ -5,6 +5,18 @@
  * (grep, find, read, ls) for comprehensive code discovery.
  */
 
+import {
+  createRenderCache,
+  FailedToolCalls,
+  MarkdownResponse,
+  renderToolTextFallback,
+  SubagentFooter,
+  ToolCallHeader,
+  ToolCallList,
+  ToolCallSummary,
+  ToolDetails,
+  type ToolDetailsField,
+} from "@aliou/pi-utils-ui";
 import type {
   AgentToolResult,
   AgentToolUpdateCallback,
@@ -13,24 +25,8 @@ import type {
   ToolDefinition,
   ToolRenderResultOptions,
 } from "@mariozechner/pi-coding-agent";
-import {
-  createReadOnlyTools,
-  getMarkdownTheme,
-  type Theme,
-} from "@mariozechner/pi-coding-agent";
-import { Markdown, Text } from "@mariozechner/pi-tui";
+import { createReadOnlyTools, type Theme } from "@mariozechner/pi-coding-agent";
 import { Type } from "@sinclair/typebox";
-import {
-  FailedToolCalls,
-  MarkdownResponse,
-  SubagentFooter,
-  ToolCallList,
-  ToolCallSummary,
-  ToolDetails,
-  type ToolDetailsField,
-  ToolPreview,
-  type ToolPreviewField,
-} from "../../components";
 import { getSubagentModelConfig, isDebugEnabled } from "../../config";
 import { executeSubagent, resolveModel, resolveSkillsByName } from "../../lib";
 import type { SubagentToolCall } from "../../lib/types";
@@ -91,7 +87,7 @@ export function createLookoutTool(): ToolDefinition<
   LookoutDetails
 > {
   // Render cache for reusing components across updates
-  const renderCache = new Map<
+  const renderCache = createRenderCache<
     string,
     {
       toolDetails: ToolDetails;
@@ -338,13 +334,21 @@ Pass relevant skills (e.g., 'ios-26', 'drizzle-orm') to provide specialized cont
     },
 
     renderCall(args, theme) {
-      const fields: ToolPreviewField[] = [
-        { label: "Query", value: args.query },
-      ];
-      if (args.cwd) fields.push({ label: "Directory", value: args.cwd });
-      if (args.skills?.length)
-        fields.push({ label: "Skills", value: args.skills.join(", ") });
-      return new ToolPreview({ title: "Lookout", fields }, theme);
+      const query = args.query?.trim() ?? "";
+
+      return new ToolCallHeader(
+        {
+          toolName: "Lookout",
+          mainArg: query,
+          optionArgs: [
+            ...(args.cwd ? [{ label: "cwd", value: args.cwd }] : []),
+            ...(args.skills?.length
+              ? [{ label: "skills", value: args.skills.join(",") }]
+              : []),
+          ],
+        },
+        theme,
+      );
     },
 
     renderResult(
@@ -356,17 +360,7 @@ Pass relevant skills (e.g., 'ios-26', 'drizzle-orm') to provide specialized cont
 
       // Fallback if details missing
       if (!details) {
-        const text = result.content[0];
-        const content = text?.type === "text" ? text.text : "";
-        if (content) {
-          try {
-            const mdTheme = getMarkdownTheme();
-            return new Markdown(content, 0, 0, mdTheme);
-          } catch {
-            return new Text(content, 0, 0);
-          }
-        }
-        return new Text("", 0, 0);
+        return renderToolTextFallback(result, theme);
       }
 
       const {

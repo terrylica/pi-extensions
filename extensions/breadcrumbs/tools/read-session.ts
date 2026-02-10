@@ -7,28 +7,27 @@
 
 import { readdirSync, statSync } from "node:fs";
 import { join } from "node:path";
+import {
+  FailedToolCalls,
+  MarkdownResponse,
+  renderToolTextFallback,
+  SubagentFooter,
+  type ToolCallFormatter,
+  ToolCallHeader,
+  ToolCallList,
+  ToolCallSummary,
+  ToolDetails,
+  type ToolDetailsField,
+} from "@aliou/pi-utils-ui";
 import type {
   AgentToolResult,
   AgentToolUpdateCallback,
   ExtensionAPI,
   ExtensionContext,
+  Theme,
   ToolRenderResultOptions,
 } from "@mariozechner/pi-coding-agent";
-import { getMarkdownTheme, type Theme } from "@mariozechner/pi-coding-agent";
-import { Markdown, Text } from "@mariozechner/pi-tui";
 import { Type } from "@sinclair/typebox";
-import {
-  FailedToolCalls,
-  MarkdownResponse,
-  SubagentFooter,
-  type ToolCallFormatter,
-  ToolCallList,
-  ToolCallSummary,
-  ToolDetails,
-  type ToolDetailsField,
-  ToolPreview,
-  type ToolPreviewField,
-} from "../../subagents/components";
 import {
   executeSubagent,
   resolveModel,
@@ -346,11 +345,29 @@ Input the session ID (UUID or path) and what you want to learn about it.`,
     },
 
     renderCall(args: ReadSessionInputType, theme: Theme) {
-      const fields: ToolPreviewField[] = [
-        { label: "Session", value: args.sessionId },
-        { label: "Goal", value: args.goal },
-      ];
-      return new ToolPreview({ title: "Read Session", fields }, theme);
+      const goal = args.goal.trim();
+      const shortGoal = goal.length > 80 ? `${goal.slice(0, 77)}...` : goal;
+
+      return new ToolCallHeader(
+        {
+          toolName: "Read Session",
+          mainArg: args.sessionId,
+          optionArgs:
+            goal.length <= 80
+              ? [{ label: "goal", value: shortGoal }]
+              : undefined,
+          longArgs:
+            goal.length > 80
+              ? [
+                  {
+                    label: "goal",
+                    value: goal,
+                  },
+                ]
+              : undefined,
+        },
+        theme,
+      );
     },
 
     renderResult(
@@ -362,17 +379,7 @@ Input the session ID (UUID or path) and what you want to learn about it.`,
 
       // Fallback if details missing
       if (!details) {
-        const text = result.content[0];
-        const content = text?.type === "text" ? text.text : "";
-        if (content) {
-          try {
-            const mdTheme = getMarkdownTheme();
-            return new Markdown(content, 0, 0, mdTheme);
-          } catch {
-            return new Text(content, 0, 0);
-          }
-        }
-        return new Text("", 0, 0);
+        return renderToolTextFallback(result, theme);
       }
 
       const { toolCalls, response, aborted, error, usage, resolvedModel } =
@@ -409,7 +416,9 @@ Input the session ID (UUID or path) and what you want to learn about it.`,
 /**
  * Tool call formatter for read_session subagent tools.
  */
-const toolCallFormatter: ToolCallFormatter = (tc: SubagentToolCall) => {
+const toolCallFormatter: ToolCallFormatter<SubagentToolCall> = (
+  tc: SubagentToolCall,
+) => {
   const { toolName, args } = tc;
 
   // Format tool calls by name

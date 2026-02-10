@@ -1,18 +1,15 @@
 import type { Theme } from "@mariozechner/pi-coding-agent";
 import type { Component } from "@mariozechner/pi-tui";
 import { TruncatedText } from "@mariozechner/pi-tui";
-import type { SubagentToolCall } from "../../lib/types";
-import { pluralize } from "../../lib/ui/stats";
-import type { ToolCallFormatter } from "./ToolCallList";
+import type { ToolCallFormatter } from "./ToolCallListField";
 
-/**
- * Renders a one-line summary:
- *   7 tool calls: Read x3, Write x2, Bash x1, Edit x1
- */
-export class ToolCallSummary implements Component {
+export class ToolCallSummaryField<
+  TCall extends { status: "running" | "done" | "error" },
+> implements Component
+{
   constructor(
-    private toolCalls: SubagentToolCall[],
-    private formatter: ToolCallFormatter,
+    private toolCalls: TCall[],
+    private formatter: ToolCallFormatter<TCall>,
     private theme: Theme,
   ) {}
 
@@ -26,11 +23,14 @@ export class ToolCallSummary implements Component {
     if (this.toolCalls.length === 0) return [];
 
     const th = this.theme;
-    const toolNames = this.toolCalls.map((tc) => this.formatter(tc).label);
+    const names = this.toolCalls.map(
+      (toolCall) => this.formatter(toolCall).label,
+    );
     const counts: Record<string, number> = {};
-    for (const name of toolNames) {
-      counts[name] = (counts[name] || 0) + 1;
+    for (const name of names) {
+      counts[name] = (counts[name] ?? 0) + 1;
     }
+
     const summary = Object.entries(counts)
       .map(([name, count]) => (count > 1 ? `${name} x${count}` : name))
       .join(", ");
@@ -39,4 +39,8 @@ export class ToolCallSummary implements Component {
     const line = new TruncatedText(th.fg("muted", `${prefix}: `) + summary);
     return line.render(width);
   }
+}
+
+function pluralize(count: number, singular: string, plural?: string): string {
+  return count === 1 ? singular : (plural ?? `${singular}s`);
 }

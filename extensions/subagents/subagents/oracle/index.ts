@@ -7,25 +7,25 @@
 
 import * as fs from "node:fs/promises";
 import * as path from "node:path";
+import {
+  createRenderCache,
+  MarkdownResponse,
+  renderToolTextFallback,
+  SubagentFooter,
+  ToolCallHeader,
+  ToolDetails,
+  type ToolDetailsField,
+} from "@aliou/pi-utils-ui";
 import type {
   AgentToolResult,
   AgentToolUpdateCallback,
   ExtensionContext,
   Skill,
+  Theme,
   ToolDefinition,
   ToolRenderResultOptions,
 } from "@mariozechner/pi-coding-agent";
-import { getMarkdownTheme, type Theme } from "@mariozechner/pi-coding-agent";
-import { Markdown, Text } from "@mariozechner/pi-tui";
 import { Type } from "@sinclair/typebox";
-import {
-  MarkdownResponse,
-  SubagentFooter,
-  ToolDetails,
-  type ToolDetailsField,
-  ToolPreview,
-  type ToolPreviewField,
-} from "../../components";
 import { getSubagentModelConfig, isDebugEnabled } from "../../config";
 import { executeSubagent, resolveModel, resolveSkillsByName } from "../../lib";
 import { ORACLE_SYSTEM_PROMPT } from "./system-prompt";
@@ -118,7 +118,7 @@ export function createOracleTool(): ToolDefinition<
   OracleDetails
 > {
   // Render cache for reusing components across updates
-  const renderCache = new Map<
+  const renderCache = createRenderCache<
     string,
     {
       toolDetails: ToolDetails;
@@ -284,17 +284,33 @@ Pass relevant skills (e.g., 'ios-26', 'drizzle-orm') to provide specialized cont
     },
 
     renderCall(args, theme) {
-      const fields: ToolPreviewField[] = [];
-      if (args.files?.length) {
-        fields.push({
-          label: "Files",
-          value: `${args.files.length} file${args.files.length > 1 ? "s" : ""}`,
-        });
-      }
-      if (args.skills?.length) {
-        fields.push({ label: "Skills", value: args.skills.join(", ") });
-      }
-      return new ToolPreview({ title: "Oracle", fields }, theme);
+      const task = args.task?.trim() ?? "";
+
+      return new ToolCallHeader(
+        {
+          toolName: "Oracle",
+          optionArgs: [
+            ...(args.files?.length
+              ? [
+                  {
+                    label: "files",
+                    value: String(args.files.length),
+                  },
+                ]
+              : []),
+            ...(args.skills?.length
+              ? [{ label: "skills", value: args.skills.join(",") }]
+              : []),
+          ],
+          longArgs: [
+            ...(task ? [{ label: "task", value: task }] : []),
+            ...(args.context
+              ? [{ label: "context", value: args.context }]
+              : []),
+          ],
+        },
+        theme,
+      );
     },
 
     renderResult(
@@ -306,17 +322,7 @@ Pass relevant skills (e.g., 'ios-26', 'drizzle-orm') to provide specialized cont
 
       // Fallback if details missing
       if (!details) {
-        const text = result.content[0];
-        const content = text?.type === "text" ? text.text : "";
-        if (content) {
-          try {
-            const mdTheme = getMarkdownTheme();
-            return new Markdown(content, 0, 0, mdTheme);
-          } catch {
-            return new Text(content, 0, 0);
-          }
-        }
-        return new Text("", 0, 0);
+        return renderToolTextFallback(result, theme);
       }
 
       const {

@@ -4,6 +4,7 @@
  * Uses ripgrep-based search for efficient scanning across session files.
  */
 
+import { ToolBody, ToolCallHeader, ToolFooter } from "@aliou/pi-utils-ui";
 import type {
   AgentToolResult,
   ExtensionAPI,
@@ -226,35 +227,46 @@ Uses fast keyword search (ripgrep) across 2000+ session files.`,
         details: {
           query,
           backend,
-          filters: { cwd, after, before, limit },
+          filters: { cwd, after, before, limit: limit || 10 },
           resultCount: results.length,
           results,
         },
       };
     },
 
-    renderCall(args: FindSessionsParamsType, theme: Theme): Text {
-      let text = theme.fg("toolTitle", theme.bold("find_sessions"));
-      text += ` ${theme.fg("accent", `"${args.query}"`)}`;
+    renderCall(args: FindSessionsParamsType, theme: Theme) {
+      const query = args.query.trim();
+      const shortQuery = query.length > 70 ? `${query.slice(0, 67)}...` : query;
 
-      const filters: string[] = [];
-      if (args.cwd) filters.push(`cwd: ${args.cwd}`);
-      if (args.after) filters.push(`after: ${args.after}`);
-      if (args.before) filters.push(`before: ${args.before}`);
-      if (args.limit) filters.push(`limit: ${args.limit}`);
-
-      if (filters.length > 0) {
-        text += ` [${filters.join(", ")}]`;
-      }
-
-      return new Text(text, 0, 0);
+      return new ToolCallHeader(
+        {
+          toolName: "Find Sessions",
+          mainArg: `"${shortQuery}"`,
+          optionArgs: [
+            { label: "limit", value: String(args.limit ?? 10), tone: "accent" },
+            ...(args.cwd ? [{ label: "cwd", value: args.cwd }] : []),
+            ...(args.after ? [{ label: "after", value: args.after }] : []),
+            ...(args.before ? [{ label: "before", value: args.before }] : []),
+          ],
+          longArgs:
+            query.length > 70
+              ? [
+                  {
+                    label: "query",
+                    value: query,
+                  },
+                ]
+              : [],
+        },
+        theme,
+      );
     },
 
     renderResult(
       result: AgentToolResult<FindSessionsDetails>,
-      { expanded }: ToolRenderResultOptions,
+      options: ToolRenderResultOptions,
       theme: Theme,
-    ): Text {
+    ) {
       const { details } = result;
 
       if (!details) {
@@ -263,65 +275,73 @@ Uses fast keyword search (ripgrep) across 2000+ session files.`,
         return new Text(content, 0, 0);
       }
 
-      const { query, backend, resultCount, results } = details;
-      const backendLabel =
-        backend === "sesame"
-          ? `${theme.fg("muted", "using")} ${theme.fg("success", "sesame")}`
-          : `${theme.fg("muted", "using")} ${theme.fg("accent", "ripgrep")}`;
+      const { query, backend, resultCount, results, filters } = details;
+      const fields: Array<
+        { label: string; value: string; showCollapsed?: boolean } | Text
+      > = [];
 
       if (resultCount === 0) {
-        return new Text(
-          [
+        fields.push(
+          new Text(
             `${theme.fg("muted", "No sessions found matching")} ${theme.fg("accent", `"${query}"`)}`,
-            backendLabel,
-          ].join("\n"),
-          0,
-          0,
+            0,
+            0,
+          ),
         );
-      }
+      } else {
+        const lines: string[] = [];
 
-      const lines: string[] = [
-        `${theme.fg("success", "Found")} ${theme.fg("accent", String(resultCount))} ${theme.fg("muted", `session${resultCount === 1 ? "" : "s"}`)} ${theme.fg("success", "matching")} ${theme.fg("accent", `"${query}"`)}`,
-        backendLabel,
-      ];
+        if (!options.expanded) {
+          for (const session of results) {
+            const date = (session.created || session.modified || "").slice(
+              0,
+              10,
+            );
+            const label = session.name || session.firstMessage || "(untitled)";
+            const preview =
+              label.length > 48 ? `${label.slice(0, 48)}...` : label;
+            const msgCount = `${session.messageCount} msg${session.messageCount === 1 ? "" : "s"}`;
 
-      const shown = results.slice(0, 5);
-
-      if (!expanded) {
-        for (const session of shown) {
-          const date = (session.created || session.modified || "").slice(0, 10);
-          const label = session.name || session.firstMessage || "(untitled)";
-          const preview =
-            label.length > 48 ? `${label.slice(0, 48)}...` : label;
-          const msgCount = `${session.messageCount} msg${session.messageCount === 1 ? "" : "s"}`;
-
-          lines.push(
-            `  ${theme.fg("success", "•")} ${theme.fg("accent", session.id.slice(0, 8))} ${theme.fg("muted", "- ")}${theme.fg("muted", date)} ${theme.fg("muted", "- ")}${theme.fg("toolOutput", preview)} ${theme.fg("muted", "- ")}${theme.fg("success", msgCount)}`,
-          );
+            lines.push(
+              `  ${theme.fg("success", "•")} ${theme.fg("accent", session.id.slice(0, 8))} ${theme.fg("muted", "- ")}${theme.fg("muted", date)} ${theme.fg("muted", "- ")}${theme.fg("toolOutput", preview)} ${theme.fg("muted", "- ")}${theme.fg("success", msgCount)}`,
+            );
+          }
+        } else {
+          for (const session of results) {
+            if (lines.length > 0) lines.push("");
+            lines.push(...renderSessionCard(session, query, theme));
+          }
         }
 
-        if (resultCount > 5) {
-          lines.push(
-            `${theme.fg("muted", "  ... and")} ${theme.fg("accent", String(resultCount - 5))} ${theme.fg("muted", "more")}`,
-          );
+        if (lines.length > 0) {
+          fields.push(new Text(lines.join("\n"), 0, 0));
         }
-
-        return new Text(lines.join("\n"), 0, 0);
       }
 
-      for (const session of shown) {
-        lines.push("");
-        lines.push(...renderSessionCard(session, query, theme));
-      }
+      const footer = new ToolFooter(theme, {
+        items: [
+          {
+            label: "backend",
+            value: backend === "sesame" ? "sesame" : "ripgrep",
+            tone: "accent",
+          },
+          { label: "matches", value: String(resultCount), tone: "success" },
+          {
+            label: "limit",
+            value: String(filters.limit ?? 10),
+            tone: "muted",
+          },
+        ],
+      });
 
-      if (resultCount > 5) {
-        lines.push("");
-        lines.push(
-          `${theme.fg("muted", "... and")} ${theme.fg("accent", String(resultCount - 5))} ${theme.fg("muted", "more")}`,
-        );
-      }
-
-      return new Text(lines.join("\n"), 0, 0);
+      return new ToolBody(
+        {
+          fields,
+          footer,
+        },
+        options,
+        theme,
+      );
     },
   });
 }

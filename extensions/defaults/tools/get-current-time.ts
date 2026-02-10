@@ -1,3 +1,4 @@
+import { ToolCallHeader } from "@aliou/pi-utils-ui";
 import type {
   AgentToolResult,
   ExtensionAPI,
@@ -97,12 +98,16 @@ export function setupGetCurrentTimeTool(pi: ExtensionAPI) {
       };
     },
 
-    renderCall(args: GetCurrentTimeParamsType, theme: Theme): Text {
-      let text = theme.fg("toolTitle", theme.bold("get_current_time"));
-      if (args.format) {
-        text += ` ${theme.fg("accent", args.format)}`;
-      }
-      return new Text(text, 0, 0);
+    renderCall(args: GetCurrentTimeParamsType, theme: Theme) {
+      return new ToolCallHeader(
+        {
+          toolName: "Current Time",
+          optionArgs: args.format
+            ? [{ label: "format", value: args.format }]
+            : [],
+        },
+        theme,
+      );
     },
 
     renderResult(

@@ -5,6 +5,18 @@
  * verification. Does not search or explore the codebase.
  */
 
+import {
+  createRenderCache,
+  FileList,
+  MarkdownField,
+  MarkdownResponse,
+  renderToolTextFallback,
+  SubagentFooter,
+  ToolCallHeader,
+  ToolCallList,
+  ToolDetails,
+  type ToolDetailsField,
+} from "@aliou/pi-utils-ui";
 import type {
   AgentToolResult,
   AgentToolUpdateCallback,
@@ -19,22 +31,9 @@ import {
   type createReadOnlyTools,
   createReadTool,
   createWriteTool,
-  getMarkdownTheme,
   type Theme,
 } from "@mariozechner/pi-coding-agent";
-import { Markdown, Text } from "@mariozechner/pi-tui";
 import { Type } from "@sinclair/typebox";
-import {
-  FileList,
-  MarkdownField,
-  MarkdownResponse,
-  SubagentFooter,
-  ToolCallList,
-  ToolDetails,
-  type ToolDetailsField,
-  ToolPreview,
-  type ToolPreviewField,
-} from "../../components";
 import { getSubagentModelConfig, isDebugEnabled } from "../../config";
 import { executeSubagent, resolveModel, resolveSkillsByName } from "../../lib";
 import type { SubagentToolCall } from "../../lib/types";
@@ -124,7 +123,7 @@ export function createWorkerTool(): ToolDefinition<
   WorkerDetails
 > {
   // Render cache for reusing components across updates
-  const renderCache = new Map<
+  const renderCache = createRenderCache<
     string,
     {
       toolDetails: ToolDetails;
@@ -419,14 +418,28 @@ Pass relevant skills (e.g., 'ios-26', 'drizzle-orm') to provide specialized cont
     },
 
     renderCall(args, theme) {
-      const fields: ToolPreviewField[] = [{ label: "Task", value: args.task }];
+      const task = args.task?.trim() ?? "";
+      const shortTask = task.length > 80 ? `${task.slice(0, 77)}...` : task;
 
-      // Only add optional fields if present
-      if (args.skills?.length) {
-        fields.push({ label: "Skills", value: args.skills.join(", ") });
-      }
-
-      return new ToolPreview({ title: "Worker", fields }, theme);
+      return new ToolCallHeader(
+        {
+          toolName: "Worker",
+          mainArg: shortTask,
+          optionArgs: [
+            { label: "files", value: String(args.files?.length ?? 0) },
+            ...(args.skills?.length
+              ? [{ label: "skills", value: args.skills.join(",") }]
+              : []),
+          ],
+          longArgs: [
+            ...(task.length > 80 ? [{ label: "task", value: task }] : []),
+            ...(args.context
+              ? [{ label: "context", value: args.context }]
+              : []),
+          ],
+        },
+        theme,
+      );
     },
 
     renderResult(
@@ -438,17 +451,7 @@ Pass relevant skills (e.g., 'ios-26', 'drizzle-orm') to provide specialized cont
 
       // Fallback if details missing
       if (!details) {
-        const text = result.content[0];
-        const content = text?.type === "text" ? text.text : "";
-        if (content) {
-          try {
-            const mdTheme = getMarkdownTheme();
-            return new Markdown(content, 0, 0, mdTheme);
-          } catch {
-            return new Text(content, 0, 0);
-          }
-        }
-        return new Text("", 0, 0);
+        return renderToolTextFallback(result, theme);
       }
 
       const {

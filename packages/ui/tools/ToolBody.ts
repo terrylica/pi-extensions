@@ -4,27 +4,20 @@ import type {
 } from "@mariozechner/pi-coding-agent";
 import type { Component } from "@mariozechner/pi-tui";
 import { Text } from "@mariozechner/pi-tui";
-import type { SubagentFooter } from "./SubagentFooter";
 
-/** A field is either a plain label/value or a custom Component */
-export type ToolDetailsField =
+export type ToolBodyField =
   | { label: string; value: string; showCollapsed?: boolean }
   | (Component & { showCollapsed?: boolean });
 
-export interface ToolDetailsConfig {
-  /** Fields to display when expanded */
-  fields: ToolDetailsField[];
-  /** Footer -- always displayed */
-  footer: SubagentFooter;
+export interface ToolBodyConfig {
+  fields: ToolBodyField[];
+  footer?: Component;
+  includeSpacerBeforeFooter?: boolean;
 }
 
-/**
- * Collapsed: empty line + footer.
- * Expanded: fields + empty line + footer.
- */
-export class ToolDetails implements Component {
+export class ToolBody implements Component {
   constructor(
-    private config: ToolDetailsConfig,
+    private config: ToolBodyConfig,
     private options: ToolRenderResultOptions,
     private theme: Theme,
   ) {}
@@ -35,7 +28,7 @@ export class ToolDetails implements Component {
 
   invalidate(): void {}
 
-  update(config: ToolDetailsConfig, options: ToolRenderResultOptions): void {
+  update(config: ToolBodyConfig, options: ToolRenderResultOptions): void {
     this.config = config;
     this.options = options;
   }
@@ -47,7 +40,7 @@ export class ToolDetails implements Component {
     const fieldsToRender = this.options.expanded
       ? this.config.fields
       : this.config.fields.filter(
-          (f) => "showCollapsed" in f && f.showCollapsed,
+          (field) => "showCollapsed" in field && field.showCollapsed,
         );
 
     for (const field of fieldsToRender) {
@@ -63,12 +56,17 @@ export class ToolDetails implements Component {
       }
     }
 
-    lines.push("");
-    lines.push(...this.config.footer.render(width));
+    if (this.config.footer) {
+      if (this.config.includeSpacerBeforeFooter ?? true) {
+        lines.push("");
+      }
+      lines.push(...this.config.footer.render(width));
+    }
+
     return lines;
   }
 }
 
-function isComponent(field: ToolDetailsField): field is Component {
+function isComponent(field: ToolBodyField): field is Component {
   return "render" in field && typeof (field as Component).render === "function";
 }

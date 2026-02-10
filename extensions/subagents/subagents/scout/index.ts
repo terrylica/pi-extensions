@@ -5,28 +5,28 @@
  * answer based on fetched information.
  */
 
+import {
+  createRenderCache,
+  FailedToolCalls,
+  MarkdownResponse,
+  renderToolTextFallback,
+  SubagentFooter,
+  ToolCallHeader,
+  ToolCallList,
+  ToolCallSummary,
+  ToolDetails,
+  type ToolDetailsField,
+} from "@aliou/pi-utils-ui";
 import type {
   AgentToolResult,
   AgentToolUpdateCallback,
   ExtensionContext,
   Skill,
+  Theme,
   ToolDefinition,
   ToolRenderResultOptions,
 } from "@mariozechner/pi-coding-agent";
-import { getMarkdownTheme, type Theme } from "@mariozechner/pi-coding-agent";
-import { Markdown, Text } from "@mariozechner/pi-tui";
 import { Type } from "@sinclair/typebox";
-import {
-  FailedToolCalls,
-  MarkdownResponse,
-  SubagentFooter,
-  ToolCallList,
-  ToolCallSummary,
-  ToolDetails,
-  type ToolDetailsField,
-  ToolPreview,
-  type ToolPreviewField,
-} from "../../components";
 import { getSubagentModelConfig, isDebugEnabled } from "../../config";
 import { executeSubagent, resolveModel, resolveSkillsByName } from "../../lib";
 import type { SubagentToolCall } from "../../lib/types";
@@ -143,7 +143,7 @@ export function createScoutTool(): ToolDefinition<
   ScoutDetails
 > {
   // Render cache for reusing components across updates
-  const renderCache = new Map<
+  const renderCache = createRenderCache<
     string,
     {
       toolDetails: ToolDetails;
@@ -461,14 +461,30 @@ Pass relevant skills (e.g., 'ios-26', 'drizzle-orm') to provide specialized cont
     },
 
     renderCall(args, theme) {
-      const fields: ToolPreviewField[] = [];
-      if (args.url) fields.push({ label: "URL", value: args.url });
-      if (args.query) fields.push({ label: "Query", value: args.query });
-      if (args.repo) fields.push({ label: "Repo", value: args.repo });
-      if (args.prompt) fields.push({ label: "Prompt", value: args.prompt });
-      if (args.skills?.length)
-        fields.push({ label: "Skills", value: args.skills.join(", ") });
-      return new ToolPreview({ title: "Scout", fields }, theme);
+      const prompt = args.prompt?.trim() ?? "";
+
+      return new ToolCallHeader(
+        {
+          toolName: "Scout",
+          optionArgs: [
+            ...(args.url ? [{ label: "url", value: args.url }] : []),
+            ...(args.query ? [{ label: "query", value: args.query }] : []),
+            ...(args.repo ? [{ label: "repo", value: args.repo }] : []),
+            ...(args.skills?.length
+              ? [{ label: "skills", value: args.skills.join(",") }]
+              : []),
+          ],
+          longArgs: prompt
+            ? [
+                {
+                  label: "prompt",
+                  value: prompt,
+                },
+              ]
+            : undefined,
+        },
+        theme,
+      );
     },
 
     renderResult(
@@ -480,17 +496,7 @@ Pass relevant skills (e.g., 'ios-26', 'drizzle-orm') to provide specialized cont
 
       // Fallback if details missing
       if (!details) {
-        const text = result.content[0];
-        const content = text?.type === "text" ? text.text : "";
-        if (content) {
-          try {
-            const mdTheme = getMarkdownTheme();
-            return new Markdown(content, 0, 0, mdTheme);
-          } catch {
-            return new Text(content, 0, 0);
-          }
-        }
-        return new Text("", 0, 0);
+        return renderToolTextFallback(result, theme);
       }
 
       const {

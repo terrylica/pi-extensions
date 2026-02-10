@@ -3,11 +3,6 @@ import { getMarkdownTheme } from "@mariozechner/pi-coding-agent";
 import type { Component } from "@mariozechner/pi-tui";
 import { Markdown, Text } from "@mariozechner/pi-tui";
 
-/**
- * Renders a labeled field with markdown content:
- *   Instructions:
- *   <markdown content>
- */
 export class MarkdownField implements Component {
   constructor(
     private label: string,
@@ -24,15 +19,13 @@ export class MarkdownField implements Component {
   render(width: number): string[] {
     if (!this.content) return [];
 
-    const th = this.theme;
     const lines: string[] = [];
-
-    lines.push(th.fg("muted", `${this.label}:`));
+    lines.push(this.theme.fg("muted", `${this.label}:`));
 
     try {
-      const mdTheme = getMarkdownTheme();
-      const md = new Markdown(this.content, 2, 0, mdTheme);
-      lines.push(...md.render(width));
+      const markdownTheme = getMarkdownTheme();
+      const markdown = new Markdown(this.content, 2, 0, markdownTheme);
+      lines.push(...markdown.render(width));
     } catch {
       const text = new Text(this.content, 0, 0);
       lines.push(...text.render(width));

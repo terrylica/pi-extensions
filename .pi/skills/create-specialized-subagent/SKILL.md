@@ -106,6 +106,48 @@ Exports:
 8. Check if all tool calls failed → return error
 9. Return `usage` from result (include skill info)
 
+## Tool Rendering Guidelines (required)
+
+Use shared UI abstractions from `@aliou/pi-utils-ui`. Do not hand-roll tool header/body/footer for new subagents.
+
+### renderCall pattern
+
+Always use this header shape:
+
+- First line: `[Tool Name]: [Action] [Main arg] [Option args]`
+- Following lines: long args only (wrapped naturally)
+
+In subagents, use `ToolCallHeader`:
+
+```ts
+return new ToolCallHeader(
+  {
+    toolName: "Scout", // display name, not snake_case tool id
+    // action only when meaningful (e.g. process start/output/kill)
+    mainArg: "short primary arg",
+    optionArgs: [{ label: "cwd", value: args.cwd ?? "" }],
+    longArgs: [{ label: "prompt", value: args.prompt }],
+  },
+  theme,
+);
+```
+
+Rules:
+- Keep main arg short and useful.
+- Move long text (prompt/task/question/instructions/context) to `longArgs`.
+- Do not truncate when wrapping gives better readability (e.g. query/question).
+- Tool name should be human display text (`Scout`, `Read Session`), not raw tool id.
+
+### renderResult structure
+
+Use `ToolBody` + footer component (`SubagentFooter` for model-backed subagents).
+
+```ts
+return new ToolBody({ fields, footer }, options, theme);
+```
+
+Footer spacing is standardized. Keep footer data concise and machine-skim-friendly.
+
 ## renderResult States
 
 | State | Display |
@@ -151,7 +193,8 @@ Add your required keys to `checkApiKeys()` in `extensions/subagents/index.ts`. S
    - Resolve skills in execute function
    - Pass `skills: resolvedSkills` to executeSubagent
    - Include skill info in all details returns
-   - Show skills in renderCall if provided
+   - Use `ToolCallHeader` in `renderCall` and follow standard line pattern
+   - Use `ToolBody` + `SubagentFooter` in `renderResult`
 8. Register in `extensions/subagents/index.ts`
 9. Run `pnpm typecheck`
 
