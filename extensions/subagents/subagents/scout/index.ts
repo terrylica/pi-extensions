@@ -5,7 +5,7 @@
  * answer based on fetched information.
  */
 
-import { createRequire } from "node:module";
+import path from "node:path";
 import {
   createRenderCache,
   FailedToolCalls,
@@ -260,8 +260,9 @@ Pass relevant skills (e.g., 'ios-26', 'drizzle-orm') to provide specialized cont
             systemPrompt: SCOUT_SYSTEM_PROMPT,
             skills: resolvedSkills,
             extensionPaths: [
-              createRequire(import.meta.url).resolve(
-                "@aliou/pi-linkup/src/index.ts",
+              path.resolve(
+                import.meta.dirname,
+                "../../node_modules/@aliou/pi-linkup",
               ),
             ],
             customTools: createScoutTools(),
