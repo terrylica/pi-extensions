@@ -23,6 +23,7 @@ export interface SessionSearchResult {
   messageCount: number;
   firstMessage: string;
   matchedSnippet?: string;
+  score?: number;
 }
 
 export interface SearchOptions {
@@ -31,6 +32,13 @@ export interface SearchOptions {
   after?: string;
   before?: string;
   limit?: number;
+}
+
+export type SearchBackend = "sesame" | "ripgrep";
+
+export interface SessionSearchResponse {
+  backend: SearchBackend;
+  results: SessionSearchResult[];
 }
 
 /**
@@ -186,19 +194,150 @@ async function extractSnippet(
 }
 
 /**
- * Search for sessions by keyword using ripgrep.
+ * Check if sesame CLI is available. Cached after first check.
+ */
+let sesameAvailable: boolean | null = null;
+async function isSesameAvailable(): Promise<boolean> {
+  if (sesameAvailable !== null) return sesameAvailable;
+  try {
+    await execFileAsync("sesame", ["status"]);
+    sesameAvailable = true;
+  } catch {
+    sesameAvailable = false;
+  }
+  return sesameAvailable;
+}
+
+interface SesameSearchResult {
+  sessionId: string;
+  source: string;
+  path: string;
+  cwd: string;
+  name: string | null;
+  score: number;
+  created: string;
+  matchedSnippet: string;
+}
+
+interface SessionFileMetadata {
+  modified: string;
+  messageCount: number;
+  firstMessage: string;
+  sessionName?: string;
+}
+
+function readSessionFileMetadata(filePath: string): SessionFileMetadata | null {
+  try {
+    const content = readFileSync(filePath, "utf-8");
+    const lines = content.split("\n");
+    const stats = statSync(filePath);
+
+    let messageCount = 0;
+    let firstMessage = "";
+    let sessionName: string | undefined;
+
+    for (let i = 0; i < Math.min(500, lines.length); i++) {
+      const line = lines[i];
+      if (!line) continue;
+
+      try {
+        const entry = JSON.parse(line);
+
+        if (entry.type === "message") {
+          messageCount++;
+          if (!firstMessage && entry.message?.role === "user") {
+            firstMessage = extractTextFromEntry(entry) || "";
+            if (firstMessage.length > 100) {
+              firstMessage = `${firstMessage.slice(0, 100)}...`;
+            }
+          }
+        }
+
+        if (!sessionName && entry.type === "session_info" && entry.name) {
+          sessionName = entry.name;
+        }
+
+        if (messageCount > 0 && firstMessage && sessionName) break;
+      } catch {
+        // Skip invalid lines
+      }
+    }
+
+    return {
+      modified: stats.mtime.toISOString(),
+      messageCount,
+      firstMessage: firstMessage || "(no messages yet)",
+      sessionName,
+    };
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Search sessions using the Sesame CLI (indexed BM25 search).
+ */
+async function searchWithSesame(
+  options: SearchOptions,
+): Promise<SessionSearchResult[]> {
+  const { query, cwd, after, before, limit = 10 } = options;
+
+  const args = ["search", query, "--json", "--limit", String(limit)];
+  if (cwd) args.push("--cwd", cwd);
+  if (after) args.push("--after", after);
+  if (before) args.push("--before", before);
+
+  const { stdout } = await execFileAsync("sesame", args, {
+    maxBuffer: 10 * 1024 * 1024,
+  });
+
+  if (!stdout) return [];
+
+  const parsed: { results: SesameSearchResult[] } = JSON.parse(stdout);
+
+  return parsed.results.map((r) => {
+    const meta = readSessionFileMetadata(r.path);
+
+    return {
+      id: r.sessionId,
+      path: r.path,
+      cwd: r.cwd,
+      name: r.name ?? meta?.sessionName,
+      created: r.created,
+      modified: meta?.modified ?? r.created,
+      messageCount: meta?.messageCount ?? 0,
+      firstMessage: meta?.firstMessage ?? "(no messages yet)",
+      matchedSnippet: r.matchedSnippet || undefined,
+      score: r.score,
+    };
+  });
+}
+
+/**
+ * Search for sessions by keyword. Uses Sesame CLI if available, falls back to ripgrep.
  * Respects cwd and date filters, returns sorted results up to limit.
  * Resilient: skips bad files, never throws.
  */
 export async function searchSessions(
   options: SearchOptions,
-): Promise<SessionSearchResult[]> {
+): Promise<SessionSearchResponse> {
   const { query, cwd, after, before, limit = 10 } = options;
 
   if (!query || query.trim() === "") {
-    return [];
+    return { backend: "ripgrep", results: [] };
   }
 
+  // Use Sesame if available (indexed BM25 search, much faster)
+  if (await isSesameAvailable()) {
+    try {
+      const results = await searchWithSesame(options);
+      return { backend: "sesame", results };
+    } catch (err) {
+      console.error("[session-search] sesame failed, falling back to rg:", err);
+    }
+  }
+
+  // Fallback: ripgrep-based search
   const sessionsDir = getSessionsDir();
   let searchDirs: string[] = [];
 
@@ -251,11 +390,11 @@ export async function searchSessions(
     // rg returns exit code 1 if no matches found - this is normal
     const error = err as { status?: number };
     if (error.status === 1) {
-      return [];
+      return { backend: "ripgrep", results: [] };
     }
     // For other errors, log but don't throw
     console.error("[session-search] rg search error:", err);
-    return [];
+    return { backend: "ripgrep", results: [] };
   }
 
   // Process each matching file
@@ -364,5 +503,5 @@ export async function searchSessions(
   results.sort(
     (a, b) => new Date(b.modified).getTime() - new Date(a.modified).getTime(),
   );
-  return results.slice(0, limit);
+  return { backend: "ripgrep", results: results.slice(0, limit) };
 }

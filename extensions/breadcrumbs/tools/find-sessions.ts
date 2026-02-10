@@ -14,6 +14,7 @@ import type {
 import { Text } from "@mariozechner/pi-tui";
 import { Type } from "@sinclair/typebox";
 import {
+  type SearchBackend,
   type SearchOptions,
   type SessionSearchResult,
   searchSessions,
@@ -59,6 +60,7 @@ type FindSessionsParamsType = {
 
 interface FindSessionsDetails {
   query: string;
+  backend: SearchBackend;
   filters: {
     cwd?: string;
     after?: string;
@@ -70,6 +72,45 @@ interface FindSessionsDetails {
 }
 
 type ExecuteResult = AgentToolResult<FindSessionsDetails>;
+
+function renderSessionCard(
+  session: SessionSearchResult,
+  query: string,
+  theme: Theme,
+): string[] {
+  const date = (session.created || session.modified || "").slice(0, 10);
+  const title = session.name || "(untitled)";
+  const firstMessage = session.firstMessage || "(no messages yet)";
+  const msgCount = `${session.messageCount} msg${session.messageCount === 1 ? "" : "s"}`;
+  const snippet = session.matchedSnippet?.replace(/\s+/g, " ").trim();
+  const lines: string[] = [];
+
+  lines.push(
+    `${theme.fg("muted", "┌─")} ${theme.fg("accent", session.id.slice(0, 8))} ${theme.fg("muted", "•")} ${theme.fg("muted", date)} ${theme.fg("muted", "•")} ${theme.fg("toolOutput", title)} ${theme.fg("muted", "•")} ${theme.fg("success", msgCount)}`,
+  );
+  lines.push(
+    `${theme.fg("muted", "│")} ${theme.fg("muted", "term:")} ${theme.fg("accent", `"${query}"`)}`,
+  );
+
+  if (typeof session.score === "number") {
+    lines.push(
+      `${theme.fg("muted", "│")} ${theme.fg("muted", "score:")} ${theme.fg("success", session.score.toFixed(3))}`,
+    );
+  }
+
+  lines.push(
+    `${theme.fg("muted", "│")} ${theme.fg("muted", "first:")} ${theme.fg("toolOutput", firstMessage)}`,
+  );
+
+  if (snippet) {
+    lines.push(
+      `${theme.fg("muted", "│")} ${theme.fg("muted", "match:")} ${theme.fg("toolOutput", snippet)}`,
+    );
+  }
+
+  lines.push(theme.fg("muted", "└─"));
+  return lines;
+}
 
 export const FIND_SESSIONS_GUIDANCE = `
 ## find_sessions
@@ -127,9 +168,12 @@ Uses fast keyword search (ripgrep) across 2000+ session files.`,
       };
 
       // Execute search
+      let backend: SearchBackend = "ripgrep";
       let results: SessionSearchResult[] = [];
       try {
-        results = await searchSessions(searchOpts);
+        const response = await searchSessions(searchOpts);
+        backend = response.backend;
+        results = response.results;
         // Filter out current session - users searching for sessions want to find other sessions, not the one they're in
         results = results.filter((r) => r.id !== currentSessionId);
       } catch (err) {
@@ -141,6 +185,7 @@ Uses fast keyword search (ripgrep) across 2000+ session files.`,
               type: "text",
               text: JSON.stringify({
                 query,
+                backend,
                 resultCount: 0,
                 results: [],
                 error: `Search failed: ${err instanceof Error ? err.message : String(err)}`,
@@ -149,6 +194,7 @@ Uses fast keyword search (ripgrep) across 2000+ session files.`,
           ],
           details: {
             query,
+            backend,
             filters: { cwd, after, before, limit },
             resultCount: 0,
             results: [],
@@ -159,6 +205,7 @@ Uses fast keyword search (ripgrep) across 2000+ session files.`,
       // Format result for LLM
       const resultJson = JSON.stringify({
         query,
+        backend,
         resultCount: results.length,
         results: results.map((r) => ({
           id: r.id,
@@ -170,6 +217,7 @@ Uses fast keyword search (ripgrep) across 2000+ session files.`,
           messageCount: r.messageCount,
           firstMessage: r.firstMessage,
           matchedSnippet: r.matchedSnippet,
+          score: r.score,
         })),
       });
 
@@ -177,6 +225,7 @@ Uses fast keyword search (ripgrep) across 2000+ session files.`,
         content: [{ type: "text", text: resultJson }],
         details: {
           query,
+          backend,
           filters: { cwd, after, before, limit },
           resultCount: results.length,
           results,
@@ -203,7 +252,7 @@ Uses fast keyword search (ripgrep) across 2000+ session files.`,
 
     renderResult(
       result: AgentToolResult<FindSessionsDetails>,
-      _options: ToolRenderResultOptions,
+      { expanded }: ToolRenderResultOptions,
       theme: Theme,
     ): Text {
       const { details } = result;
@@ -214,48 +263,62 @@ Uses fast keyword search (ripgrep) across 2000+ session files.`,
         return new Text(content, 0, 0);
       }
 
-      const { query, resultCount, results } = details;
+      const { query, backend, resultCount, results } = details;
+      const backendLabel =
+        backend === "sesame"
+          ? `${theme.fg("muted", "using")} ${theme.fg("success", "sesame")}`
+          : `${theme.fg("muted", "using")} ${theme.fg("accent", "ripgrep")}`;
 
       if (resultCount === 0) {
         return new Text(
-          theme.fg("muted", `No sessions found matching "${query}"`),
+          [
+            `${theme.fg("muted", "No sessions found matching")} ${theme.fg("accent", `"${query}"`)}`,
+            backendLabel,
+          ].join("\n"),
           0,
           0,
         );
       }
 
-      // Format results for display
       const lines: string[] = [
-        theme.fg(
-          "success",
-          `Found ${resultCount} session${resultCount === 1 ? "" : "s"} matching "${query}"`,
-        ),
+        `${theme.fg("success", "Found")} ${theme.fg("accent", String(resultCount))} ${theme.fg("muted", `session${resultCount === 1 ? "" : "s"}`)} ${theme.fg("success", "matching")} ${theme.fg("accent", `"${query}"`)}`,
+        backendLabel,
       ];
 
-      for (const session of results.slice(0, 5)) {
-        // Show first 5 results
-        const name = session.name ? ` (${session.name})` : "";
-        const date = new Date(session.modified).toLocaleDateString();
-        const msgCount = `${session.messageCount} msg${session.messageCount === 1 ? "" : "s"}`;
+      const shown = results.slice(0, 5);
 
-        lines.push(
-          theme.fg(
-            "muted",
-            `  • ${session.id.slice(0, 8)}${name} - ${date} - ${msgCount}`,
-          ),
-        );
-
-        if (session.firstMessage) {
+      if (!expanded) {
+        for (const session of shown) {
+          const date = (session.created || session.modified || "").slice(0, 10);
+          const label = session.name || session.firstMessage || "(untitled)";
           const preview =
-            session.firstMessage.length > 60
-              ? `${session.firstMessage.slice(0, 60)}...`
-              : session.firstMessage;
-          lines.push(theme.fg("muted", `    "${preview}"`));
+            label.length > 48 ? `${label.slice(0, 48)}...` : label;
+          const msgCount = `${session.messageCount} msg${session.messageCount === 1 ? "" : "s"}`;
+
+          lines.push(
+            `  ${theme.fg("success", "•")} ${theme.fg("accent", session.id.slice(0, 8))} ${theme.fg("muted", "- ")}${theme.fg("muted", date)} ${theme.fg("muted", "- ")}${theme.fg("toolOutput", preview)} ${theme.fg("muted", "- ")}${theme.fg("success", msgCount)}`,
+          );
         }
+
+        if (resultCount > 5) {
+          lines.push(
+            `${theme.fg("muted", "  ... and")} ${theme.fg("accent", String(resultCount - 5))} ${theme.fg("muted", "more")}`,
+          );
+        }
+
+        return new Text(lines.join("\n"), 0, 0);
+      }
+
+      for (const session of shown) {
+        lines.push("");
+        lines.push(...renderSessionCard(session, query, theme));
       }
 
       if (resultCount > 5) {
-        lines.push(theme.fg("muted", `  ... and ${resultCount - 5} more`));
+        lines.push("");
+        lines.push(
+          `${theme.fg("muted", "... and")} ${theme.fg("accent", String(resultCount - 5))} ${theme.fg("muted", "more")}`,
+        );
       }
 
       return new Text(lines.join("\n"), 0, 0);
