@@ -7,7 +7,7 @@
     ]
   },
   "dependencies": {
-    "@aliou/pi-linkup": "^0.6.0",
+    "@aliou/pi-linkup": "^0.6.2",
     "@aliou/pi-utils-settings": "workspace:^",
     "@aliou/pi-utils-ui": "workspace:^"
   },
