@@ -25,6 +25,7 @@ Pi's built-in discovery only loads AGENTS.md files from the cwd and its ancestor
 - Resets on session start/switch
 - Skips cwd's own AGENTS.md (already loaded by Pi)
 - Falls back to home directory as boundary if file is outside cwd
+- Supports global ignore list (`agentsIgnorePaths`) to skip selected AGENTS.md files/directories
 
 ### Git rebase helper
 

@@ -15,6 +15,8 @@ export class AgentsDiscoveryManager {
   private cwdAgentsPath = "";
   private homeDir = "";
 
+  constructor(private readonly getIgnoredPaths: () => string[] = () => []) {}
+
   resetSession(cwd: string) {
     this.currentCwd = this.resolvePath(cwd, process.cwd());
     this.cwdAgentsPath = path.join(this.currentCwd, AGENTS_FILENAME);
@@ -67,6 +69,8 @@ export class AgentsDiscoveryManager {
   async discover(filePath: string): Promise<DiscoveredFile[] | null> {
     const absolutePath = this.resolvePath(filePath, this.currentCwd);
 
+    if (this.shouldIgnorePath(absolutePath)) return null;
+
     const searchRoot = this.isInsideRoot(this.currentCwd, absolutePath)
       ? this.currentCwd
       : this.isInsideRoot(this.homeDir, absolutePath)
@@ -87,6 +91,7 @@ export class AgentsDiscoveryManager {
     for (const agentsPath of candidates) {
       const resolved = this.resolvePath(agentsPath, this.currentCwd);
       if (this.loadedAgents.has(resolved)) continue;
+      if (this.shouldIgnorePath(resolved)) continue;
 
       const content = await fs.promises.readFile(agentsPath, "utf-8");
       this.loadedAgents.add(resolved);
@@ -121,9 +126,16 @@ export class AgentsDiscoveryManager {
   }
 
   private resolvePath(targetPath: string, baseDir: string): string {
-    const absolute = path.isAbsolute(targetPath)
-      ? path.normalize(targetPath)
-      : path.resolve(baseDir, targetPath);
+    const expanded =
+      targetPath === "~"
+        ? this.homeDir || os.homedir()
+        : targetPath.startsWith("~/")
+          ? path.join(this.homeDir || os.homedir(), targetPath.slice(2))
+          : targetPath;
+
+    const absolute = path.isAbsolute(expanded)
+      ? path.normalize(expanded)
+      : path.resolve(baseDir, expanded);
 
     try {
       return fs.realpathSync.native?.(absolute) ?? fs.realpathSync(absolute);
@@ -162,5 +174,33 @@ export class AgentsDiscoveryManager {
 
     // Return in root-first order.
     return agentsFiles.reverse();
+  }
+
+  private shouldIgnorePath(targetPath: string): boolean {
+    const ignored = this.getIgnoredPaths();
+    if (ignored.length === 0) return false;
+
+    for (const rawPath of ignored) {
+      const trimmed = rawPath.trim();
+      if (!trimmed) continue;
+
+      const resolved = this.resolvePath(trimmed, this.currentCwd);
+      const isAgentsFile = path.basename(resolved) === AGENTS_FILENAME;
+
+      if (isAgentsFile) {
+        if (targetPath === resolved) return true;
+        continue;
+      }
+
+      // Directory-style ignore: skip any AGENTS.md at or under this path.
+      if (
+        this.isInsideRoot(resolved, targetPath) &&
+        path.basename(targetPath) === AGENTS_FILENAME
+      ) {
+        return true;
+      }
+    }
+
+    return false;
   }
 }

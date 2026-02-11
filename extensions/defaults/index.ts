@@ -9,7 +9,9 @@ export default async function (pi: ExtensionAPI) {
   // Load config
   await configLoader.load();
 
-  const agentsDiscovery = new AgentsDiscoveryManager();
+  const agentsDiscovery = new AgentsDiscoveryManager(
+    () => configLoader.getConfig().agentsIgnorePaths,
+  );
 
   setupHooks(pi, agentsDiscovery);
   setupCommands(pi);

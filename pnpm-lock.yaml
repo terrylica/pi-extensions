@@ -90,6 +90,9 @@ importers:
 
   extensions/defaults:
     dependencies:
+      '@aliou/pi-utils-settings':
+        specifier: workspace:^
+        version: link:../../packages/settings
       '@aliou/pi-utils-ui':
         specifier: workspace:^
         version: link:../../packages/ui
