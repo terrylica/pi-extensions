@@ -5,12 +5,11 @@
  * answer based on fetched information.
  */
 
-import { existsSync } from "node:fs";
-import path from "node:path";
 import {
   createExecutionTimer,
   wrapToolDefinitionsWithTiming,
 } from "@aliou/pi-agent-kit";
+import { webFetchTool, webSearchTool } from "@aliou/pi-linkup/tools";
 import {
   createRenderCache,
   FailedToolCalls,
@@ -40,23 +39,6 @@ import { SCOUT_SYSTEM_PROMPT } from "./system-prompt";
 import { formatScoutToolCall } from "./tool-formatter";
 import { createScoutTools } from "./tools";
 import type { ScoutDetails, ScoutInput } from "./types";
-
-/** Walk up from `startDir` to find `@aliou/pi-linkup` in node_modules and return relative path. */
-function findPiLinkup(startDir: string): string {
-  let dir = startDir;
-  const root = path.parse(dir).root;
-  while (dir !== root) {
-    const candidate = path.join(dir, "node_modules", "@aliou", "pi-linkup");
-    if (existsSync(candidate)) {
-      // Convert to relative path from startDir
-      const relativePath = path.relative(startDir, candidate);
-      // Ensure it starts with ./ or ../
-      return relativePath.startsWith(".") ? relativePath : `./${relativePath}`;
-    }
-    dir = path.dirname(dir);
-  }
-  throw new Error("@aliou/pi-linkup not found in any parent node_modules");
-}
 
 /** System prompt guidance for scout tool usage */
 export const SCOUT_GUIDANCE = `
@@ -283,8 +265,11 @@ Pass relevant skills (e.g., 'ios-26', 'drizzle-orm') to provide specialized cont
             model,
             systemPrompt: SCOUT_SYSTEM_PROMPT,
             skills: resolvedSkills,
-            extensionPaths: [findPiLinkup(import.meta.dirname)],
-            customTools: wrapToolDefinitionsWithTiming(createScoutTools()),
+            customTools: wrapToolDefinitionsWithTiming([
+              ...createScoutTools(),
+              webSearchTool,
+              webFetchTool,
+            ]),
             thinkingLevel: "off",
             logging: {
               enabled: true,
