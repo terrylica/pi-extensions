@@ -22,4 +22,5 @@ export interface ReadSessionDetails {
   error?: string;
   usage?: SubagentUsage;
   resolvedModel?: { provider: string; id: string };
+  totalDurationMs?: number;
 }

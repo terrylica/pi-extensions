@@ -8,6 +8,10 @@
 import { readdirSync, statSync } from "node:fs";
 import { join } from "node:path";
 import {
+  createExecutionTimer,
+  wrapToolDefinitionsWithTiming,
+} from "@aliou/pi-agent-kit";
+import {
   FailedToolCalls,
   MarkdownResponse,
   renderToolTextFallback,
@@ -163,6 +167,7 @@ Input the session ID (UUID or path) and what you want to learn about it.`,
       ctx: ExtensionContext,
     ) {
       const { sessionId, goal } = args;
+      const executionTimer = createExecutionTimer();
 
       let resolvedPath: string | null = null;
       let resolvedModel: { provider: string; id: string } | undefined;
@@ -181,6 +186,7 @@ Input the session ID (UUID or path) and what you want to learn about it.`,
             resolvedPath: undefined,
             toolCalls: [],
             error,
+            totalDurationMs: executionTimer.getDurationMs(),
           },
         };
       }
@@ -200,12 +206,15 @@ Input the session ID (UUID or path) and what you want to learn about it.`,
             resolvedPath,
             toolCalls: [],
             error,
+            totalDurationMs: executionTimer.getDurationMs(),
           },
         };
       }
 
       // Create session tools
-      const sessionTools = createSessionTools(session);
+      const sessionTools = wrapToolDefinitionsWithTiming(
+        createSessionTools(session),
+      );
 
       try {
         const model = resolveModel("openrouter", MODEL, ctx);
@@ -284,6 +293,7 @@ Input the session ID (UUID or path) and what you want to learn about it.`,
               aborted: true,
               usage: result.usage,
               resolvedModel,
+              totalDurationMs: result.totalDurationMs,
             },
           };
         }
@@ -300,6 +310,7 @@ Input the session ID (UUID or path) and what you want to learn about it.`,
               error: result.error,
               usage: result.usage,
               resolvedModel,
+              totalDurationMs: result.totalDurationMs,
             },
           };
         }
@@ -324,6 +335,7 @@ Input the session ID (UUID or path) and what you want to learn about it.`,
               error,
               usage: result.usage,
               resolvedModel,
+              totalDurationMs: result.totalDurationMs,
             },
           };
         }
@@ -338,6 +350,7 @@ Input the session ID (UUID or path) and what you want to learn about it.`,
             response: result.content,
             usage: result.usage,
             resolvedModel,
+            totalDurationMs: result.totalDurationMs,
           },
         };
       } finally {
@@ -382,13 +395,21 @@ Input the session ID (UUID or path) and what you want to learn about it.`,
         return renderToolTextFallback(result, theme);
       }
 
-      const { toolCalls, response, aborted, error, usage, resolvedModel } =
-        details;
+      const {
+        toolCalls,
+        response,
+        aborted,
+        error,
+        usage,
+        resolvedModel,
+        totalDurationMs,
+      } = details;
 
       const footer = new SubagentFooter(theme, {
         resolvedModel,
         usage,
         toolCalls,
+        totalDurationMs,
       });
 
       // Build fields based on state
@@ -421,36 +442,65 @@ const toolCallFormatter: ToolCallFormatter<SubagentToolCall> = (
 ) => {
   const { toolName, args } = tc;
 
+  let formatted: { label: string; detail?: string };
+
   // Format tool calls by name
   switch (toolName) {
     case "get_session_overview":
-      return { label: "Overview" };
+      formatted = { label: "Overview" };
+      break;
 
     case "get_messages": {
       const role = args.role ? ` (${args.role})` : "";
       const limit = args.limit ? ` - ${args.limit} items` : "";
-      return { label: "Messages", detail: `${role}${limit}` };
+      formatted = { label: "Messages", detail: `${role}${limit}` };
+      break;
     }
 
     case "get_tool_calls": {
       const name = args.toolName ? String(args.toolName) : "unknown";
-      return { label: "Tool Calls", detail: name };
+      formatted = { label: "Tool Calls", detail: name };
+      break;
     }
 
     case "get_tool_results": {
       const name = args.toolName ? String(args.toolName) : "unknown";
-      return { label: "Tool Results", detail: name };
+      formatted = { label: "Tool Results", detail: name };
+      break;
     }
 
     case "get_compactions":
-      return { label: "Compactions" };
+      formatted = { label: "Compactions" };
+      break;
 
     case "find_messages": {
       const query = args.query ? ` "${String(args.query).slice(0, 30)}"` : "";
-      return { label: "Find", detail: query };
+      formatted = { label: "Find", detail: query };
+      break;
     }
 
     default:
-      return { label: toolName };
+      formatted = { label: toolName };
+      break;
   }
+
+  return appendDurationToDetail(formatted, tc.durationMs);
 };
+
+function appendDurationToDetail(
+  formatted: { label: string; detail?: string },
+  durationMs?: number,
+): { label: string; detail?: string } {
+  if (durationMs === undefined) return formatted;
+
+  const duration = formatDuration(durationMs);
+  return {
+    ...formatted,
+    detail: formatted.detail ? `${formatted.detail} · ${duration}` : duration,
+  };
+}
+
+function formatDuration(durationMs: number): string {
+  if (durationMs < 1000) return `${durationMs}ms`;
+  return `${(durationMs / 1000).toFixed(2)}s`;
+}
