@@ -9,11 +9,6 @@
       url = "github:cachix/git-hooks.nix";
       inputs.nixpkgs.follows = "nixpkgs";
     };
-
-    treefmt-nix = {
-      url = "github:numtide/treefmt-nix";
-      inputs.nixpkgs.follows = "nixpkgs";
-    };
   };
 
   outputs =
@@ -26,34 +21,16 @@
 
       imports = [
         inputs.git-hooks-nix.flakeModule
-        inputs.treefmt-nix.flakeModule
       ];
 
       perSystem =
         { config, pkgs, ... }:
         {
-          treefmt.config = {
-            programs.biome = {
-              enable = true;
-              includes = [
-                "*.json"
-                "*.ts"
-              ];
-              settings = {
-                formatter = {
-                  indentStyle = "space";
-                  indentWidth = 2;
-                };
-              };
-            };
-          };
-
           pre-commit.settings.hooks = {
-            treefmt.enable = true;
             biome-check = {
               enable = true;
               name = "biome check";
-              entry = "${pkgs.biome}/bin/biome check --write";
+              entry = "node_modules/.bin/biome check --write";
               files = "\\.(ts|tsx|json)$";
               pass_filenames = false;
             };
