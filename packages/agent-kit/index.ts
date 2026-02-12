@@ -34,6 +34,19 @@ export {
 } from "./logging";
 // Model resolution
 export { resolveModel } from "./model-resolver";
+// Timing
+export {
+  createExecutionTimer,
+  markExecutionEnd,
+  markExecutionStart,
+  type TimedExecution,
+} from "./timing";
+// Tool wrappers
+export {
+  type ToolTimingMeta,
+  type WrapToolDefinitionsWithTimingOptions,
+  wrapToolDefinitionsWithTiming,
+} from "./tool-wrappers";
 // Types
 export type {
   BaseSubagentDetails,

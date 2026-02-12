@@ -9,6 +9,7 @@ export interface LlmTelemetryData {
     totalCost?: number;
   };
   toolCalls?: Array<{ status: "running" | "done" | "error" }>;
+  totalDurationMs?: number;
 }
 
 export class ToolLlmTelemetryFooter implements Component {
@@ -29,7 +30,7 @@ export class ToolLlmTelemetryFooter implements Component {
 
   render(width: number): string[] {
     const th = this.theme;
-    const { resolvedModel, usage, toolCalls } = this.data;
+    const { resolvedModel, usage, toolCalls, totalDurationMs } = this.data;
     const parts: string[] = [];
 
     if (resolvedModel) {
@@ -42,6 +43,10 @@ export class ToolLlmTelemetryFooter implements Component {
 
     if (usage?.totalCost !== undefined && usage.totalCost > 0) {
       parts.push(formatCost(usage.totalCost));
+    }
+
+    if (totalDurationMs !== undefined) {
+      parts.push(formatDuration(totalDurationMs));
     }
 
     const totalCalls = toolCalls?.length ?? 0;
@@ -67,4 +72,12 @@ function formatCost(cost: number): string {
   if (cost < 0.01) return "<$0.01";
   if (cost < 1) return `$${cost.toFixed(4)}`;
   return `$${cost.toFixed(2)}`;
+}
+
+function formatDuration(durationMs: number): string {
+  if (durationMs < 1000) return `${durationMs}ms`;
+  if (durationMs < 60_000) return `${(durationMs / 1000).toFixed(2)}s`;
+  const minutes = Math.floor(durationMs / 60_000);
+  const seconds = ((durationMs % 60_000) / 1000).toFixed(1);
+  return `${minutes}m ${seconds}s`;
 }

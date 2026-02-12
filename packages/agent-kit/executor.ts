@@ -16,6 +16,11 @@ import {
   SettingsManager,
 } from "@mariozechner/pi-coding-agent";
 import { generateRunId } from "./logging/paths";
+import {
+  createExecutionTimer,
+  markExecutionEnd,
+  markExecutionStart,
+} from "./timing";
 import type {
   OnTextUpdate,
   OnToolUpdate,
@@ -98,6 +103,8 @@ export async function executeSubagent(
     runId = generateRunId(config.name);
   }
 
+  const executionTimer = createExecutionTimer();
+
   const agentDir = getAgentDir();
   const settingsManager = SettingsManager.create(ctx.cwd, agentDir);
   const resourceLoader = new DefaultResourceLoader({
@@ -176,6 +183,7 @@ export async function executeSubagent(
         args: event.args ?? {},
         status: "running",
       };
+      markExecutionStart(toolCall);
       toolCalls.set(event.toolCallId, toolCall);
       onToolUpdate?.([...toolCalls.values()]);
       logger?.logToolStart(toolCall).catch(() => {});
@@ -200,6 +208,7 @@ export async function executeSubagent(
       if (existing) {
         existing.status = event.isError ? "error" : "done";
         existing.result = event.result;
+        markExecutionEnd(existing);
         if (event.isError && event.result) {
           existing.error =
             typeof event.result === "string"
@@ -252,6 +261,7 @@ export async function executeSubagent(
         content: "",
         aborted: true,
         toolCalls: [],
+        totalDurationMs: executionTimer.getDurationMs(),
         runId,
         usage,
       };
@@ -307,6 +317,7 @@ export async function executeSubagent(
     content: cleanedContent,
     aborted,
     toolCalls: [...toolCalls.values()],
+    totalDurationMs: executionTimer.getDurationMs(),
     error,
     runId,
     usage,
