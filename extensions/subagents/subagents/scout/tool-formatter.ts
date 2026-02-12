@@ -29,23 +29,31 @@ export function formatScoutToolCall(
 ): FormattedToolCall {
   const { toolName, args } = toolCall;
 
+  let formatted: FormattedToolCall;
+
   switch (toolName) {
     case "linkup_web_fetch": {
       const url = args.url as string | undefined;
       if (url) {
         try {
           const parsed = new URL(url);
-          return { label: "Fetch", detail: parsed.hostname + parsed.pathname };
+          formatted = {
+            label: "Fetch",
+            detail: parsed.hostname + parsed.pathname,
+          };
         } catch {
-          return { label: "Fetch", detail: url };
+          formatted = { label: "Fetch", detail: url };
         }
+      } else {
+        formatted = { label: "Fetch" };
       }
-      return { label: "Fetch" };
+      break;
     }
 
     case "linkup_web_search": {
       const query = args.query as string | undefined;
-      return { label: "Search", detail: query ? `'${query}'` : undefined };
+      formatted = { label: "Search", detail: query ? `'${query}'` : undefined };
+      break;
     }
 
     case "github_content": {
@@ -64,9 +72,11 @@ export function formatScoutToolCall(
           // Not a URL, use as-is
         }
         const detail = path ? `${repoName}/${path}` : repoName;
-        return { label: "Content", detail };
+        formatted = { label: "Content", detail };
+      } else {
+        formatted = { label: "Content" };
       }
-      return { label: "Content" };
+      break;
     }
 
     case "github_search": {
@@ -76,16 +86,16 @@ export function formatScoutToolCall(
       if (repo && detail) {
         detail += ` in ${repo}`;
       }
-      return { label: "Code Search", detail };
+      formatted = { label: "Code Search", detail };
+      break;
     }
 
     case "github_commits": {
       const repo = args.repo as string | undefined;
       const sha = args.sha as string | undefined;
       if (sha) {
-        return { label: "Diff", detail: sha.slice(0, 7) };
-      }
-      if (repo) {
+        formatted = { label: "Diff", detail: sha.slice(0, 7) };
+      } else if (repo) {
         // Extract owner/repo from URL or use as-is
         let repoName = repo;
         try {
@@ -97,9 +107,11 @@ export function formatScoutToolCall(
         } catch {
           // Not a URL, use as-is
         }
-        return { label: "Commits", detail: repoName };
+        formatted = { label: "Commits", detail: repoName };
+      } else {
+        formatted = { label: "Commits" };
       }
-      return { label: "Commits" };
+      break;
     }
 
     case "github_issue": {
@@ -117,9 +129,11 @@ export function formatScoutToolCall(
         } catch {
           // Not a URL, use as-is
         }
-        return { label: "Issue", detail: `${repoName}#${number}` };
+        formatted = { label: "Issue", detail: `${repoName}#${number}` };
+      } else {
+        formatted = { label: "Issue" };
       }
-      return { label: "Issue" };
+      break;
     }
 
     case "github_issues": {
@@ -146,9 +160,11 @@ export function formatScoutToolCall(
         }
         const detail =
           filters.length > 0 ? `${repoName} (${filters.join(", ")})` : repoName;
-        return { label: "Issues", detail };
+        formatted = { label: "Issues", detail };
+      } else {
+        formatted = { label: "Issues" };
       }
-      return { label: "Issues" };
+      break;
     }
 
     case "github_pr_diff": {
@@ -165,9 +181,11 @@ export function formatScoutToolCall(
         } catch {
           // Not a URL, use as-is
         }
-        return { label: "PR Diff", detail: `${repoName}#${number}` };
+        formatted = { label: "PR Diff", detail: `${repoName}#${number}` };
+      } else {
+        formatted = { label: "PR Diff" };
       }
-      return { label: "PR Diff" };
+      break;
     }
 
     case "github_pr_reviews": {
@@ -184,9 +202,11 @@ export function formatScoutToolCall(
         } catch {
           // Not a URL, use as-is
         }
-        return { label: "PR Reviews", detail: `${repoName}#${number}` };
+        formatted = { label: "PR Reviews", detail: `${repoName}#${number}` };
+      } else {
+        formatted = { label: "PR Reviews" };
       }
-      return { label: "PR Reviews" };
+      break;
     }
 
     case "github_compare": {
@@ -204,9 +224,14 @@ export function formatScoutToolCall(
         } catch {
           // Not a URL, use as-is
         }
-        return { label: "Compare", detail: `${repoName} ${base}...${head}` };
+        formatted = {
+          label: "Compare",
+          detail: `${repoName} ${base}...${head}`,
+        };
+      } else {
+        formatted = { label: "Compare" };
       }
-      return { label: "Compare" };
+      break;
     }
 
     case "list_user_repos": {
@@ -225,22 +250,47 @@ export function formatScoutToolCall(
         if (filters.length > 0) {
           detail += ` (${filters.join(", ")})`;
         }
-        return { label: "List Repos", detail };
+        formatted = { label: "List Repos", detail };
+      } else {
+        formatted = { label: "List Repos" };
       }
-      return { label: "List Repos" };
+      break;
     }
 
     case "download_gist": {
       const gist = args.gist as string | undefined;
-      return { label: "Download Gist", detail: gist };
+      formatted = { label: "Download Gist", detail: gist };
+      break;
     }
 
     case "upload_gist": {
       const gist = args.gist as string | undefined;
-      return { label: "Upload Gist", detail: gist };
+      formatted = { label: "Upload Gist", detail: gist };
+      break;
     }
 
     default:
-      return { label: toolName };
+      formatted = { label: toolName };
+      break;
   }
+
+  return appendDurationToDetail(formatted, toolCall.durationMs);
+}
+
+function appendDurationToDetail(
+  formatted: FormattedToolCall,
+  durationMs?: number,
+): FormattedToolCall {
+  if (durationMs === undefined) return formatted;
+
+  const duration = formatDuration(durationMs);
+  return {
+    ...formatted,
+    detail: formatted.detail ? `${formatted.detail} · ${duration}` : duration,
+  };
+}
+
+function formatDuration(durationMs: number): string {
+  if (durationMs < 1000) return `${durationMs}ms`;
+  return `${(durationMs / 1000).toFixed(2)}s`;
 }

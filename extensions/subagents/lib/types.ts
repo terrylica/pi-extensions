@@ -49,6 +49,12 @@ export interface SubagentToolCall {
   toolName: string;
   args: Record<string, unknown>;
   status: "running" | "done" | "error";
+  /** Epoch ms when tool execution started */
+  startedAt?: number;
+  /** Epoch ms when tool execution ended */
+  endedAt?: number;
+  /** Duration in milliseconds (set when ended) */
+  durationMs?: number;
   result?: unknown;
   error?: string;
   /** Partial result from tool updates (for progress display) */
@@ -92,6 +98,9 @@ export interface SubagentResult {
 
   /** Final tool call states */
   toolCalls: SubagentToolCall[];
+
+  /** Total subagent execution duration in milliseconds */
+  totalDurationMs: number;
 
   /** Error message if the subagent failed */
   error?: string;
@@ -147,6 +156,8 @@ export interface SubagentResponseDetails {
   usage?: SubagentUsage;
   /** Resolved model used for this run (provider + model id) */
   resolvedModel?: { provider: string; id: string };
+  /** Total subagent execution duration in milliseconds */
+  totalDurationMs?: number;
 }
 
 /**

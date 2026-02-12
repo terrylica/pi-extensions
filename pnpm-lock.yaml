@@ -186,6 +186,9 @@ importers:
 
   extensions/subagents:
     dependencies:
+      '@aliou/pi-agent-kit':
+        specifier: workspace:^
+        version: link:../../packages/agent-kit
       '@aliou/pi-linkup':
         specifier: ^0.6.2
         version: 0.6.2(@mariozechner/pi-ai@0.52.9(ws@8.19.0)(zod@3.25.76))(@mariozechner/pi-coding-agent@0.52.9(ws@8.19.0)(zod@3.25.76))

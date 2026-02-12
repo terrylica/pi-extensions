@@ -8,6 +8,10 @@
 import { existsSync } from "node:fs";
 import path from "node:path";
 import {
+  createExecutionTimer,
+  wrapToolDefinitionsWithTiming,
+} from "@aliou/pi-agent-kit";
+import {
   createRenderCache,
   FailedToolCalls,
   MarkdownResponse,
@@ -196,6 +200,7 @@ Pass relevant skills (e.g., 'ios-26', 'drizzle-orm') to provide specialized cont
       ctx: ExtensionContext,
     ) {
       const { url, query, repo, prompt, skills: skillNames } = args;
+      const executionTimer = createExecutionTimer();
 
       // Resolve skills if provided
       let resolvedSkills: Skill[] = [];
@@ -224,6 +229,7 @@ Pass relevant skills (e.g., 'ios-26', 'drizzle-orm') to provide specialized cont
               notFoundSkills.length > 0 ? notFoundSkills : undefined,
             toolCalls: [],
             error,
+            totalDurationMs: executionTimer.getDurationMs(),
           },
         };
       }
@@ -273,7 +279,7 @@ Pass relevant skills (e.g., 'ios-26', 'drizzle-orm') to provide specialized cont
             systemPrompt: SCOUT_SYSTEM_PROMPT,
             skills: resolvedSkills,
             extensionPaths: [findPiLinkup(import.meta.dirname)],
-            customTools: createScoutTools(),
+            customTools: wrapToolDefinitionsWithTiming(createScoutTools()),
             thinkingLevel: "off",
             logging: {
               enabled: true,
@@ -344,6 +350,7 @@ Pass relevant skills (e.g., 'ios-26', 'drizzle-orm') to provide specialized cont
               aborted: true,
               usage: result.usage,
               resolvedModel,
+              totalDurationMs: result.totalDurationMs,
             },
           };
         }
@@ -367,6 +374,7 @@ Pass relevant skills (e.g., 'ios-26', 'drizzle-orm') to provide specialized cont
               error: result.error,
               usage: result.usage,
               resolvedModel,
+              totalDurationMs: result.totalDurationMs,
             },
           };
         }
@@ -396,6 +404,7 @@ Pass relevant skills (e.g., 'ios-26', 'drizzle-orm') to provide specialized cont
               error,
               usage: result.usage,
               resolvedModel,
+              totalDurationMs: result.totalDurationMs,
             },
           };
         }
@@ -468,6 +477,7 @@ Pass relevant skills (e.g., 'ios-26', 'drizzle-orm') to provide specialized cont
             response: result.content,
             usage: result.usage,
             resolvedModel,
+            totalDurationMs: result.totalDurationMs,
           },
         };
       } finally {
@@ -521,13 +531,14 @@ Pass relevant skills (e.g., 'ios-26', 'drizzle-orm') to provide specialized cont
         error,
         usage,
         resolvedModel,
+        totalDurationMs,
       } = details;
 
       const renderKey = _renderKey ?? "_default_";
       const cached = renderCache.get(renderKey);
 
       // Footer - reuse or create
-      const footerData = { resolvedModel, usage, toolCalls };
+      const footerData = { resolvedModel, usage, toolCalls, totalDurationMs };
       let footer: SubagentFooter;
       if (cached) {
         footer = cached.footer;
