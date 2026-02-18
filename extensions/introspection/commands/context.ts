@@ -208,8 +208,10 @@ function buildContent(
   // Context details
   const contextLines: string[] = [];
   if (contextUsage) {
+    const tokensLabel =
+      contextUsage.tokens != null ? formatTokens(contextUsage.tokens) : "?";
     contextLines.push(
-      `${theme.fg("dim", "Tokens:")}     ${formatTokens(contextUsage.tokens)} / ${formatTokens(contextWindow)}`,
+      `${theme.fg("dim", "Tokens:")}     ${tokensLabel} / ${formatTokens(contextWindow)}`,
     );
   }
   contextLines.push(`${theme.fg("dim", "Turns:")}      ${usage.turnCount}`);
