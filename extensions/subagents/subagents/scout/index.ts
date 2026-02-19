@@ -50,7 +50,12 @@ import type {
 } from "@mariozechner/pi-coding-agent";
 import { Type } from "@sinclair/typebox";
 import { getSubagentModelConfig, isDebugEnabled } from "../../config";
-import { executeSubagent, resolveModel, resolveSkillsByName } from "../../lib";
+import {
+  executeSubagent,
+  resolveModel,
+  resolveSkillsByName,
+  shouldFailToolCallForModelIssue,
+} from "../../lib";
 import type { SubagentToolCall } from "../../lib/types";
 import { SCOUT_SYSTEM_PROMPT } from "./system-prompt";
 import { formatScoutToolCall } from "./tool-formatter";
@@ -363,6 +368,10 @@ Pass relevant skills (e.g., 'ios-26', 'drizzle-orm') to provide specialized cont
         }
 
         if (result.error) {
+          if (shouldFailToolCallForModelIssue(result)) {
+            throw new Error(result.error);
+          }
+
           return {
             content: [
               { type: "text" as const, text: `Error: ${result.error}` },

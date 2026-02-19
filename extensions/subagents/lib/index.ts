@@ -18,6 +18,11 @@ export {
   type ParsedGitHubUrl,
   parseGitHubUrl,
 } from "./clients";
+// Error classification
+export {
+  isModelAvailabilityError,
+  shouldFailToolCallForModelIssue,
+} from "./error-classification";
 // Core executor
 export { executeSubagent, filterThinkingTags } from "./executor";
 // Logging

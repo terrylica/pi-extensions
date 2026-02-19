@@ -103,6 +103,8 @@ export async function executeSubagent(
   let accumulated = "";
   let finalResponse = "";
   let aborted = false;
+  let stopReason: string | undefined;
+  let providerErrorMessage: string | undefined;
   const toolCalls = new Map<string, SubagentToolCall>();
 
   // Track tool execution state to capture only the final response
@@ -209,11 +211,18 @@ export async function executeSubagent(
       }
     }
 
-    // Capture usage from assistant messages at turn end
+    // Capture usage and stop reason from assistant messages at turn end
     if (event.type === "turn_end") {
       const msg = event.message;
       if (msg.role === "assistant") {
-        const assistantMsg = msg as AssistantMessage;
+        const assistantMsg = msg as AssistantMessage & {
+          stopReason?: string;
+          errorMessage?: string;
+        };
+
+        stopReason = assistantMsg.stopReason;
+        providerErrorMessage = assistantMsg.errorMessage;
+
         const msgUsage = assistantMsg.usage;
         if (msgUsage) {
           usage.inputTokens = (usage.inputTokens ?? 0) + msgUsage.input;
@@ -302,6 +311,8 @@ export async function executeSubagent(
     toolCalls: [...toolCalls.values()],
     totalDurationMs: executionTimer.getDurationMs(),
     error,
+    stopReason,
+    providerErrorMessage,
     runId,
     usage,
   };

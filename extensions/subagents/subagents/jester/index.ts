@@ -21,7 +21,11 @@ import type {
 } from "@mariozechner/pi-coding-agent";
 import { Type } from "@sinclair/typebox";
 import { getSubagentModelConfig, isDebugEnabled } from "../../config";
-import { executeSubagent, resolveModel } from "../../lib";
+import {
+  executeSubagent,
+  resolveModel,
+  shouldFailToolCallForModelIssue,
+} from "../../lib";
 import type { SubagentToolCall } from "../../lib/types";
 import { JESTER_SYSTEM_PROMPT } from "./system-prompt";
 import type { JesterDetails, JesterInput } from "./types";
@@ -155,6 +159,10 @@ export function createJesterTool(): ToolDefinition<
         }
 
         if (result.error) {
+          if (shouldFailToolCallForModelIssue(result)) {
+            throw new Error(result.error);
+          }
+
           return {
             content: [
               { type: "text" as const, text: `Error: ${result.error}` },

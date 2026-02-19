@@ -36,6 +36,7 @@ import {
   executeSubagent,
   resolveModel,
   type SubagentToolCall,
+  shouldFailToolCallForModelIssue,
 } from "../../subagents/lib";
 import {
   createSessionTools,
@@ -299,6 +300,10 @@ Input the session ID (UUID or path) and what you want to learn about it.`,
         }
 
         if (result.error) {
+          if (shouldFailToolCallForModelIssue(result)) {
+            throw new Error(result.error);
+          }
+
           return {
             content: [{ type: "text", text: `Error: ${result.error}` }],
             details: {

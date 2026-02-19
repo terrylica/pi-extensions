@@ -105,6 +105,12 @@ export interface SubagentResult {
   /** Error message if the subagent failed */
   error?: string;
 
+  /** Final stop reason from the assistant turn (if available) */
+  stopReason?: string;
+
+  /** Provider-level error message from the assistant turn (if available) */
+  providerErrorMessage?: string;
+
   /** Unique run identifier */
   runId: string;
 
