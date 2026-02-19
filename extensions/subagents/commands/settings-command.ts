@@ -112,9 +112,20 @@ export function registerSubagentsSettings(pi: ExtensionAPI): void {
           modelValues.unshift(currentModel);
         }
 
+        const currentEnabled =
+          tabConfig?.subagents?.[name]?.enabled ??
+          resolved.subagents[name].enabled;
+
         return {
           label: `${ui.label} - ${ui.description}`,
           items: [
+            {
+              id: `subagents.${name}.enabled`,
+              label: "Enabled",
+              description: `Enable or disable ${ui.label}`,
+              currentValue: currentEnabled ? "enabled" : "disabled",
+              values: ["enabled", "disabled"],
+            },
             {
               id: `subagents.${name}.provider`,
               label: "Provider",
@@ -149,17 +160,25 @@ export function registerSubagentsSettings(pi: ExtensionAPI): void {
       config: SubagentsConfig,
     ): SubagentsConfig | null => {
       const updated = structuredClone(config);
+
+      if (id === "debug") {
+        updated.debug = newValue === "enabled";
+        return updated;
+      }
+
       if (!updated.subagents) updated.subagents = {};
 
       const parts = id.split(".");
       if (parts.length !== 3 || parts[0] !== "subagents") return null;
       const name = parts[1] as SubagentName;
-      const field = parts[2] as "provider" | "model";
+      const field = parts[2] as "provider" | "model" | "enabled";
 
       const existing = updated.subagents[name] ?? {};
       updated.subagents[name] = existing;
 
-      if (field === "provider") {
+      if (field === "enabled") {
+        existing.enabled = newValue === "enabled";
+      } else if (field === "provider") {
         const newProvider = newValue as SupportedProvider;
         existing.provider = newProvider;
         // Reset model to first available for the new provider

@@ -29,6 +29,7 @@ export type SubagentName = (typeof SUBAGENT_NAMES)[number];
 export interface SubagentModelConfig {
   provider?: SupportedProvider;
   model?: string;
+  enabled?: boolean;
 }
 
 export interface SubagentsConfig {
@@ -39,6 +40,7 @@ export interface SubagentsConfig {
 export interface ResolvedSubagentModelConfig {
   provider: SupportedProvider;
   model: string;
+  enabled: boolean;
 }
 
 export interface ResolvedSubagentsConfig {
@@ -49,18 +51,32 @@ export interface ResolvedSubagentsConfig {
 const DEFAULT_CONFIG: ResolvedSubagentsConfig = {
   debug: false,
   subagents: {
-    scout: { provider: "openrouter", model: "anthropic/claude-haiku-4.5" },
+    scout: {
+      provider: "openrouter",
+      model: "anthropic/claude-haiku-4.5",
+      enabled: true,
+    },
     lookout: {
       provider: "openrouter",
       model: "google/gemini-3-flash-preview",
+      enabled: true,
     },
-    oracle: { provider: "openrouter", model: "openai/gpt-5.2" },
+    oracle: { provider: "openrouter", model: "openai/gpt-5.2", enabled: true },
     reviewer: {
       provider: "openrouter",
       model: "anthropic/claude-sonnet-4.5",
+      enabled: true,
     },
-    jester: { provider: "openrouter", model: "anthropic/claude-haiku-4.5" },
-    worker: { provider: "openrouter", model: "anthropic/claude-haiku-4.5" },
+    jester: {
+      provider: "openrouter",
+      model: "anthropic/claude-haiku-4.5",
+      enabled: true,
+    },
+    worker: {
+      provider: "openrouter",
+      model: "anthropic/claude-haiku-4.5",
+      enabled: true,
+    },
   },
 };
 
@@ -81,4 +97,9 @@ export function getSubagentModelConfig(
 /** Whether debug logging is enabled for subagents. */
 export function isDebugEnabled(): boolean {
   return configLoader.getConfig().debug;
+}
+
+/** Whether a subagent is enabled. */
+export function isSubagentEnabled(name: SubagentName): boolean {
+  return configLoader.getConfig().subagents[name].enabled;
 }

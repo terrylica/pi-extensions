@@ -1,6 +1,14 @@
-import type { ExtensionAPI } from "@mariozechner/pi-coding-agent";
+import type {
+  ExtensionAPI,
+  ExtensionContext,
+} from "@mariozechner/pi-coding-agent";
 import { registerSubagentsSettings } from "./commands/settings-command";
-import { configLoader } from "./config";
+import {
+  configLoader,
+  isSubagentEnabled,
+  SUBAGENT_NAMES,
+  type SubagentName,
+} from "./config";
 import { createJesterTool, JESTER_GUIDANCE } from "./subagents/jester";
 import { createLookoutTool, LOOKOUT_GUIDANCE } from "./subagents/lookout";
 import { createOracleTool, ORACLE_GUIDANCE } from "./subagents/oracle";
@@ -49,16 +57,15 @@ When you pass skill names, the skill content is injected into the subagent's sys
 Use \`skills\` whenever the task involves a domain covered by an available skill. For example, when delegating iOS work to the worker, pass \`skills: ["ios-26"]\` instead of listing skill files in \`files\` or mentioning them in \`instructions\`.
 `;
 
-// Collect all subagent guidances
-const SUBAGENT_GUIDANCES = [
-  SCOUT_GUIDANCE,
-  LOOKOUT_GUIDANCE,
-  ORACLE_GUIDANCE,
-  REVIEWER_GUIDANCE,
-  JESTER_GUIDANCE,
-  WORKER_GUIDANCE,
-  SKILLS_GUIDANCE,
-];
+/** Mapping from subagent name to its guidance text. */
+const GUIDANCE_BY_NAME: Record<SubagentName, string> = {
+  scout: SCOUT_GUIDANCE,
+  lookout: LOOKOUT_GUIDANCE,
+  oracle: ORACLE_GUIDANCE,
+  reviewer: REVIEWER_GUIDANCE,
+  jester: JESTER_GUIDANCE,
+  worker: WORKER_GUIDANCE,
+};
 
 export default async function (pi: ExtensionAPI) {
   // Load config
@@ -76,7 +83,7 @@ export default async function (pi: ExtensionAPI) {
   // Register settings command
   registerSubagentsSettings(pi);
 
-  // Register subagent tools
+  // Always register all tools so they can be toggled on/off dynamically.
   pi.registerTool(createScoutTool());
   pi.registerTool(createLookoutTool());
   pi.registerTool(createOracleTool());
@@ -84,14 +91,20 @@ export default async function (pi: ExtensionAPI) {
   pi.registerTool(createJesterTool());
   pi.registerTool(createWorkerTool());
 
-  // Listen for cross-extension scout calls
+  // Listen for cross-extension scout calls (always registered)
   pi.events.on("scout:execute", (data: unknown) => {
     const payload = data as {
       input: { prompt: string; query?: string };
       resolve: (result: unknown) => void;
     };
 
-    const ctx: import("@mariozechner/pi-coding-agent").ExtensionContext = {
+    // Skip execution if scout is disabled
+    if (!isSubagentEnabled("scout")) {
+      payload.resolve(null);
+      return;
+    }
+
+    const ctx: ExtensionContext = {
       ui: {} as never,
       hasUI: false,
       cwd: process.cwd(),
@@ -121,11 +134,27 @@ export default async function (pi: ExtensionAPI) {
       });
   });
 
-  // Inject subagent guidance into system prompt
+  // Before each agent turn: sync active tools and guidance with current config.
   pi.on("before_agent_start", async (event) => {
-    const guidance = SUBAGENT_GUIDANCES.join("\n");
+    // Determine which subagent tools should be disabled
+    const disabledSubagents = new Set(
+      SUBAGENT_NAMES.filter((name) => !isSubagentEnabled(name)),
+    );
+
+    // Filter active tools: remove disabled subagents, keep everything else
+    const activeTools = pi
+      .getActiveTools()
+      .filter((tool) => !disabledSubagents.has(tool as SubagentName));
+    pi.setActiveTools(activeTools);
+
+    // Build guidance from enabled subagents only
+    const guidances = SUBAGENT_NAMES.filter(
+      (name) => !disabledSubagents.has(name),
+    ).map((name) => GUIDANCE_BY_NAME[name]);
+    guidances.push(SKILLS_GUIDANCE);
+
     return {
-      systemPrompt: `${event.systemPrompt}\n${guidance}`,
+      systemPrompt: `${event.systemPrompt}\n${guidances.join("\n")}`,
     };
   });
 }
