@@ -14,5 +14,10 @@
   },
   "peerDependencies": {
     "@mariozechner/pi-coding-agent": ">=0.51.0"
+  },
+  "peerDependenciesMeta": {
+    "@mariozechner/pi-coding-agent": {
+      "optional": true
+    }
   }
 }
