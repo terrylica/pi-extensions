@@ -1,30 +1,27 @@
+import { existsSync, mkdirSync, writeFileSync } from "node:fs";
+import { homedir } from "node:os";
+import { join } from "node:path";
 import type { ExtensionAPI } from "@mariozechner/pi-coding-agent";
-import { registerGuardrailsSettings } from "./commands/settings-command";
-import { configLoader } from "./config";
-import { setupGuardrailsHooks } from "./hooks";
 
-/**
- * Guardrails Extension
- *
- * Security hooks to prevent potentially dangerous operations:
- * - protect-env-files: Prevents access to .env files (except .example/.sample/.test)
- * - permission-gate: Prompts for confirmation on dangerous commands
- *
- * Toolchain features (preventBrew, preventPython, enforcePackageManager,
- * packageManager) have been moved to @aliou/pi-toolchain. Old configs
- * containing these fields are auto-migrated on first load.
- *
- * Configuration:
- * - Global: ~/.pi/agent/extensions/guardrails.json
- * - Project: .pi/extensions/guardrails.json
- * - Command: /guardrails:settings
- */
+const MARKER_DIR = join(homedir(), ".pi", "agent", "extensions", "migrations");
+const MARKER_FILE = join(MARKER_DIR, "guardrails-moved");
+
 export default async function (pi: ExtensionAPI) {
-  await configLoader.load();
-  const config = configLoader.getConfig();
+  if (existsSync(MARKER_FILE)) return;
 
-  if (!config.enabled) return;
+  pi.on("session_start", async (_event, ctx) => {
+    if (existsSync(MARKER_FILE)) return;
 
-  setupGuardrailsHooks(pi, config);
-  registerGuardrailsSettings(pi);
+    if (ctx.hasUI) {
+      ctx.ui.notify(
+        "@aliou/pi-guardrails has moved to its own repo. " +
+          "Run: pi install npm:@aliou/pi-guardrails -- " +
+          "then remove it from the pi-extensions package config.",
+        "warning",
+      );
+    }
+
+    mkdirSync(MARKER_DIR, { recursive: true });
+    writeFileSync(MARKER_FILE, new Date().toISOString());
+  });
 }

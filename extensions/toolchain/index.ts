@@ -1,45 +1,27 @@
-import {
-  createBashTool,
-  type ExtensionAPI,
-} from "@mariozechner/pi-coding-agent";
-import { setupBlockers } from "./blockers";
-import { registerToolchainSettings } from "./commands/settings-command";
-import { configLoader } from "./config";
-import { createSpawnHook } from "./rewriters";
+import { existsSync, mkdirSync, writeFileSync } from "node:fs";
+import { homedir } from "node:os";
+import { join } from "node:path";
+import type { ExtensionAPI } from "@mariozechner/pi-coding-agent";
 
-/**
- * Toolchain Extension
- *
- * Enforces opinionated toolchain preferences by transparently rewriting
- * commands where possible (via BashSpawnHook) or blocking when no rewrite
- * target exists (via tool_call event hooks).
- *
- * Configuration:
- * - Global: ~/.pi/agent/extensions/toolchain.json
- * - Project: .pi/extensions/toolchain.json
- */
+const MARKER_DIR = join(homedir(), ".pi", "agent", "extensions", "migrations");
+const MARKER_FILE = join(MARKER_DIR, "toolchain-moved");
+
 export default async function (pi: ExtensionAPI) {
-  await configLoader.load();
-  const config = configLoader.getConfig();
-  if (!config.enabled) return;
+  if (existsSync(MARKER_FILE)) return;
 
-  // Register settings command.
-  registerToolchainSettings(pi);
+  pi.on("session_start", async (_event, ctx) => {
+    if (existsSync(MARKER_FILE)) return;
 
-  // Register blockers first (tool_call event hooks).
-  // These run before the spawn hook and can block commands entirely.
-  setupBlockers(pi, config);
+    if (ctx.hasUI) {
+      ctx.ui.notify(
+        "@aliou/pi-toolchain has moved to its own repo. " +
+          "Run: pi install npm:@aliou/pi-toolchain -- " +
+          "then remove it from the pi-extensions package config.",
+        "warning",
+      );
+    }
 
-  // Register bash tool with spawn hook (command rewriting).
-  // Only if at least one rewriter feature is enabled.
-  const hasRewriters =
-    config.features.enforcePackageManager ||
-    config.features.rewritePython ||
-    config.features.gitRebaseEditor;
-
-  if (hasRewriters) {
-    const spawnHook = createSpawnHook(config);
-    const bashTool = createBashTool(process.cwd(), { spawnHook });
-    pi.registerTool({ ...bashTool });
-  }
+    mkdirSync(MARKER_DIR, { recursive: true });
+    writeFileSync(MARKER_FILE, new Date().toISOString());
+  });
 }

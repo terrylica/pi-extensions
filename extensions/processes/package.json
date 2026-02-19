@@ -1,17 +1,18 @@
 {
   "name": "@aliou/pi-processes",
-  "version": "0.4.4",
+  "version": "0.5.0",
   "type": "module",
   "private": false,
   "keywords": [
     "pi-package",
     "pi-extension",
     "pi",
-    "processes"
+    "processes",
+    "deprecated"
   ],
   "repository": {
     "type": "git",
-    "url": "https://github.com/aliou/pi-extensions"
+    "url": "https://github.com/aliou/pi-processes"
   },
   "pi": {
     "extensions": [
@@ -23,20 +24,8 @@
     "access": "public"
   },
   "files": [
-    "*.ts",
-    "commands",
-    "components",
-    "constants",
-    "hooks",
-    "tools",
-    "utils",
-    "README.md"
+    "*.ts"
   ],
-  "dependencies": {
-    "@aliou/pi-utils-settings": "workspace:*",
-    "@aliou/pi-utils-ui": "workspace:^",
-    "@sinclair/typebox": "^0.34.41"
-  },
   "peerDependencies": {
     "@mariozechner/pi-coding-agent": ">=0.51.0"
   }

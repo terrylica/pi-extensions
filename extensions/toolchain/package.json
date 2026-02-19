@@ -1,6 +1,6 @@
 {
   "name": "@aliou/pi-toolchain",
-  "version": "0.3.3",
+  "version": "0.4.0",
   "license": "MIT",
   "type": "module",
   "private": false,
@@ -8,12 +8,12 @@
     "pi-package",
     "pi-extension",
     "pi",
-    "toolchain"
+    "toolchain",
+    "deprecated"
   ],
   "repository": {
     "type": "git",
-    "url": "https://github.com/aliou/pi-extensions",
-    "directory": "extensions/toolchain"
+    "url": "https://github.com/aliou/pi-toolchain"
   },
   "pi": {
     "extensions": [
@@ -24,17 +24,8 @@
     "access": "public"
   },
   "files": [
-    "*.ts",
-    "rewriters",
-    "blockers",
-    "commands",
-    "utils",
-    "README.md"
+    "*.ts"
   ],
-  "dependencies": {
-    "@aliou/pi-utils-settings": "workspace:^",
-    "@aliou/sh": "^0.1.0"
-  },
   "peerDependencies": {
     "@mariozechner/pi-coding-agent": ">=0.51.0"
   }
