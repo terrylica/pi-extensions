@@ -1,8 +1,8 @@
 /**
  * /project:init command.
  *
- * Shows an interactive wizard that scans catalog/project in background,
- * calls scout for recommendations, and applies selections.
+ * Shows a multi-step wizard to configure packages, skills, and AGENTS.md
+ * for the current project.
  */
 
 import type { ExtensionAPI } from "@mariozechner/pi-coding-agent";
@@ -33,12 +33,11 @@ export function registerProjectInitCommand(pi: ExtensionAPI): void {
         return;
       }
 
-      // Wizard handles all loading, scanning, and scout calls internally
       const result = await showWizard(
-        pi,
         ctx,
         config.catalog,
         config.catalogDepth,
+        config.childProjectDepth,
       );
 
       if (!result) {
@@ -76,11 +75,11 @@ export function registerProjectInitCommand(pi: ExtensionAPI): void {
       }
 
       // Generate AGENTS.md via prompt injection
-      if (result.generateAgents) {
+      if (result.generateAgents && result.agentsDirs.length > 0) {
         const prompt = buildAgentsPrompt(
           result.stack,
           result.selectedEntries,
-          result.scoutAnalysis,
+          result.agentsDirs,
         );
         pi.sendUserMessage(prompt);
       }

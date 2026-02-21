@@ -4,7 +4,7 @@
  * Detects languages, frameworks, and tools from manifest files in cwd.
  */
 
-import { existsSync } from "node:fs";
+import { existsSync, readdirSync, statSync } from "node:fs";
 import { readFile } from "node:fs/promises";
 import { resolve } from "node:path";
 
@@ -138,4 +138,77 @@ export async function scanProject(cwd: string): Promise<ProjectStack> {
     tools: [...tools],
     summary: parts.length > 0 ? parts.join(" | ") : "No stack detected",
   };
+}
+
+/** Project marker files that indicate a directory is a project root. */
+const PROJECT_MARKERS = [
+  "package.json",
+  "Cargo.toml",
+  "go.mod",
+  "pyproject.toml",
+  "requirements.txt",
+  "Gemfile",
+  "Package.swift",
+  "build.gradle",
+  "pom.xml",
+  "flake.nix",
+];
+
+/** Directories to skip when scanning for child projects. */
+const SKIP_DIRS = new Set([
+  "node_modules",
+  ".git",
+  "dist",
+  "build",
+  "vendor",
+  ".next",
+  ".nuxt",
+  "target",
+  "__pycache__",
+]);
+
+function hasProjectMarker(dir: string): boolean {
+  return PROJECT_MARKERS.some((marker) => existsSync(resolve(dir, marker)));
+}
+
+/**
+ * Find child directories that look like project roots.
+ * Returns absolute paths, not including cwd itself.
+ */
+export function findChildProjects(cwd: string, maxDepth: number): string[] {
+  const results: string[] = [];
+  scanForProjects(cwd, results, 0, maxDepth);
+  return results.sort();
+}
+
+function scanForProjects(
+  dir: string,
+  results: string[],
+  depth: number,
+  maxDepth: number,
+): void {
+  if (depth >= maxDepth) return;
+
+  let entries: string[];
+  try {
+    entries = readdirSync(dir).filter((name) => {
+      if (name.startsWith(".") || SKIP_DIRS.has(name)) return false;
+      try {
+        return statSync(resolve(dir, name)).isDirectory();
+      } catch {
+        return false;
+      }
+    });
+  } catch {
+    return;
+  }
+
+  for (const name of entries) {
+    const childPath = resolve(dir, name);
+    if (hasProjectMarker(childPath)) {
+      results.push(childPath);
+    }
+    // Keep scanning deeper regardless (nested projects like packages/foo/bar/)
+    scanForProjects(childPath, results, depth + 1, maxDepth);
+  }
 }
