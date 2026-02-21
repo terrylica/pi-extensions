@@ -2,47 +2,126 @@
  * Handoff command - /handoff [goal]
  *
  * Creates a new session with extracted context from the current session.
- * The goal guides what context to extract. The user is shown the extracted
- * prompt in an editor for review before the new session is created.
+ * The goal guides what context to extract. Shows streaming extraction
+ * progress that can be toggled with Ctrl+O.
  */
 
-import { createRunLogger, type SubagentLogger } from "@aliou/pi-agent-kit";
-import { type Message, stream } from "@mariozechner/pi-ai";
-import type { ExtensionAPI } from "@mariozechner/pi-coding-agent";
-import { BorderedLoader } from "@mariozechner/pi-coding-agent";
+import type { ExtensionAPI, Theme } from "@mariozechner/pi-coding-agent";
+import { DynamicBorder } from "@mariozechner/pi-coding-agent";
 import {
-  extractFilesFromSessionEntries,
-  extractMentionedFiles,
-} from "../lib/context-extractor";
+  Container,
+  Loader,
+  matchesKey,
+  Spacer,
+  Text,
+  type TUI,
+} from "@mariozechner/pi-tui";
+import type { ExtractedHandoffContext } from "../lib/handoff";
+import { extractHandoffContext } from "../lib/handoff";
 import { writeHandoffMarker, writeHandoffSource } from "../lib/handoff-marker";
-import {
-  readCurrentSessionContent,
-  readRawSessionContent,
-} from "../lib/session-content-reader";
 
 /**
- * System prompt for the context extraction LLM call.
+ * Max characters to keep in the streaming buffer to avoid unbounded growth.
  */
-const EXTRACTION_SYSTEM_PROMPT = `You are a context extraction assistant. Given a conversation history and a goal for a new session, extract the FINAL STATE of what was accomplished.
+const MAX_STREAM_BUFFER = 20_000;
 
-CRITICAL: Focus on WHERE THINGS ENDED UP, not the journey. If something was planned then implemented, report it as IMPLEMENTED. If something was discussed then decided against, report the final decision. The new session needs to know the current state, not the full history.
+/**
+ * Custom component that shows a bordered loader with expandable streaming text.
+ * Collapsed: spinner + hint. Expanded: spinner + streaming extraction output.
+ * Toggle with Ctrl+O, cancel with Esc.
+ */
+class HandoffExtractionView extends Container {
+  private expanded = false;
+  private streamBuffer = "";
+  private loader: Loader;
+  private borderTop: DynamicBorder;
+  private borderBottom: DynamicBorder;
+  private streamText: Text;
+  private hintText: Text;
 
-Return your response in this exact format:
+  /** Called when the user presses Esc. Set by the factory. */
+  onCancel: (() => void) | undefined;
 
-## Relevant Files
+  constructor(tui: TUI, theme: Theme) {
+    super();
 
-List file paths relevant to the goal (that exist or were created), one per line prefixed with "- ".
+    const borderColor = (s: string) => theme.fg("border", s);
+    this.borderTop = new DynamicBorder(borderColor);
+    this.borderBottom = new DynamicBorder(borderColor);
 
-## Context
+    this.loader = new Loader(
+      tui,
+      (s: string) => theme.fg("accent", s),
+      (s: string) => theme.fg("muted", s),
+      "Extracting handoff context...",
+    );
+    this.loader.start();
 
-Summarize the FINAL STATE:
-- What IS implemented (not "was discussed" or "needs to be done")
-- Final decisions made (not alternatives that were rejected)
-- Current technical details (APIs, data structures, patterns IN USE)
-- What works and what is broken RIGHT NOW
-- Any remaining open questions or next steps
+    this.streamText = new Text("", 1, 0);
+    this.hintText = new Text(
+      theme.fg("dim", "  Ctrl+O to expand | Esc to cancel"),
+      0,
+      0,
+    );
 
-Be factual and specific. Prioritize the END of the conversation over the beginning.`;
+    this.rebuild();
+  }
+
+  private rebuild() {
+    this.clear();
+    this.addChild(this.borderTop);
+    this.addChild(this.loader);
+
+    if (this.expanded && this.streamBuffer) {
+      this.addChild(new Spacer(1));
+      this.addChild(this.streamText);
+    } else {
+      this.addChild(this.hintText);
+    }
+
+    this.addChild(new Spacer(1));
+    this.addChild(this.borderBottom);
+  }
+
+  handleInput(data: string) {
+    if (matchesKey(data, "escape")) {
+      this.onCancel?.();
+      return;
+    }
+    if (matchesKey(data, "ctrl+o")) {
+      this.toggleExpanded();
+      return;
+    }
+  }
+
+  toggleExpanded() {
+    this.expanded = !this.expanded;
+    this.rebuild();
+    this.invalidate();
+  }
+
+  appendText(chunk: string) {
+    this.streamBuffer += chunk;
+    if (this.streamBuffer.length > MAX_STREAM_BUFFER) {
+      this.streamBuffer = this.streamBuffer.slice(-MAX_STREAM_BUFFER);
+    }
+    this.streamText.setText(this.streamBuffer);
+    if (this.expanded) {
+      this.invalidate();
+    }
+  }
+
+  finish(message: string) {
+    this.loader.stop();
+    this.loader.setMessage(message);
+    this.rebuild();
+    this.invalidate();
+  }
+
+  dispose() {
+    this.loader.stop();
+  }
+}
 
 export function setupHandoffCommand(pi: ExtensionAPI) {
   pi.registerCommand("handoff", {
@@ -58,159 +137,73 @@ export function setupHandoffCommand(pi: ExtensionAPI) {
         return;
       }
 
-      const goal = args.trim();
+      // If no goal provided, prompt the user for one
+      let goal = args.trim();
       if (!goal) {
-        ctx.ui.notify(
-          "Usage: /handoff <goal for new session>\nExample: /handoff implement OAuth support for Linear API",
-          "error",
+        const input = await ctx.ui.input(
+          "Handoff goal",
+          "e.g. implement OAuth support for Linear API",
         );
-        return;
+        if (!input) {
+          return; // user pressed Esc
+        }
+        goal = input.trim();
+        if (!goal) {
+          ctx.ui.notify("No goal provided", "error");
+          return;
+        }
       }
 
-      // Create logger for debugging (uses same format as subagents)
-      let logger: SubagentLogger | null = null;
-      try {
-        logger = await createRunLogger(ctx.cwd, "handoff", true);
-      } catch {
-        // Logging is optional, continue without it
-      }
-
-      const log = (msg: string): Promise<void> =>
-        logger?.logEventRaw({ type: "handoff", message: msg }) ??
-        Promise.resolve();
-
-      await log(`Goal: ${goal}`);
-      await log(`Session ID: ${ctx.sessionManager.getSessionId()}`);
-
-      // Read session content (both formatted and raw)
-      await log("Reading session content...");
-      const sessionContent = readCurrentSessionContent(ctx.sessionManager);
-      if (!sessionContent) {
-        await log("ERROR: No session content");
-        await logger?.close();
-        ctx.ui.notify(
-          "No session content to hand off (ephemeral or empty session)",
-          "error",
-        );
-        return;
-      }
-      await log(`Session content: ${sessionContent.length} chars`);
-
-      const rawContent = readRawSessionContent(ctx.sessionManager);
-      await log(`Raw content: ${rawContent?.length ?? 0} chars`);
-
-      // Extract mentioned files from both text patterns and tool call arguments
-      await log("Extracting mentioned files...");
-      const filesFromText = extractMentionedFiles(sessionContent, ctx.cwd);
-      const filesFromTools = rawContent
-        ? extractFilesFromSessionEntries(rawContent, ctx.cwd)
-        : [];
-      const mentionedFiles = Array.from(
-        new Set([...filesFromText, ...filesFromTools]),
-      ).sort();
-      await log(`Found ${mentionedFiles.length} files`);
-
-      const currentSessionFile = ctx.sessionManager.getSessionFile();
       const parentSessionId = ctx.sessionManager.getSessionId() ?? "unknown";
+      const currentSessionFile = ctx.sessionManager.getSessionFile();
 
-      // Generate handoff prompt with a loader UI
-      const model = ctx.model;
-      await log(`Starting LLM extraction with model: ${model.name}`);
-
-      const extractedContent = await ctx.ui.custom<string | null>(
+      // Extract context with a streaming progress UI
+      const extracted = await ctx.ui.custom<ExtractedHandoffContext | null>(
         (tui, theme, _kb, done) => {
-          const loader = new BorderedLoader(
-            tui,
-            theme,
-            "Extracting handoff context...",
-          );
-          loader.onAbort = () => {
-            log("Aborted by user").catch(() => {});
-            done(null);
+          const view = new HandoffExtractionView(tui, theme);
+          const ac = new AbortController();
+          let finished = false;
+
+          const finishOnce = (result: ExtractedHandoffContext | null) => {
+            if (finished) return;
+            finished = true;
+            done(result);
           };
 
-          const doExtract = async () => {
-            await log("Getting API key...");
-            const apiKey = await ctx.modelRegistry.getApiKey(model);
-            await log("API key obtained");
-
-            const userMessage: Message = {
-              role: "user",
-              content: [
-                {
-                  type: "text",
-                  text: `## Goal for New Session\n\n${goal}\n\n## Available Files from Session\n\n${mentionedFiles.map((f) => `- ${f}`).join("\n") || "(none detected)"}\n\n## Session Content\n\n${sessionContent}`,
-                },
-              ],
-              timestamp: Date.now(),
-            };
-            await log(
-              `User message: ${JSON.stringify(userMessage.content).length} chars`,
-            );
-
-            await log("Starting stream...");
-            const eventStream = stream(
-              model,
-              {
-                systemPrompt: EXTRACTION_SYSTEM_PROMPT,
-                messages: [userMessage],
-              },
-              { apiKey, signal: loader.signal },
-            );
-
-            // Stream and log the response
-            let accumulated = "";
-            for await (const event of eventStream) {
-              if (event.type === "text_delta") {
-                accumulated += event.delta;
-                // Log delta to stream.log via logTextDelta
-                await logger?.logTextDelta(event.delta, accumulated);
-              }
-            }
-
-            const response = await eventStream.result();
-            await log(`Stream complete, stopReason: ${response.stopReason}`);
-
-            if (response.stopReason === "aborted") {
-              return null;
-            }
-
-            return response.content
-              .filter(
-                (c): c is { type: "text"; text: string } => c.type === "text",
-              )
-              .map((c) => c.text)
-              .join("\n");
+          view.onCancel = () => {
+            ac.abort();
+            view.finish("Cancelled.");
+            finishOnce(null);
           };
 
-          doExtract()
+          extractHandoffContext(
+            goal,
+            ctx,
+            (delta) => {
+              if (!finished) view.appendText(delta);
+            },
+            ac.signal,
+          )
             .then((result) => {
-              log(`Extraction complete: ${result?.length ?? 0} chars`).catch(
-                () => {},
-              );
-              done(result);
+              view.finish("Context extracted.");
+              finishOnce(result);
             })
             .catch((err) => {
-              const errorMsg = err instanceof Error ? err.message : String(err);
-              log(`ERROR: ${errorMsg}`).catch(() => {});
               console.error("Handoff extraction failed:", err);
-              done(null);
+              view.finish("Extraction failed.");
+              finishOnce(null);
             });
 
-          return loader;
+          return view;
         },
       );
 
-      if (extractedContent === null) {
-        await log("Extraction returned null (cancelled or error)");
-        await logger?.close();
+      if (extracted === null) {
         ctx.ui.notify("Handoff cancelled", "info");
         return;
       }
 
-      await log(`Extracted content: ${extractedContent.length} chars`);
-
-      await log("Creating new session...");
+      const { relevantInformation, relevantFiles } = extracted;
 
       // Create new session with parent tracking
       const newSessionResult = await ctx.newSession({
@@ -220,24 +213,23 @@ export function setupHandoffCommand(pi: ExtensionAPI) {
           if (currentSessionFile && newSessionId) {
             writeHandoffMarker(currentSessionFile, newSessionId, goal);
           }
-          if (extractedContent) {
-            writeHandoffSource(sm, parentSessionId, goal, extractedContent);
-          }
+          writeHandoffSource(
+            sm,
+            parentSessionId,
+            goal,
+            relevantInformation,
+            relevantFiles,
+          );
         },
       });
 
       if (newSessionResult.cancelled) {
-        await log("Session creation cancelled");
-        await logger?.close();
         ctx.ui.notify("Session creation cancelled", "info");
         return;
       }
 
       // Set just the goal in the editor -- context is in the custom entry
       ctx.ui.setEditorText(goal);
-
-      await log("Handoff complete");
-      await logger?.close();
 
       ctx.ui.notify("Handoff ready -- review and submit.", "info");
     },

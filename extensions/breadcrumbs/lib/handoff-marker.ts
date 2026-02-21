@@ -136,14 +136,15 @@ interface HandoffSourceMessage {
 
 /**
  * Register the handoff source message renderer.
- * Displays "Continuing from {sessionName}" for every entry with details.
+ * Collapsed: "Continuing from {sessionName}" header with hint.
+ * Expanded: header + full context content.
  */
 export function setupHandoffSourceRenderer(pi: ExtensionAPI) {
   pi.registerMessageRenderer<HandoffSourceDetails>(
     HANDOFF_SOURCE_CUSTOM_TYPE,
     (
       message: HandoffSourceMessage,
-      _options: MessageRenderOptions,
+      options: MessageRenderOptions,
       theme: Theme,
     ) => {
       const details = message.details;
@@ -152,13 +153,37 @@ export function setupHandoffSourceRenderer(pi: ExtensionAPI) {
         return undefined;
       }
 
+      const { expanded } = options;
       const parentSessionId = details.parentSessionId;
       const displayName = resolveSessionName(parentSessionId);
       const label = theme.fg("muted", "Continuing from ");
-      const displayText = `${label}${theme.fg("accent", displayName)}`;
+      const header = `${label}${theme.fg("accent", displayName)}`;
 
       const box = new Box(1, 1, (t) => theme.bg("customMessageBg", t));
-      box.addChild(new Text(displayText, 0, 0));
+      box.addChild(new Text(header, 0, 0));
+
+      if (expanded) {
+        // Show the full content below the header
+        const content =
+          typeof message.content === "string"
+            ? message.content
+            : Array.isArray(message.content)
+              ? message.content
+                  .filter(
+                    (c: { type: string; text?: string }) => c.type === "text",
+                  )
+                  .map((c: { type: string; text?: string }) => c.text ?? "")
+                  .join("")
+              : "";
+
+        if (content) {
+          box.addChild(new Text("", 0, 0)); // spacer
+          box.addChild(new Text(theme.fg("muted", content), 0, 0));
+        }
+      } else {
+        box.addChild(new Text(theme.fg("dim", "Press Ctrl+O to expand"), 0, 0));
+      }
+
       return box;
     },
   );
@@ -173,15 +198,21 @@ export function setupHandoffSourceRenderer(pi: ExtensionAPI) {
  * @param sm - The new session's SessionManager
  * @param parentSessionId - The ID of the session being handed off from
  * @param goal - The handoff goal
- * @param extractedContext - The extracted context from the parent session
+ * @param relevantInformation - Summarized context from the parent session
+ * @param relevantFiles - File paths relevant to the goal
  */
 export function writeHandoffSource(
   sm: SessionManager,
   parentSessionId: string,
   goal: string,
-  extractedContext: string,
+  relevantInformation: string,
+  relevantFiles: string[],
 ): void {
-  const content = `Continuing from session ${parentSessionId}.\n\nThe context below is a summary. If you need more details, read the parent session:\n\nread_session({ sessionId: "${parentSessionId}", goal: "Get the last assistant message with the full plan and context" })\n\n${extractedContext}`;
+  const filesSection =
+    relevantFiles.length > 0
+      ? `\n\n## Relevant Files\n\n${relevantFiles.map((f) => `- ${f}`).join("\n")}`
+      : "";
+  const content = `Continuing from session ${parentSessionId}.\n\nThe context below is a summary. If you need more details, read the parent session:\n\nread_session({ sessionId: "${parentSessionId}", goal: "Get the last assistant message with the full plan and context" })\n\n## Context\n\n${relevantInformation}${filesSection}`;
   sm.appendCustomMessageEntry<HandoffSourceDetails>(
     HANDOFF_SOURCE_CUSTOM_TYPE,
     content,

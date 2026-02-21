@@ -31,7 +31,7 @@ type HandoffParamsType = {
 interface HandoffDetails {
   goal: string;
   parentSessionId: string;
-  filesExtracted: number;
+  relevantFiles: string[];
   contextLength: number;
   error?: string;
 }
@@ -82,7 +82,7 @@ Example goals:
     async execute(
       _toolCallId: string,
       params: HandoffParamsType,
-      _signal: AbortSignal | undefined,
+      signal: AbortSignal | undefined,
       _onUpdate: unknown,
       ctx: ExtensionContext,
     ): Promise<AgentToolResult<HandoffDetails>> {
@@ -90,23 +90,27 @@ Example goals:
       const parentSessionId = ctx.sessionManager.getSessionId() ?? "unknown";
 
       try {
-        const { extractedContext, filesExtracted, contextLength } =
-          await extractHandoffContext(goal, ctx);
+        const { relevantInformation, relevantFiles } =
+          await extractHandoffContext(goal, ctx, undefined, signal);
 
         // The tool cannot call ctx.newSession (only available in command context).
         // Instead, return the extracted context and instruct the user to run /handoff.
+        const filesSection =
+          relevantFiles.length > 0
+            ? `\n\n## Relevant Files\n\n${relevantFiles.map((f) => `- ${f}`).join("\n")}`
+            : "";
         return {
           content: [
             {
               type: "text",
-              text: `Handoff context extracted (${filesExtracted} files, ${contextLength} chars). Ask the user to run \`/handoff ${goal}\` to create a new session with the context below.\n\n---\n\n${extractedContext}`,
+              text: `Handoff context extracted (${relevantFiles.length} files, ${relevantInformation.length} chars). Ask the user to run \`/handoff ${goal}\` to create a new session with the context below.\n\n---\n\n${relevantInformation}${filesSection}`,
             },
           ],
           details: {
             goal,
             parentSessionId,
-            filesExtracted,
-            contextLength,
+            relevantFiles,
+            contextLength: relevantInformation.length,
           },
         };
       } catch (err) {
@@ -116,7 +120,7 @@ Example goals:
           details: {
             goal,
             parentSessionId,
-            filesExtracted: 0,
+            relevantFiles: [],
             contextLength: 0,
             error,
           },
@@ -171,7 +175,7 @@ Example goals:
         theme.fg("success", `Context extracted for handoff`),
         theme.fg(
           "muted",
-          `  ${details.filesExtracted} files, ${details.contextLength} chars of context`,
+          `  ${details.relevantFiles.length} files, ${details.contextLength} chars of context`,
         ),
         theme.fg("muted", `  Goal: ${details.goal}`),
       ];
