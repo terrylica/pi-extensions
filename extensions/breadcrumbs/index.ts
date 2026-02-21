@@ -3,9 +3,9 @@ import { setupSessionCommands } from "./commands";
 import { configLoader } from "./config";
 import { setupProtectSessionsDirHook } from "./hooks/protect-sessions-dir";
 import {
-  setupHandoffMarkerRenderer,
-  setupHandoffSourceRenderer,
-} from "./lib/handoff-marker";
+  setupSessionLinkMarkerRenderer,
+  setupSessionLinkSourceRenderer,
+} from "./lib/session-link";
 import {
   FIND_SESSIONS_GUIDANCE,
   HANDOFF_GUIDANCE,
@@ -18,8 +18,8 @@ export default async function (pi: ExtensionAPI) {
   const config = configLoader.getConfig();
 
   setupProtectSessionsDirHook(pi);
-  setupHandoffMarkerRenderer(pi);
-  setupHandoffSourceRenderer(pi);
+  setupSessionLinkMarkerRenderer(pi);
+  setupSessionLinkSourceRenderer(pi);
   setupSessionTools(pi, { handoffTool: config.handoffTool });
   setupSessionCommands(pi);
 

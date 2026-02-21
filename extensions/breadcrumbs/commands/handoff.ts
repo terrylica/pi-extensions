@@ -18,7 +18,10 @@ import {
 } from "@mariozechner/pi-tui";
 import type { ExtractedHandoffContext } from "../lib/handoff";
 import { extractHandoffContext } from "../lib/handoff";
-import { writeHandoffMarker, writeHandoffSource } from "../lib/handoff-marker";
+import {
+  writeSessionLinkMarker,
+  writeSessionLinkSource,
+} from "../lib/session-link";
 
 /**
  * Max characters to keep in the streaming buffer to avoid unbounded growth.
@@ -205,20 +208,32 @@ export function setupHandoffCommand(pi: ExtensionAPI) {
 
       const { relevantInformation, relevantFiles } = extracted;
 
+      // Build the content for the handoff source entry
+      const filesSection =
+        relevantFiles.length > 0
+          ? `\n\n## Relevant Files\n\n${relevantFiles.map((f) => `- ${f}`).join("\n")}`
+          : "";
+      const sourceContent = `Continuing from session ${parentSessionId}.\n\nThe context below is a summary. If you need more details, read the parent session:\n\nread_session({ sessionId: "${parentSessionId}", goal: "Get the last assistant message with the full plan and context" })\n\n## Context\n\n${relevantInformation}${filesSection}`;
+
       // Create new session with parent tracking
       const newSessionResult = await ctx.newSession({
         parentSession: currentSessionFile,
         setup: async (sm) => {
           const newSessionId = sm.getSessionId();
           if (currentSessionFile && newSessionId) {
-            writeHandoffMarker(currentSessionFile, newSessionId, goal);
+            writeSessionLinkMarker(
+              currentSessionFile,
+              newSessionId,
+              goal,
+              "handoff",
+            );
           }
-          writeHandoffSource(
+          writeSessionLinkSource(
             sm,
             parentSessionId,
             goal,
-            relevantInformation,
-            relevantFiles,
+            "handoff",
+            sourceContent,
           );
         },
       });
