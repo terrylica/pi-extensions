@@ -2,7 +2,7 @@
  * Format scout tool calls for display.
  */
 
-import type { SubagentToolCall } from "../../lib/types";
+import { getToolResultDetails, type SubagentToolCall } from "../../lib/types";
 
 export interface FormattedToolCall {
   label: string;
@@ -13,8 +13,8 @@ export interface FormattedToolCall {
  * Format a scout tool call for display.
  *
  * Examples:
- * - linkup_web_fetch: "Fetch example.com/path"
- * - linkup_web_search: "Search 'typescript best practices'"
+ * - web_fetch: "Fetch example.com/path via exa"
+ * - web_search: "Search 'typescript best practices' via exa"
  * - github_content: "Content owner/repo/path"
  * - github_search: "Search 'query'"
  * - github_commits: "Commits owner/repo" or "Diff abc1234"
@@ -32,27 +32,35 @@ export function formatScoutToolCall(
   let formatted: FormattedToolCall;
 
   switch (toolName) {
-    case "linkup_web_fetch": {
+    case "web_fetch": {
       const url = args.url as string | undefined;
+      const provider = getProviderFromToolCall(toolCall);
       if (url) {
         try {
           const parsed = new URL(url);
           formatted = {
             label: "Fetch",
-            detail: parsed.hostname + parsed.pathname,
+            detail: withProvider(parsed.hostname + parsed.pathname, provider),
           };
         } catch {
-          formatted = { label: "Fetch", detail: url };
+          formatted = { label: "Fetch", detail: withProvider(url, provider) };
         }
       } else {
-        formatted = { label: "Fetch" };
+        formatted = {
+          label: "Fetch",
+          detail: withProvider(undefined, provider),
+        };
       }
       break;
     }
 
-    case "linkup_web_search": {
+    case "web_search": {
       const query = args.query as string | undefined;
-      formatted = { label: "Search", detail: query ? `'${query}'` : undefined };
+      const provider = getProviderFromToolCall(toolCall);
+      formatted = {
+        label: "Search",
+        detail: withProvider(query ? `'${query}'` : undefined, provider),
+      };
       break;
     }
 
@@ -275,6 +283,22 @@ export function formatScoutToolCall(
   }
 
   return appendDurationToDetail(formatted, toolCall.durationMs);
+}
+
+function getProviderFromToolCall(
+  toolCall: SubagentToolCall,
+): string | undefined {
+  const details = getToolResultDetails(toolCall.result);
+  return typeof details?.provider === "string" ? details.provider : undefined;
+}
+
+function withProvider(
+  detail: string | undefined,
+  provider: string | undefined,
+): string | undefined {
+  if (!provider) return detail;
+  if (!detail) return `via ${provider}`;
+  return `${detail} via ${provider}`;
 }
 
 function appendDurationToDetail(

@@ -9,23 +9,6 @@ import {
   createExecutionTimer,
   wrapToolDefinitionsWithTiming,
 } from "@aliou/pi-agent-kit";
-import { webFetchTool, webSearchTool } from "@aliou/pi-linkup/tools";
-
-// Fail-fast: ensure Linkup tools resolved correctly from @aliou/pi-linkup/tools.
-// If these assertions fire, the installed version likely lacks the "./tools" export
-// (requires >=0.7.1).
-if (!webSearchTool || webSearchTool.name !== "linkup_web_search") {
-  throw new Error(
-    `[scout] webSearchTool not found or has unexpected name (got ${webSearchTool?.name ?? "undefined"}). ` +
-      "Ensure @aliou/pi-linkup >=0.7.1 is installed.",
-  );
-}
-if (!webFetchTool || webFetchTool.name !== "linkup_web_fetch") {
-  throw new Error(
-    `[scout] webFetchTool not found or has unexpected name (got ${webFetchTool?.name ?? "undefined"}). ` +
-      "Ensure @aliou/pi-linkup >=0.7.1 is installed.",
-  );
-}
 
 import {
   createRenderCache,
@@ -281,11 +264,7 @@ Pass relevant skills (e.g., 'ios-26', 'drizzle-orm') to provide specialized cont
             model,
             systemPrompt: SCOUT_SYSTEM_PROMPT,
             skills: resolvedSkills,
-            customTools: wrapToolDefinitionsWithTiming([
-              webSearchTool,
-              webFetchTool,
-              ...createScoutTools(),
-            ]),
+            customTools: wrapToolDefinitionsWithTiming(createScoutTools()),
             thinkingLevel: "off",
             logging: {
               enabled: true,

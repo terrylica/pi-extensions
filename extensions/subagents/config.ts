@@ -1,8 +1,5 @@
 /**
  * Configuration for the specialized subagents extension.
- *
- * SubagentsConfig is the user-facing schema (all fields optional).
- * ResolvedSubagentsConfig is the internal schema (all fields required, defaults applied).
  */
 
 import { ConfigLoader } from "@aliou/pi-utils-settings";
@@ -26,10 +23,53 @@ export const SUBAGENT_NAMES = [
 ] as const;
 export type SubagentName = (typeof SUBAGENT_NAMES)[number];
 
+export const SCOUT_WEB_SEARCH_PROVIDERS = [
+  "exa",
+  "linkup",
+  "synthetic",
+] as const;
+export const SCOUT_WEB_FETCH_PROVIDERS = ["exa", "linkup"] as const;
+
+export type ScoutWebSearchProvider =
+  (typeof SCOUT_WEB_SEARCH_PROVIDERS)[number];
+export type ScoutWebFetchProvider = (typeof SCOUT_WEB_FETCH_PROVIDERS)[number];
+
+export interface ScoutWebConfig {
+  searchOrder?: ScoutWebSearchProvider[];
+  fetchOrder?: ScoutWebFetchProvider[];
+  providers?: {
+    exa?: {
+      enabled?: boolean;
+      searchMode?: "auto" | "fast" | "deep" | "instant";
+    };
+    linkup?: {
+      enabled?: boolean;
+      searchDepth?: "standard" | "deep" | "fast";
+      renderJsDefault?: boolean;
+    };
+    synthetic?: { enabled?: boolean };
+  };
+}
+
+export interface ResolvedScoutWebConfig {
+  searchOrder: ScoutWebSearchProvider[];
+  fetchOrder: ScoutWebFetchProvider[];
+  providers: {
+    exa: { enabled: boolean; searchMode: "auto" | "fast" | "deep" | "instant" };
+    linkup: {
+      enabled: boolean;
+      searchDepth: "standard" | "deep" | "fast";
+      renderJsDefault: boolean;
+    };
+    synthetic: { enabled: boolean };
+  };
+}
+
 export interface SubagentModelConfig {
   provider?: SupportedProvider;
   model?: string;
   enabled?: boolean;
+  web?: ScoutWebConfig;
 }
 
 export interface SubagentsConfig {
@@ -41,12 +81,23 @@ export interface ResolvedSubagentModelConfig {
   provider: SupportedProvider;
   model: string;
   enabled: boolean;
+  web?: ResolvedScoutWebConfig;
 }
 
 export interface ResolvedSubagentsConfig {
   debug: boolean;
   subagents: Record<SubagentName, ResolvedSubagentModelConfig>;
 }
+
+const DEFAULT_SCOUT_WEB_CONFIG: ResolvedScoutWebConfig = {
+  searchOrder: ["exa", "linkup", "synthetic"],
+  fetchOrder: ["exa", "linkup"],
+  providers: {
+    exa: { enabled: true, searchMode: "auto" },
+    linkup: { enabled: true, searchDepth: "fast", renderJsDefault: false },
+    synthetic: { enabled: true },
+  },
+};
 
 const DEFAULT_CONFIG: ResolvedSubagentsConfig = {
   debug: false,
@@ -55,6 +106,7 @@ const DEFAULT_CONFIG: ResolvedSubagentsConfig = {
       provider: "openrouter",
       model: "z-ai/glm-5",
       enabled: true,
+      web: DEFAULT_SCOUT_WEB_CONFIG,
     },
     lookout: {
       provider: "openrouter",
@@ -102,4 +154,68 @@ export function isDebugEnabled(): boolean {
 /** Whether a subagent is enabled. */
 export function isSubagentEnabled(name: SubagentName): boolean {
   return configLoader.getConfig().subagents[name].enabled;
+}
+
+function normalizeSearchOrder(
+  order: ScoutWebSearchProvider[] | undefined,
+): ScoutWebSearchProvider[] {
+  const valid = new Set(SCOUT_WEB_SEARCH_PROVIDERS);
+  const filtered = (order ?? []).filter((p): p is ScoutWebSearchProvider =>
+    valid.has(p),
+  );
+  const deduped = [...new Set(filtered)];
+  for (const provider of DEFAULT_SCOUT_WEB_CONFIG.searchOrder) {
+    if (!deduped.includes(provider)) deduped.push(provider);
+  }
+  return deduped;
+}
+
+function normalizeFetchOrder(
+  order: ScoutWebFetchProvider[] | undefined,
+): ScoutWebFetchProvider[] {
+  const valid = new Set(SCOUT_WEB_FETCH_PROVIDERS);
+  const filtered = (order ?? []).filter((p): p is ScoutWebFetchProvider =>
+    valid.has(p),
+  );
+  const deduped = [...new Set(filtered)];
+  for (const provider of DEFAULT_SCOUT_WEB_CONFIG.fetchOrder) {
+    if (!deduped.includes(provider)) deduped.push(provider);
+  }
+  return deduped;
+}
+
+export function getScoutWebConfig(): ResolvedScoutWebConfig {
+  const config = configLoader.getConfig();
+  const web = config.subagents.scout.web;
+
+  return {
+    searchOrder: normalizeSearchOrder(web?.searchOrder),
+    fetchOrder: normalizeFetchOrder(web?.fetchOrder),
+    providers: {
+      exa: {
+        enabled:
+          web?.providers?.exa?.enabled ??
+          DEFAULT_SCOUT_WEB_CONFIG.providers.exa.enabled,
+        searchMode:
+          web?.providers?.exa?.searchMode ??
+          DEFAULT_SCOUT_WEB_CONFIG.providers.exa.searchMode,
+      },
+      linkup: {
+        enabled:
+          web?.providers?.linkup?.enabled ??
+          DEFAULT_SCOUT_WEB_CONFIG.providers.linkup.enabled,
+        searchDepth:
+          web?.providers?.linkup?.searchDepth ??
+          DEFAULT_SCOUT_WEB_CONFIG.providers.linkup.searchDepth,
+        renderJsDefault:
+          web?.providers?.linkup?.renderJsDefault ??
+          DEFAULT_SCOUT_WEB_CONFIG.providers.linkup.renderJsDefault,
+      },
+      synthetic: {
+        enabled:
+          web?.providers?.synthetic?.enabled ??
+          DEFAULT_SCOUT_WEB_CONFIG.providers.synthetic.enabled,
+      },
+    },
+  };
 }

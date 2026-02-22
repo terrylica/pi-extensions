@@ -14,10 +14,14 @@ import { githubPrReviewsTool } from "./github-pr-reviews";
 import { githubSearchTool } from "./github-search";
 import { listUserReposTool } from "./list-user-repos";
 import { uploadGistTool } from "./upload-gist";
+import { webFetchTool } from "./web-fetch";
+import { webSearchTool } from "./web-search";
 
 /** Create scout tools array */
 export function createScoutTools(): ToolDefinition[] {
   return [
+    webSearchTool,
+    webFetchTool,
     githubContentTool,
     githubSearchTool,
     githubCommitsTool,
@@ -44,4 +48,6 @@ export {
   githubSearchTool,
   listUserReposTool,
   uploadGistTool,
+  webFetchTool,
+  webSearchTool,
 };

@@ -20,13 +20,14 @@ import {
   SettingsManager,
 } from "@mariozechner/pi-coding-agent";
 import { createRunLogger, generateRunId, type RunLogger } from "./logging";
-import type {
-  OnTextUpdate,
-  OnToolUpdate,
-  SubagentConfig,
-  SubagentResult,
-  SubagentToolCall,
-  SubagentUsage,
+import {
+  getToolResultDetails,
+  type OnTextUpdate,
+  type OnToolUpdate,
+  type SubagentConfig,
+  type SubagentResult,
+  type SubagentToolCall,
+  type SubagentUsage,
 } from "./types";
 
 /**
@@ -119,8 +120,9 @@ export async function executeSubagent(
     cacheWriteTokens: 0,
     estimatedTokens: 0,
     llmCost: 0,
-    toolCost: 0,
-    totalCost: 0,
+    toolCostUsd: 0,
+    toolCostEur: 0,
+    totalCostUsd: 0,
   };
 
   // Subscribe to events for streaming output
@@ -193,12 +195,15 @@ export async function executeSubagent(
         onToolUpdate?.([...toolCalls.values()]);
         logger?.logToolEnd(existing).catch(() => {});
 
-        // Capture tool cost from result details (e.g., Exa API costs)
-        const resultDetails = event.result?.details as
-          | { cost?: number }
-          | undefined;
+        // Capture tool cost from result details (e.g., Exa/Linkup API costs)
+        const resultDetails = getToolResultDetails(existing.result);
         if (resultDetails?.cost !== undefined) {
-          usage.toolCost = (usage.toolCost ?? 0) + resultDetails.cost;
+          const currency = resultDetails.costCurrency ?? "USD";
+          if (currency === "EUR") {
+            usage.toolCostEur = (usage.toolCostEur ?? 0) + resultDetails.cost;
+          } else {
+            usage.toolCostUsd = (usage.toolCostUsd ?? 0) + resultDetails.cost;
+          }
         }
       }
 
@@ -232,7 +237,6 @@ export async function executeSubagent(
           usage.cacheWriteTokens =
             (usage.cacheWriteTokens ?? 0) + msgUsage.cacheWrite;
           usage.llmCost = (usage.llmCost ?? 0) + msgUsage.cost.total;
-          // totalCost will be computed at the end (llmCost + toolCost)
         }
       }
     }
@@ -301,8 +305,8 @@ export async function executeSubagent(
       ? totalRealTokens
       : Math.round(cleanedContent.length / 4);
 
-  // Compute total cost (LLM + tool costs)
-  usage.totalCost = (usage.llmCost ?? 0) + (usage.toolCost ?? 0);
+  // Compute cost summaries
+  usage.totalCostUsd = (usage.llmCost ?? 0) + (usage.toolCostUsd ?? 0);
 
   // Build result
   const result: SubagentResult = {

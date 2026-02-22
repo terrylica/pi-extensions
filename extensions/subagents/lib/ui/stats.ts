@@ -15,11 +15,10 @@ export function formatTokenCount(tokens: number): string {
   return `${tokens}`;
 }
 
-/** Format cost in USD (e.g., "$0.0023" or "<$0.01") */
-export function formatCost(cost: number): string {
-  if (cost < 0.01) return "<$0.01";
-  if (cost < 1) return `$${cost.toFixed(4)}`;
-  return `$${cost.toFixed(2)}`;
+/** Format cost with currency suffix (e.g., "0.0023 USD") */
+export function formatCost(cost: number, currency: "USD" | "EUR"): string {
+  if (cost < 1) return `${cost.toFixed(4)} ${currency}`;
+  return `${cost.toFixed(2)} ${currency}`;
 }
 
 /**
@@ -51,8 +50,15 @@ export function formatSubagentStats(
     parts.push(`${toolCallCount} ${pluralize(toolCallCount, "tool")}`);
   }
 
-  if (usage.totalCost !== undefined && usage.totalCost > 0) {
-    parts.push(formatCost(usage.totalCost));
+  if ((usage.totalCostUsd ?? 0) > 0 || (usage.toolCostEur ?? 0) > 0) {
+    const costParts: string[] = [];
+    if ((usage.totalCostUsd ?? 0) > 0) {
+      costParts.push(formatCost(usage.totalCostUsd ?? 0, "USD"));
+    }
+    if ((usage.toolCostEur ?? 0) > 0) {
+      costParts.push(formatCost(usage.toolCostEur ?? 0, "EUR"));
+    }
+    parts.push(costParts.join(" + "));
   }
 
   if (suffix) {

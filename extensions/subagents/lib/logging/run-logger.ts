@@ -1,6 +1,6 @@
 import * as fs from "node:fs/promises";
 import * as path from "node:path";
-import type { SubagentToolCall } from "../types";
+import { getToolResultDetails, type SubagentToolCall } from "../types";
 import { generateRunId, getLogDirectory } from "./paths";
 
 export interface RunLogger {
@@ -84,8 +84,33 @@ class RunLoggerImpl implements RunLogger {
   async logToolEnd(call: SubagentToolCall): Promise<void> {
     const status = call.status === "error" ? "error" : "completed";
     const errorSuffix = call.error ? ` - ${call.error.slice(0, 100)}` : "";
+
+    const details = getToolResultDetails(call.result);
+    const provider =
+      typeof details?.provider === "string" ? details.provider : undefined;
+    const cost = typeof details?.cost === "number" ? details.cost : undefined;
+    const currency =
+      details?.costCurrency === "EUR" || details?.costCurrency === "USD"
+        ? details.costCurrency
+        : undefined;
+
+    const telemetryParts: string[] = [];
+    if (provider) telemetryParts.push(`provider=${provider}`);
+    if (call.durationMs !== undefined)
+      telemetryParts.push(`duration=${call.durationMs}ms`);
+    if (cost !== undefined) {
+      if (currency === "EUR") {
+        telemetryParts.push(`cost=€${cost}`);
+      } else {
+        telemetryParts.push(`cost=$${cost}`);
+      }
+    }
+
+    const telemetrySuffix =
+      telemetryParts.length > 0 ? ` (${telemetryParts.join(" ")})` : "";
+
     await this.writeStream(
-      `[${formatTimestamp()}] Tool: ${call.toolName} ${status}${errorSuffix}\n`,
+      `[${formatTimestamp()}] Tool: ${call.toolName} ${status}${telemetrySuffix}${errorSuffix}\n`,
     );
   }
 

@@ -11,6 +11,8 @@ import {
 import {
   configLoader,
   type ResolvedSubagentsConfig,
+  SCOUT_WEB_FETCH_PROVIDERS,
+  SCOUT_WEB_SEARCH_PROVIDERS,
   SUBAGENT_NAMES,
   SUPPORTED_PROVIDERS,
   type SubagentName,
@@ -49,9 +51,6 @@ const SUBAGENT_UI: Record<
   },
 };
 
-/**
- * Get available model IDs for a provider from the model registry.
- */
 function getModelsForProvider(
   registry: ModelRegistry | null,
   provider: SupportedProvider,
@@ -63,14 +62,16 @@ function getModelsForProvider(
     .map((m) => m.id);
 }
 
-/**
- * Shared reference to the model registry, captured at session start.
- * Needed because buildSections doesn't receive ExtensionContext.
- */
 let registry: ModelRegistry | null = null;
 
+function parseCsvOrder(value: string): string[] {
+  return value
+    .split(",")
+    .map((part) => part.trim())
+    .filter((part) => part.length > 0);
+}
+
 export function registerSubagentsSettings(pi: ExtensionAPI): void {
-  // Capture model registry at session start so buildSections can query models.
   pi.on("session_start", async (_event, ctx) => {
     registry = ctx.modelRegistry;
   });
@@ -107,8 +108,6 @@ export function registerSubagentsSettings(pi: ExtensionAPI): void {
           tabConfig?.subagents?.[name]?.model ?? resolved.subagents[name].model;
 
         const modelValues = getModelsForProvider(registry, currentProvider);
-
-        // Ensure current model is in the list even if not available
         if (!modelValues.includes(currentModel)) {
           modelValues.unshift(currentModel);
         }
@@ -117,7 +116,7 @@ export function registerSubagentsSettings(pi: ExtensionAPI): void {
           tabConfig?.subagents?.[name]?.enabled ??
           resolved.subagents[name].enabled;
 
-        return {
+        const baseSection: SettingsSection = {
           label: `${ui.label} - ${ui.description}`,
           items: [
             {
@@ -151,6 +150,106 @@ export function registerSubagentsSettings(pi: ExtensionAPI): void {
             },
           ],
         };
+
+        if (name !== "scout") return baseSection;
+
+        const scoutWeb = resolved.subagents.scout.web;
+        const scoutWebTab = tabConfig?.subagents?.scout?.web;
+
+        baseSection.items.push(
+          {
+            id: "subagents.scout.web.searchOrder",
+            label: "Search order",
+            description: "CSV order, first provider tried first",
+            currentValue: (
+              scoutWebTab?.searchOrder ??
+              scoutWeb?.searchOrder ??
+              []
+            ).join(","),
+            values: [
+              "exa,linkup,synthetic",
+              "exa,synthetic,linkup",
+              "synthetic,exa,linkup",
+            ],
+          },
+          {
+            id: "subagents.scout.web.fetchOrder",
+            label: "Fetch order",
+            description: "CSV order, first provider tried first",
+            currentValue: (
+              scoutWebTab?.fetchOrder ??
+              scoutWeb?.fetchOrder ??
+              []
+            ).join(","),
+            values: ["exa,linkup", "linkup,exa"],
+          },
+          {
+            id: "subagents.scout.web.providers.exa.enabled",
+            label: "Exa enabled",
+            description: "Enable Exa for search/fetch",
+            currentValue:
+              (scoutWebTab?.providers?.exa?.enabled ??
+              scoutWeb?.providers.exa.enabled)
+                ? "enabled"
+                : "disabled",
+            values: ["enabled", "disabled"],
+          },
+          {
+            id: "subagents.scout.web.providers.linkup.enabled",
+            label: "Linkup enabled",
+            description: "Enable Linkup for search/fetch",
+            currentValue:
+              (scoutWebTab?.providers?.linkup?.enabled ??
+              scoutWeb?.providers.linkup.enabled)
+                ? "enabled"
+                : "disabled",
+            values: ["enabled", "disabled"],
+          },
+          {
+            id: "subagents.scout.web.providers.synthetic.enabled",
+            label: "Synthetic enabled",
+            description: "Enable Synthetic for web search",
+            currentValue:
+              (scoutWebTab?.providers?.synthetic?.enabled ??
+              scoutWeb?.providers.synthetic.enabled)
+                ? "enabled"
+                : "disabled",
+            values: ["enabled", "disabled"],
+          },
+          {
+            id: "subagents.scout.web.providers.exa.searchMode",
+            label: "Exa search mode",
+            description: "Exa /search mode",
+            currentValue:
+              scoutWebTab?.providers?.exa?.searchMode ??
+              scoutWeb?.providers.exa.searchMode ??
+              "auto",
+            values: ["auto", "fast", "deep", "instant"],
+          },
+          {
+            id: "subagents.scout.web.providers.linkup.searchDepth",
+            label: "Linkup depth",
+            description: "Linkup /search depth",
+            currentValue:
+              scoutWebTab?.providers?.linkup?.searchDepth ??
+              scoutWeb?.providers.linkup.searchDepth ??
+              "fast",
+            values: ["standard", "deep", "fast"],
+          },
+          {
+            id: "subagents.scout.web.providers.linkup.renderJsDefault",
+            label: "Linkup render JS",
+            description: "Default renderJs for Linkup fetch",
+            currentValue:
+              (scoutWebTab?.providers?.linkup?.renderJsDefault ??
+              scoutWeb?.providers.linkup.renderJsDefault)
+                ? "enabled"
+                : "disabled",
+            values: ["enabled", "disabled"],
+          },
+        );
+
+        return baseSection;
       });
 
       return [generalSection, ...subagentSections];
@@ -170,26 +269,107 @@ export function registerSubagentsSettings(pi: ExtensionAPI): void {
       if (!updated.subagents) updated.subagents = {};
 
       const parts = id.split(".");
-      if (parts.length !== 3 || parts[0] !== "subagents") return null;
-      const name = parts[1] as SubagentName;
-      const field = parts[2] as "provider" | "model" | "enabled";
+      if (parts[0] !== "subagents") return null;
 
-      const existing = updated.subagents[name] ?? {};
-      updated.subagents[name] = existing;
+      if (parts.length === 3) {
+        const name = parts[1] as SubagentName;
+        const field = parts[2] as "provider" | "model" | "enabled";
 
-      if (field === "enabled") {
-        existing.enabled = newValue === "enabled";
-      } else if (field === "provider") {
-        const newProvider = newValue as SupportedProvider;
-        existing.provider = newProvider;
-        // Reset model to first available for the new provider
-        const models = getModelsForProvider(registry, newProvider);
-        existing.model = models[0] ?? "";
-      } else {
-        existing[field] = newValue;
+        const existing = updated.subagents[name] ?? {};
+        updated.subagents[name] = existing;
+
+        if (field === "enabled") {
+          existing.enabled = newValue === "enabled";
+        } else if (field === "provider") {
+          const newProvider = newValue as SupportedProvider;
+          existing.provider = newProvider;
+          const models = getModelsForProvider(registry, newProvider);
+          existing.model = models[0] ?? "";
+        } else {
+          existing[field] = newValue;
+        }
+
+        return updated;
       }
 
-      return updated;
+      if (parts[1] !== "scout") return null;
+      if (!updated.subagents.scout) {
+        updated.subagents.scout = {};
+      }
+      const scout = updated.subagents.scout;
+      if (!scout.web) {
+        scout.web = {};
+      }
+      const web = scout.web;
+
+      if (id === "subagents.scout.web.searchOrder") {
+        const values = parseCsvOrder(newValue).filter((p) =>
+          SCOUT_WEB_SEARCH_PROVIDERS.includes(
+            p as (typeof SCOUT_WEB_SEARCH_PROVIDERS)[number],
+          ),
+        ) as (typeof SCOUT_WEB_SEARCH_PROVIDERS)[number][];
+        if (values.length > 0) web.searchOrder = values;
+        return updated;
+      }
+
+      if (id === "subagents.scout.web.fetchOrder") {
+        const values = parseCsvOrder(newValue).filter((p) =>
+          SCOUT_WEB_FETCH_PROVIDERS.includes(
+            p as (typeof SCOUT_WEB_FETCH_PROVIDERS)[number],
+          ),
+        ) as (typeof SCOUT_WEB_FETCH_PROVIDERS)[number][];
+        if (values.length > 0) web.fetchOrder = values;
+        return updated;
+      }
+
+      if (!web.providers) {
+        web.providers = {};
+      }
+      if (!web.providers.exa) {
+        web.providers.exa = {};
+      }
+      if (!web.providers.linkup) {
+        web.providers.linkup = {};
+      }
+      if (!web.providers.synthetic) {
+        web.providers.synthetic = {};
+      }
+
+      const exa = web.providers.exa;
+      const linkup = web.providers.linkup;
+      const synthetic = web.providers.synthetic;
+
+      if (id === "subagents.scout.web.providers.exa.enabled") {
+        exa.enabled = newValue === "enabled";
+        return updated;
+      }
+
+      if (id === "subagents.scout.web.providers.linkup.enabled") {
+        linkup.enabled = newValue === "enabled";
+        return updated;
+      }
+
+      if (id === "subagents.scout.web.providers.synthetic.enabled") {
+        synthetic.enabled = newValue === "enabled";
+        return updated;
+      }
+
+      if (id === "subagents.scout.web.providers.exa.searchMode") {
+        exa.searchMode = newValue as "auto" | "fast" | "deep" | "instant";
+        return updated;
+      }
+
+      if (id === "subagents.scout.web.providers.linkup.searchDepth") {
+        linkup.searchDepth = newValue as "standard" | "deep" | "fast";
+        return updated;
+      }
+
+      if (id === "subagents.scout.web.providers.linkup.renderJsDefault") {
+        linkup.renderJsDefault = newValue === "enabled";
+        return updated;
+      }
+
+      return null;
     },
   });
 }

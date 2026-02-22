@@ -41,6 +41,29 @@ export interface SubagentConfig {
   };
 }
 
+export type ToolCostCurrency = "USD" | "EUR";
+
+export interface SubagentToolResultDetails {
+  provider?: string;
+  cost?: number;
+  costCurrency?: ToolCostCurrency;
+  [key: string]: unknown;
+}
+
+export interface SubagentToolResultObject {
+  content?: Array<{ type: string; text?: string }>;
+  details?: SubagentToolResultDetails;
+  [key: string]: unknown;
+}
+
+export type SubagentToolResultValue =
+  | SubagentToolResultObject
+  | string
+  | number
+  | boolean
+  | null
+  | Array<unknown>;
+
 /**
  * Tool call state for tracking subagent tool executions.
  */
@@ -55,7 +78,7 @@ export interface SubagentToolCall {
   endedAt?: number;
   /** Duration in milliseconds (set when ended) */
   durationMs?: number;
-  result?: unknown;
+  result?: SubagentToolResultValue;
   error?: string;
   /** Partial result from tool updates (for progress display) */
   partialResult?: {
@@ -80,10 +103,12 @@ export interface SubagentUsage {
   estimatedTokens: number;
   /** LLM cost in USD (if available) */
   llmCost?: number;
-  /** Tool/API cost in USD (e.g., Exa, GitHub) */
-  toolCost?: number;
-  /** Total cost in USD (llmCost + toolCost) */
-  totalCost?: number;
+  /** Tool cost in USD */
+  toolCostUsd?: number;
+  /** Tool cost in EUR */
+  toolCostEur?: number;
+  /** Total USD side cost (llmCost + toolCostUsd) */
+  totalCostUsd?: number;
 }
 
 /**
@@ -129,6 +154,22 @@ export type OnTextUpdate = (delta: string, accumulated: string) => void;
 
 /** Callback for tool execution updates */
 export type OnToolUpdate = (toolCalls: SubagentToolCall[]) => void;
+
+/** Safe helper for extracting typed details from a tool result value. */
+export function getToolResultDetails(
+  result: SubagentToolResultValue | undefined,
+): SubagentToolResultDetails | undefined {
+  if (!result || typeof result !== "object" || Array.isArray(result)) {
+    return undefined;
+  }
+
+  const details = (result as { details?: unknown }).details;
+  if (!details || typeof details !== "object" || Array.isArray(details)) {
+    return undefined;
+  }
+
+  return details as SubagentToolResultDetails;
+}
 
 // ---------------------------------------------------------------------------
 // Shared detail interfaces - composed into BaseSubagentDetails

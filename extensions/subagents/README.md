@@ -12,21 +12,22 @@ Framework for spawning specialized subagents with custom tools, consistent UI re
 
 ## Requirements
 
-The extension requires the following environment variables:
+Environment variables are provider-specific:
 
 | Variable | Description |
 |----------|-------------|
-| `LINKUP_API_KEY` | [Linkup](https://linkup.so) API key for URL fetching |
-| `EXA_API_KEY` | [Exa](https://exa.ai) API key for web search |
+| `EXA_API_KEY` | [Exa](https://exa.ai) API key (search + fetch) |
+| `LINKUP_API_KEY` | [Linkup](https://linkup.so) API key (search + fetch fallback) |
+| `SYNTHETIC_API_KEY` | [Synthetic](https://synthetic.new) API key (search only) |
 | `SCOUT_GITHUB_TOKEN` | GitHub personal access token for repository access |
 
-The extension will fail to load if any required variables are missing.
+Only keys for enabled/selected providers are needed at runtime.
 
 ## Available Subagents
 
 | Subagent | Description | Requirements |
 |----------|-------------|--------------|
-| Scout | Web research and GitHub codebase exploration. Fetches URLs, searches the web, explores repositories (code, commits, issues, PRs). | `LINKUP_API_KEY`, `EXA_API_KEY`, `SCOUT_GITHUB_TOKEN` |
+| Scout | Web research and GitHub codebase exploration. Multi-provider web tools (`web_search`, `web_fetch`) with routing/fallback and Exa-first defaults. | `SCOUT_GITHUB_TOKEN` + provider keys used by your configured order |
 | Lookout | Local codebase search by functionality/concept. Uses osgrep for semantic search + grep/find for exact matches. | [osgrep](https://github.com/Ryandonofrio3/osgrep) |
 | Oracle | AI advisor powered by GPT-5 for complex reasoning, code reviews, architecture planning, and debugging. | None |
 | Reviewer | Code review agent that analyzes diffs and returns structured feedback. Parses diff descriptions, focuses on security/performance/style, and flags issues with priority levels. | None |
@@ -37,7 +38,8 @@ The extension will fail to load if any required variables are missing.
 
 | Tool | Description |
 |------|-------------|
-| `web_fetch` | Fetch a URL and return content as markdown. No LLM processing. |
+| `web_search` | Search web with provider routing and fallback. |
+| `web_fetch` | Fetch URL content with provider routing and fallback. Returns raw provider content (no summarization/rewrite). |
 
 ## Creating New Subagents
 

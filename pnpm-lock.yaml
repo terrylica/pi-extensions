@@ -171,9 +171,6 @@ importers:
       '@aliou/pi-agent-kit':
         specifier: workspace:^
         version: link:../../packages/agent-kit
-      '@aliou/pi-linkup':
-        specifier: ^0.7.1
-        version: 0.7.1(@mariozechner/pi-ai@0.53.0(ws@8.19.0)(zod@3.25.76))(@mariozechner/pi-coding-agent@0.53.0(ws@8.19.0)(zod@3.25.76))
       '@aliou/pi-utils-settings':
         specifier: workspace:^
         version: link:../../packages/settings
