@@ -12,6 +12,7 @@ export function buildAgentsPrompt(
   stack: ProjectStack,
   selectedEntries: CatalogEntry[],
   targetDirs: string[],
+  promptOverride?: string | null,
 ): string {
   const parts: string[] = [];
 
@@ -63,6 +64,13 @@ export function buildAgentsPrompt(
     for (const entry of selectedEntries) {
       parts.push(`- ${entry.name} (${entry.type}): ${entry.description}`);
     }
+  }
+
+  if (promptOverride && promptOverride.trim().length > 0) {
+    parts.push("");
+    parts.push("## Extra instructions from user");
+    parts.push("");
+    parts.push(promptOverride.trim());
   }
 
   parts.push("");

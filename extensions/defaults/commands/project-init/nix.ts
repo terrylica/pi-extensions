@@ -10,12 +10,31 @@ import type { ProjectStack } from "./scanner";
 export function buildNixPrompt(
   choice: "shell.nix" | "flake.nix",
   stack: ProjectStack,
+  existing: { hasShell: boolean; hasFlake: boolean },
 ): string {
   const parts: string[] = [];
 
-  parts.push(
-    `Please create or update a **${choice}** and a matching **.envrc** for this project.`,
-  );
+  const hasSelected =
+    (choice === "shell.nix" && existing.hasShell) ||
+    (choice === "flake.nix" && existing.hasFlake);
+
+  const hasOther =
+    (choice === "shell.nix" && existing.hasFlake) ||
+    (choice === "flake.nix" && existing.hasShell);
+
+  if (hasSelected) {
+    parts.push(
+      `Please update the existing **${choice}** and matching **.envrc** for this project.`,
+    );
+  } else if (hasOther) {
+    parts.push(
+      `Please switch this project to **${choice}** by creating/updating **${choice}** and updating **.envrc** to match.`,
+    );
+  } else {
+    parts.push(
+      `Please create a new **${choice}** and a matching **.envrc** for this project.`,
+    );
+  }
   parts.push("");
   parts.push(`Detected stack: ${stack.summary}`);
   parts.push("");

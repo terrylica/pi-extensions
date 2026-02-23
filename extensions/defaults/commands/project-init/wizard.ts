@@ -1,10 +1,11 @@
 /**
  * TUI wizard for /project:init.
  *
- * Three-step wizard using the Wizard component from @aliou/pi-utils-settings:
+ * Four-step wizard using the Wizard component from @aliou/pi-utils-settings:
  * 1. Packages — multi-select packages from the catalog
  * 2. Skills — multi-select skills (skills bundled with checked packages are locked)
- * 3. AGENTS.md — toggle generation and pick target directories
+ * 3. Nix — select shell/flake strategy
+ * 4. AGENTS.md — toggle generation and pick target directories
  *
  * Ctrl+S to apply, Esc to cancel.
  */
@@ -20,7 +21,7 @@ import {
 import type { ExtensionCommandContext } from "@mariozechner/pi-coding-agent";
 import { getSettingsListTheme } from "@mariozechner/pi-coding-agent";
 import type { Component, SettingsListTheme } from "@mariozechner/pi-tui";
-import { Key, matchesKey } from "@mariozechner/pi-tui";
+import { Input, Key, matchesKey } from "@mariozechner/pi-tui";
 import type { CatalogEntry } from "./catalog";
 import { scanCatalog } from "./catalog";
 import { getInstalled, readSettings } from "./installer";
@@ -32,7 +33,10 @@ export interface WizardResult {
   selectedEntries: CatalogEntry[];
   unselectedEntries: CatalogEntry[];
   nixChoice: NixChoice;
+  nixHasShell: boolean;
+  nixHasFlake: boolean;
   generateAgents: boolean;
+  agentsPrompt: string | null;
   agentsDirs: string[];
   stack: ProjectStack;
 }
@@ -51,8 +55,10 @@ interface WizardState {
   packageItems: FuzzyMultiSelectorItem[];
   skillItems: FuzzyMultiSelectorItem[];
   nixChoice: NixChoice;
-  nixExisting: "shell.nix" | "flake.nix" | null;
+  nixHasShell: boolean;
+  nixHasFlake: boolean;
   generateAgents: boolean;
+  agentsPrompt: string;
   agentsDirItems: Array<{ path: string; checked: boolean }>;
 }
 
@@ -141,23 +147,47 @@ class SkillsStep implements Component {
 // Step 3: Nix Dev Shell
 // ---------------------------------------------------------------------------
 
-const NIX_OPTIONS: Array<{ value: NixChoice; label: string; hint: string }> = [
-  {
-    value: "shell.nix",
-    label: "shell.nix",
-    hint: "Simple dev shell with nix-shell. Pairs with .envrc containing `use nix`.",
-  },
-  {
-    value: "flake.nix",
-    label: "flake.nix",
-    hint: "Flake-based dev shell with nix develop. Pairs with .envrc containing `use flake`.",
-  },
-  {
-    value: "skip",
-    label: "Skip",
-    hint: "Do not create or modify Nix files.",
-  },
-];
+interface NixOption {
+  value: NixChoice;
+  label: string;
+  hint: string;
+}
+
+function getNixOptions(state: WizardState): NixOption[] {
+  const options: NixOption[] = [
+    {
+      value: "shell.nix",
+      label: "shell.nix",
+      hint: state.nixHasShell
+        ? "Update existing shell.nix and keep .envrc as `use nix`."
+        : state.nixHasFlake
+          ? "Switch from flake.nix to shell.nix and update .envrc to `use nix`."
+          : "Create shell.nix. Pairs with .envrc containing `use nix`.",
+    },
+    {
+      value: "flake.nix",
+      label: "flake.nix",
+      hint: state.nixHasFlake
+        ? "Update existing flake.nix and keep .envrc as `use flake`."
+        : state.nixHasShell
+          ? "Switch from shell.nix to flake.nix and update .envrc to `use flake`."
+          : "Create flake.nix. Pairs with .envrc containing `use flake`.",
+    },
+  ];
+
+  const exactlyOneExists =
+    (state.nixHasShell ? 1 : 0) + (state.nixHasFlake ? 1 : 0) === 1;
+
+  if (!exactlyOneExists) {
+    options.push({
+      value: "skip",
+      label: "Skip",
+      hint: "Do not create or modify Nix files.",
+    });
+  }
+
+  return options;
+}
 
 class NixStep implements Component {
   private settingsTheme: SettingsListTheme;
@@ -171,32 +201,37 @@ class NixStep implements Component {
     this.settingsTheme = settingsTheme;
     wizardCtx.markComplete();
 
-    // Pre-select based on existing files or default to skip
-    const currentIdx = NIX_OPTIONS.findIndex(
-      (o) => o.value === state.nixChoice,
-    );
-    this.selectedIndex = currentIdx >= 0 ? currentIdx : NIX_OPTIONS.length - 1;
+    const options = getNixOptions(state);
+    const currentIdx = options.findIndex((o) => o.value === state.nixChoice);
+    this.selectedIndex = currentIdx >= 0 ? currentIdx : 0;
   }
 
   render(_width: number): string[] {
     const lines: string[] = [];
+    const options = getNixOptions(this.state);
+
+    if (this.selectedIndex >= options.length) {
+      this.selectedIndex = Math.max(0, options.length - 1);
+    }
 
     lines.push(this.settingsTheme.label(" Nix Dev Shell", true));
     lines.push("");
 
-    if (this.state.nixExisting) {
+    if (this.state.nixHasShell && this.state.nixHasFlake) {
       lines.push(
-        this.settingsTheme.hint(
-          `  Existing: ${this.state.nixExisting} detected`,
-        ),
+        this.settingsTheme.hint("  Existing: shell.nix and flake.nix detected"),
       );
+    } else if (this.state.nixHasShell) {
+      lines.push(this.settingsTheme.hint("  Existing: shell.nix detected"));
+    } else if (this.state.nixHasFlake) {
+      lines.push(this.settingsTheme.hint("  Existing: flake.nix detected"));
     } else {
       lines.push(this.settingsTheme.hint("  No existing Nix shell detected"));
     }
     lines.push("");
 
-    for (let i = 0; i < NIX_OPTIONS.length; i++) {
-      const opt = NIX_OPTIONS[i];
+    for (let i = 0; i < options.length; i++) {
+      const opt = options[i];
       if (!opt) continue;
       const isSelected = i === this.selectedIndex;
       const isCurrent = this.state.nixChoice === opt.value;
@@ -210,7 +245,7 @@ class NixStep implements Component {
     }
 
     // Hint for selected option
-    const current = NIX_OPTIONS[this.selectedIndex];
+    const current = options[this.selectedIndex];
     if (current) {
       lines.push("");
       lines.push(this.settingsTheme.hint(`  ${current.hint}`));
@@ -219,7 +254,7 @@ class NixStep implements Component {
     lines.push("");
     lines.push(
       this.settingsTheme.hint(
-        "  Enter select · Creates shell + .envrc for direnv",
+        "  Enter select · Update/create/switch Nix shell + .envrc",
       ),
     );
 
@@ -231,24 +266,27 @@ class NixStep implements Component {
   handleInput(data: string): void {
     if (matchesKey(data, Key.escape)) return;
 
+    const options = getNixOptions(this.state);
+    if (options.length === 0) return;
+
+    if (this.selectedIndex >= options.length) {
+      this.selectedIndex = options.length - 1;
+    }
+
     if (matchesKey(data, Key.up)) {
       this.selectedIndex =
-        this.selectedIndex === 0
-          ? NIX_OPTIONS.length - 1
-          : this.selectedIndex - 1;
+        this.selectedIndex === 0 ? options.length - 1 : this.selectedIndex - 1;
       return;
     }
 
     if (matchesKey(data, Key.down)) {
       this.selectedIndex =
-        this.selectedIndex === NIX_OPTIONS.length - 1
-          ? 0
-          : this.selectedIndex + 1;
+        this.selectedIndex === options.length - 1 ? 0 : this.selectedIndex + 1;
       return;
     }
 
     if (data === " " || matchesKey(data, Key.enter)) {
-      const opt = NIX_OPTIONS[this.selectedIndex];
+      const opt = options[this.selectedIndex];
       if (opt) {
         this.state.nixChoice = opt.value;
       }
@@ -266,6 +304,7 @@ const AGENTS_MAX_VISIBLE = 14;
 class AgentsStep implements Component {
   private settingsTheme: SettingsListTheme;
   private selectedIndex = 0;
+  private promptInput: Input;
 
   constructor(
     private state: WizardState,
@@ -273,14 +312,19 @@ class AgentsStep implements Component {
     wizardCtx: WizardStepContext,
   ) {
     this.settingsTheme = settingsTheme;
+    this.promptInput = new Input();
+    if (state.agentsPrompt) this.promptInput.setValue(state.agentsPrompt);
+    this.promptInput.onSubmit = () => {
+      this.state.agentsPrompt = this.promptInput.getValue().trim();
+    };
     wizardCtx.markComplete();
   }
 
   private get totalItems(): number {
-    return this.state.generateAgents ? 1 + this.state.agentsDirItems.length : 1;
+    return this.state.generateAgents ? 2 + this.state.agentsDirItems.length : 1;
   }
 
-  render(_width: number): string[] {
+  render(width: number): string[] {
     const lines: string[] = [];
 
     lines.push(this.settingsTheme.label(" AGENTS.md", true));
@@ -297,6 +341,16 @@ class AgentsStep implements Component {
     lines.push(`${genPrefix}${genText}`);
     lines.push("");
 
+    if (this.state.generateAgents) {
+      const isPromptSelected = this.selectedIndex === 1;
+      const promptPrefix = isPromptSelected ? this.settingsTheme.cursor : "  ";
+      lines.push(this.settingsTheme.hint("  Extra prompt (optional):"));
+      lines.push(
+        `${promptPrefix}${this.promptInput.render(width - 2).join("")}`,
+      );
+      lines.push("");
+    }
+
     // Directory list
     if (this.state.generateAgents && this.state.agentsDirItems.length > 0) {
       const checkedCount = this.state.agentsDirItems.filter(
@@ -310,7 +364,7 @@ class AgentsStep implements Component {
       lines.push("");
 
       const dirCount = this.state.agentsDirItems.length;
-      const dirCursor = this.selectedIndex - 1;
+      const dirCursor = this.selectedIndex - 2;
 
       const startIndex = Math.max(
         0,
@@ -325,7 +379,7 @@ class AgentsStep implements Component {
         const item = this.state.agentsDirItems[i];
         if (!item) continue;
 
-        const listIndex = i + 1;
+        const listIndex = i + 2;
         const isSelected = this.selectedIndex === listIndex;
         const prefix = isSelected ? this.settingsTheme.cursor : "  ";
         const check = item.checked ? "[x]" : "[ ]";
@@ -344,7 +398,11 @@ class AgentsStep implements Component {
     }
 
     lines.push("");
-    lines.push(this.settingsTheme.hint("  Space toggle · Ctrl+S submit"));
+    lines.push(
+      this.settingsTheme.hint(
+        "  Space toggle · Enter edit input · Ctrl+S submit",
+      ),
+    );
 
     return lines;
   }
@@ -355,6 +413,21 @@ class AgentsStep implements Component {
     if (matchesKey(data, Key.escape)) return;
 
     const total = this.totalItems;
+
+    if (this.selectedIndex === 1 && this.state.generateAgents) {
+      if (matchesKey(data, Key.up)) {
+        this.selectedIndex = 0;
+        return;
+      }
+      if (matchesKey(data, Key.down)) {
+        this.selectedIndex = this.state.agentsDirItems.length > 0 ? 2 : 0;
+        return;
+      }
+
+      this.promptInput.handleInput(data);
+      this.state.agentsPrompt = this.promptInput.getValue().trim();
+      return;
+    }
 
     if (matchesKey(data, Key.up)) {
       this.selectedIndex =
@@ -371,8 +444,9 @@ class AgentsStep implements Component {
     if (data === " " || matchesKey(data, Key.enter)) {
       if (this.selectedIndex === 0) {
         this.state.generateAgents = !this.state.generateAgents;
-      } else {
-        const dirItem = this.state.agentsDirItems[this.selectedIndex - 1];
+        this.selectedIndex = 0;
+      } else if (this.selectedIndex >= 2) {
+        const dirItem = this.state.agentsDirItems[this.selectedIndex - 2];
         if (dirItem) {
           dirItem.checked = !dirItem.checked;
         }
@@ -511,7 +585,11 @@ function collectResult(state: WizardState): WizardResult {
     selectedEntries,
     unselectedEntries,
     nixChoice: state.nixChoice,
+    nixHasShell: state.nixHasShell,
+    nixHasFlake: state.nixHasFlake,
     generateAgents: state.generateAgents,
+    agentsPrompt:
+      state.agentsPrompt.trim().length > 0 ? state.agentsPrompt.trim() : null,
     agentsDirs,
     stack: state.stack,
   };
@@ -545,7 +623,6 @@ export async function showWizard(
   // Detect existing nix files
   const hasFlake = existsSync(resolve(ctx.cwd, "flake.nix"));
   const hasShell = existsSync(resolve(ctx.cwd, "shell.nix"));
-  const nixExisting = hasFlake ? "flake.nix" : hasShell ? "shell.nix" : null;
 
   // --- Build shared state ---
   const state: WizardState = {
@@ -555,9 +632,11 @@ export async function showWizard(
     installedPackages: installed.packages,
     packageItems: buildPackageItems(catalog, installed.packages),
     skillItems: buildSkillItems(catalog, installed.skills),
-    nixChoice: nixExisting ?? "skip",
-    nixExisting: nixExisting as "shell.nix" | "flake.nix" | null,
+    nixChoice: hasFlake ? "flake.nix" : hasShell ? "shell.nix" : "skip",
+    nixHasShell: hasShell,
+    nixHasFlake: hasFlake,
     generateAgents: true,
+    agentsPrompt: "",
     agentsDirItems: buildAgentsDirItems(ctx.cwd, childProjects),
   };
 

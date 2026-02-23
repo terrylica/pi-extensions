@@ -79,7 +79,12 @@ export function registerProjectInitCommand(pi: ExtensionAPI): void {
       const promptParts: string[] = [];
 
       if (result.nixChoice !== "skip") {
-        promptParts.push(buildNixPrompt(result.nixChoice, result.stack));
+        promptParts.push(
+          buildNixPrompt(result.nixChoice, result.stack, {
+            hasShell: result.nixHasShell,
+            hasFlake: result.nixHasFlake,
+          }),
+        );
       }
 
       if (result.generateAgents && result.agentsDirs.length > 0) {
@@ -88,6 +93,7 @@ export function registerProjectInitCommand(pi: ExtensionAPI): void {
             result.stack,
             result.selectedEntries,
             result.agentsDirs,
+            result.agentsPrompt,
           ),
         );
       }
