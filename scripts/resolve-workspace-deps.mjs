@@ -12,7 +12,7 @@
 // This is a fallback for non-pnpm installs. Under pnpm workspaces, the
 // packages are linked automatically.
 
-import { readdirSync, readFileSync, existsSync, mkdirSync, symlinkSync, lstatSync } from "fs";
+import { readdirSync, readFileSync, existsSync, mkdirSync, symlinkSync, lstatSync, rmSync } from "fs";
 import { join, dirname, resolve } from "path";
 import { fileURLToPath } from "url";
 
@@ -55,18 +55,27 @@ function scanDir(dir) {
 }
 scanDir(EXTENSIONS_DIR);
 
-// 3. Ensure used packages are in node_modules, symlink if missing
+// 3. Ensure used packages are linked to local workspace sources.
+// If npm installed an older published version, replace it with a symlink.
 for (const name of usedPackages) {
   const target = localPackages.get(name);
   // Resolve scoped package path: @scope/pkg -> node_modules/@scope/pkg
   const nmPath = join(NODE_MODULES, ...name.split("/"));
 
-  if (existsSync(nmPath)) continue;
-
   // Ensure parent dir exists (for scoped packages)
   mkdirSync(dirname(nmPath), { recursive: true });
+
+  if (existsSync(nmPath)) {
+    const stat = lstatSync(nmPath);
+    if (stat.isSymbolicLink()) {
+      // Already linked (likely via pnpm or a prior postinstall run)
+      continue;
+    }
+
+    // npm installed a real directory/package. Replace with workspace symlink.
+    rmSync(nmPath, { recursive: true, force: true });
+  }
+
   symlinkSync(target, nmPath, "dir");
-  console.warn(
-    `[resolve-workspace-deps] "${name}" is not published to npm. Symlinked from ${target}`
-  );
+  console.warn(`[resolve-workspace-deps] Linked "${name}" -> ${target}`);
 }
