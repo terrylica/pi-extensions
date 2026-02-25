@@ -1,53 +1,45 @@
 /**
- * Continue command - /continue [note]
+ * Continue command - /continue
  *
- * Creates a new session linked to the current one, without context extraction.
- * Optionally accepts a note describing the focus for the new session.
+ * Switches to the most recent previous session for the current working directory.
+ * If already in the most recent session, notifies the user.
  */
 
 import type { ExtensionAPI } from "@mariozechner/pi-coding-agent";
-import {
-  writeSessionLinkMarker,
-  writeSessionLinkSource,
-} from "../lib/session-link";
+import { SessionManager } from "@mariozechner/pi-coding-agent";
 
 export function setupContinueCommand(pi: ExtensionAPI) {
   pi.registerCommand("continue", {
     description:
-      "Create a new session linked to the current one (no context extraction)",
-    handler: async (args, ctx) => {
+      "Switch to the most recent session for the current working directory",
+    handler: async (_args, ctx) => {
       if (!ctx.hasUI) {
         ctx.ui.notify("continue requires interactive mode", "error");
         return;
       }
 
-      const note = args.trim() || "";
-      const parentSessionId = ctx.sessionManager.getSessionId() ?? "unknown";
-      const currentSessionFile = ctx.sessionManager.getSessionFile();
+      const cwd = ctx.cwd;
+      const currentSessionId = ctx.sessionManager.getSessionId();
 
-      const result = await ctx.newSession({
-        parentSession: currentSessionFile,
-        setup: async (sm) => {
-          const newSessionId = sm.getSessionId();
-          if (currentSessionFile && newSessionId) {
-            writeSessionLinkMarker(
-              currentSessionFile,
-              newSessionId,
-              note,
-              "continue",
-            );
-          }
-          writeSessionLinkSource(sm, parentSessionId, note, "continue");
-        },
-      });
+      const sessions = await SessionManager.list(cwd);
 
-      if (result.cancelled) {
-        ctx.ui.notify("Session creation cancelled", "info");
+      if (sessions.length === 0) {
+        ctx.ui.notify("No previous sessions found for this directory", "info");
         return;
       }
 
-      if (note) {
-        ctx.ui.setEditorText(note);
+      // Find the most recent session that isn't the current one.
+      const target = sessions.find((s) => s.id !== currentSessionId);
+
+      if (!target) {
+        ctx.ui.notify("Already in the most recent session", "info");
+        return;
+      }
+
+      const result = await ctx.switchSession(target.path);
+
+      if (result.cancelled) {
+        ctx.ui.notify("Session switch cancelled", "info");
       }
     },
   });
