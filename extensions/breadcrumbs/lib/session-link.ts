@@ -15,10 +15,6 @@ export type SessionLinkType = "handoff" | "continue";
 export const SESSION_LINK_MARKER_TYPE = "session-link-marker";
 export const SESSION_LINK_SOURCE_TYPE = "session-link-source";
 
-// Keep old types for backward compat renderers
-const LEGACY_HANDOFF_MARKER_TYPE = "handoff-marker";
-const LEGACY_HANDOFF_SOURCE_TYPE = "handoff-source";
-
 export interface SessionLinkMarkerDetails {
   targetSessionId: string;
   goal: string;
@@ -109,7 +105,6 @@ function resolveSessionName(sessionId: string): string {
 /**
  * Register the session link marker message renderer.
  * Displays "Handed off to {name}" or "Continues in {name}" depending on linkType.
- * Also registered for the legacy "handoff-marker" type for backward compat.
  */
 export function setupSessionLinkMarkerRenderer(pi: ExtensionAPI) {
   const renderMarker = (
@@ -142,14 +137,12 @@ export function setupSessionLinkMarkerRenderer(pi: ExtensionAPI) {
   };
 
   pi.registerMessageRenderer(SESSION_LINK_MARKER_TYPE, renderMarker);
-  pi.registerMessageRenderer(LEGACY_HANDOFF_MARKER_TYPE, renderMarker);
 }
 
 /**
  * Register the session link source message renderer.
  * Collapsed: header line with optional expand hint (only when content is non-empty).
  * Expanded: header + full context content.
- * Also registered for the legacy "handoff-source" type for backward compat.
  */
 export function setupSessionLinkSourceRenderer(pi: ExtensionAPI) {
   const renderSource = (
@@ -204,7 +197,6 @@ export function setupSessionLinkSourceRenderer(pi: ExtensionAPI) {
   };
 
   pi.registerMessageRenderer(SESSION_LINK_SOURCE_TYPE, renderSource);
-  pi.registerMessageRenderer(LEGACY_HANDOFF_SOURCE_TYPE, renderSource);
 }
 
 /**

@@ -31,9 +31,6 @@ export function setupReadTool(pi: ExtensionAPI): void {
         const stat = await lstat(absolutePath);
 
         if (stat.isDirectory()) {
-          // Warn user that read was called on a directory (temporary, for monitoring)
-          ctx.ui.notify(`read called on directory: ${path}`, "info");
-
           // Delegate to native ls when reading a directory
           return nativeLs.execute(toolCallId, { path }, signal, onUpdate);
         }
