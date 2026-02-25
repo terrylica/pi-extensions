@@ -12,7 +12,6 @@ import {
   wrapTextWithAnsi,
 } from "@mariozechner/pi-tui";
 import { collectSessionStats } from "../collectors/session-stats";
-import { getProviderSettings } from "../config";
 import { fetchAllProviderRateLimits } from "../rate-limits";
 import {
   assessWindowRisk,
@@ -139,16 +138,8 @@ function buildSessionTabContent(
   const lines: string[] = [];
   const timezone = getLocalTimezone();
 
-  // Filter out providers with widget: "never"
-  const visibleProviders = data.rateLimits.filter((provider) => {
-    const id = provider.providerId;
-    if (!id) return true;
-    const settings = getProviderSettings(id);
-    return settings.widget !== "never";
-  });
-
   // Sort providers: active first, then others alphabetically
-  const sortedProviders = [...visibleProviders].sort((a, b) => {
+  const sortedProviders = [...data.rateLimits].sort((a, b) => {
     if (activeProvider) {
       // Match by providerId or accountId (normalize by removing hyphens/underscores)
       const normalize = (id: string) => id.replace(/[-_]/g, "").toLowerCase();
@@ -233,7 +224,7 @@ function renderProviderHeader(
   }
 
   // Add plan type in parentheses if available
-  if (provider.plan && provider.plan.trim()) {
+  if (provider.plan?.trim()) {
     const planDisplay =
       provider.plan.charAt(0).toUpperCase() + provider.plan.slice(1);
     providerName = `${providerName} (${planDisplay})`;
@@ -954,7 +945,7 @@ export function setupUsageCommand(pi: ExtensionAPI): void {
       const authStorage = cmdCtx.modelRegistry.authStorage;
       const activeProvider = cmdCtx.model?.provider;
 
-      const result = await cmdCtx.ui.custom((tui, theme, _kb, done) => {
+      await cmdCtx.ui.custom((tui, theme, _kb, done) => {
         // Show loader while fetching data
         const loader = new BorderedLoader(tui, theme, "Loading usage...");
         loader.onAbort = () => done(undefined);
@@ -1016,11 +1007,6 @@ export function setupUsageCommand(pi: ExtensionAPI): void {
           },
         };
       });
-
-      // RPC fallback
-      if (result === undefined) {
-        cmdCtx.ui.notify("/providers:usage requires interactive mode", "info");
-      }
     },
   });
 }

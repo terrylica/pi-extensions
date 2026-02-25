@@ -95,36 +95,6 @@ Set per-provider in memory config:
 - **OpenAI Codex**: Requires `openai-codex` auth in Pi
 - **Synthetic**: Requires `SYNTHETIC_API_KEY` environment variable
 
-## Multi-Credential Accounts
-
-Create multiple named accounts for the same provider (e.g., work and personal Codex accounts) that share rate limits but have separate credentials.
-
-### Account Management Commands
-
-- `/providers:create-account` - Create a new account (interactive wizard)
-- `/providers:list-accounts` - List configured accounts
-- `/providers:delete-account <id>` - Delete an account
-
-### Creating an Account
-
-```
-/providers:create-account
-# 1. Select base provider (e.g., "openai-codex")
-# 2. Enter account ID (e.g., "work" becomes "openai-codex-work")
-# 3. Enter display name (e.g., "Codex (Work)")
-# 4. Optional description
-```
-
-After creating, run `/login` to authenticate the new account. The account appears in the login selector with its display name.
-
-### How Accounts Work
-
-- Account ID format: `{base-provider}-{name}` (e.g., `openai-codex-work`)
-- Credentials stored separately per account
-- Rate limits shared with base provider (same pool)
-- Inherits settings from base provider
-- Shows in usage bar and dashboard with display name
-
 ## Architecture
 
 ### Shared Projection Module
