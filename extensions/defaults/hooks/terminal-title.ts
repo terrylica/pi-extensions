@@ -1,23 +1,16 @@
 /**
  * Terminal Title Hook
  *
- * Emits terminal title change events and persists them to the session file.
- * The actual OSC sequences are handled by the presenter extension.
+ * Updates terminal title directly via UI API.
+ * No session persistence for ephemeral title changes.
  */
 
 import * as fs from "node:fs";
 import * as path from "node:path";
-import type { ExtensionAPI } from "@mariozechner/pi-coding-agent";
-
-// Event channel for terminal title changes
-const TERMINAL_TITLE_EVENT = "ad:terminal-title";
-
-// Custom entry type for session persistence
-const TERMINAL_TITLE_ENTRY = "ad:terminal-title";
-
-interface TerminalTitleEvent {
-  title: string;
-}
+import type {
+  ExtensionAPI,
+  ExtensionContext,
+} from "@mariozechner/pi-coding-agent";
 
 // Maximum breadcrumb depth before truncation (root > ... > current)
 const MAX_BREADCRUMB_DEPTH = 2;
@@ -78,38 +71,34 @@ function getContextName(cwd: string): string {
   return `${rootName} > ... > ${parts[parts.length - 1]}`;
 }
 
-/**
- * Emit title event and persist to session
- */
-function emitTitle(pi: ExtensionAPI, title: string) {
-  const event: TerminalTitleEvent = { title };
-  pi.events.emit(TERMINAL_TITLE_EVENT, event);
-  pi.appendEntry(TERMINAL_TITLE_ENTRY, event);
+function setTitle(ctx: ExtensionContext, title: string) {
+  if (!ctx.hasUI) return;
+  ctx.ui.setTitle(title);
 }
 
 export function setupTerminalTitleHook(pi: ExtensionAPI) {
   pi.on("session_start", async (_event, ctx) => {
-    emitTitle(pi, `π: ${getContextName(ctx.cwd)}`);
+    setTitle(ctx, `π: ${getContextName(ctx.cwd)}`);
   });
 
   pi.on("session_switch", async (_event, ctx) => {
-    emitTitle(pi, `π: ${getContextName(ctx.cwd)}`);
+    setTitle(ctx, `π: ${getContextName(ctx.cwd)}`);
   });
 
   pi.on("agent_start", async (_event, ctx) => {
-    emitTitle(pi, `π: ${getContextName(ctx.cwd)} (thinking...)`);
+    setTitle(ctx, `π: ${getContextName(ctx.cwd)} (thinking...)`);
   });
 
   pi.on("tool_call", async (event, ctx) => {
-    emitTitle(pi, `π: ${getContextName(ctx.cwd)} (${event.toolName})`);
+    setTitle(ctx, `π: ${getContextName(ctx.cwd)} (${event.toolName})`);
     return undefined;
   });
 
   pi.on("agent_end", async (_event, ctx) => {
-    emitTitle(pi, `π: ${getContextName(ctx.cwd)}`);
+    setTitle(ctx, `π: ${getContextName(ctx.cwd)}`);
   });
 
-  pi.on("session_shutdown", async () => {
-    emitTitle(pi, "Terminal");
+  pi.on("session_shutdown", async (_event, ctx) => {
+    setTitle(ctx, "Terminal");
   });
 }

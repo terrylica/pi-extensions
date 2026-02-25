@@ -1,34 +1,33 @@
 /**
  * Notification Hook
  *
- * Emits notification events on certain agent events.
- * The actual OSC sequences and sounds are handled by the presenter extension.
+ * Sends OS-level notifications directly from defaults.
+ * Uses terminal OSC sequences and optional macOS sounds.
  */
 
+import { exec } from "node:child_process";
 import type { ToolResultMessage } from "@mariozechner/pi-ai";
 import type {
   ExtensionAPI,
+  ExtensionContext,
   ToolCallEvent,
 } from "@mariozechner/pi-coding-agent";
 
-// Event channel for notifications
-const NOTIFICATION_EVENT = "ad:notification";
-
-interface NotificationEvent {
-  message: string;
-  sound?: string;
-}
-
 const DEFAULT_SOUND = "/System/Library/Sounds/Blow.aiff";
 const ATTENTION_SOUND = "/System/Library/Sounds/Ping.aiff";
+const GUARDRAILS_DANGEROUS_EVENT = "guardrails:dangerous";
+
+interface GuardrailsDangerousEvent {
+  description: string;
+}
 
 type ToolCallHandler = (
-  pi: ExtensionAPI,
   event: ToolCallEvent,
+  ctx: ExtensionContext,
 ) => string | undefined;
 type ToolResultHandler = (
-  pi: ExtensionAPI,
   event: ToolResultMessage,
+  ctx: ExtensionContext,
 ) => string | undefined;
 
 interface ToolStartNotification {
@@ -56,18 +55,45 @@ const TOOL_NOTIFICATIONS: ToolNotification[] = [
   },
 ];
 
+function shouldUseTerminalEffects(ctx: ExtensionContext): boolean {
+  return ctx.hasUI && process.stdout.isTTY;
+}
+
 /**
- * Emit a notification event
+ * Send terminal notification using OSC escape sequences.
+ * OSC 9: Ghostty, ConEmu
+ * OSC 777: iTerm2, WezTerm, Kitty
  */
-function emitNotification(pi: ExtensionAPI, message: string, sound?: string) {
-  const event: NotificationEvent = { message, sound };
-  pi.events.emit(NOTIFICATION_EVENT, event);
+function sendSystemNotification(message: string): void {
+  const title = "Pi";
+  process.stdout.write(`\x1b]9;${title}: ${message}\x1b\\`);
+  process.stdout.write(`\x1b]777;notify;${title};${message}\x1b\\`);
+}
+
+/**
+ * Play notification sound (macOS only)
+ */
+function playSound(soundPath: string): void {
+  if (process.platform !== "darwin") return;
+
+  try {
+    exec(`afplay "${soundPath}"`);
+  } catch {
+    // Ignore sound playback errors
+  }
+}
+
+function notify(ctx: ExtensionContext, message: string, sound?: string): void {
+  if (!shouldUseTerminalEffects(ctx)) return;
+  sendSystemNotification(message);
+  if (sound) playSound(sound);
 }
 
 export function setupNotificationHook(pi: ExtensionAPI) {
   let loopCount = 0;
   let toolCallCount = 0;
   let hadError = false;
+  let lastCtx: ExtensionContext | undefined;
 
   const startNotifications = TOOL_NOTIFICATIONS.filter(
     (n): n is ToolStartNotification => n.trigger === "start",
@@ -76,23 +102,33 @@ export function setupNotificationHook(pi: ExtensionAPI) {
     (n): n is ToolEndNotification => n.trigger === "end",
   );
 
-  pi.on("tool_call", async (event) => {
+  pi.on("session_start", async (_event, ctx) => {
+    lastCtx = ctx;
+  });
+
+  pi.on("session_switch", async (_event, ctx) => {
+    lastCtx = ctx;
+  });
+
+  pi.on("tool_call", async (event, ctx) => {
+    lastCtx = ctx;
     toolCallCount++;
 
     const notification = startNotifications.find(
       (n) => n.toolName === event.toolName,
     );
     if (notification) {
-      const message = notification.handler(pi, event);
+      const message = notification.handler(event, ctx);
       if (message) {
-        emitNotification(pi, message, notification.sound);
+        notify(ctx, message, notification.sound);
       }
     }
 
     return undefined;
   });
 
-  pi.on("turn_end", async (event) => {
+  pi.on("turn_end", async (event, ctx) => {
+    lastCtx = ctx;
     loopCount++;
 
     for (const result of event.toolResults) {
@@ -102,21 +138,22 @@ export function setupNotificationHook(pi: ExtensionAPI) {
         (n) => n.toolName === result.toolName,
       );
       if (notification) {
-        const message = notification.handler(pi, result);
+        const message = notification.handler(result, ctx);
         if (message) {
-          emitNotification(pi, message, notification.sound);
+          notify(ctx, message, notification.sound);
         }
       }
     }
   });
 
-  pi.on("agent_end", async () => {
+  pi.on("agent_end", async (_event, ctx) => {
+    lastCtx = ctx;
     const wasRunning = loopCount > 0;
 
     if (wasRunning) {
       const status = hadError ? "with errors" : "done";
       const message = `${status} - ${loopCount} loops, ${toolCallCount} tools`;
-      emitNotification(pi, message, DEFAULT_SOUND);
+      notify(ctx, message, DEFAULT_SOUND);
     }
 
     // Reset counters for next run
@@ -124,7 +161,12 @@ export function setupNotificationHook(pi: ExtensionAPI) {
     toolCallCount = 0;
     hadError = false;
   });
-}
 
-// Export for use by other extensions (e.g., guardrails)
-export { emitNotification, NOTIFICATION_EVENT, ATTENTION_SOUND };
+  // Keep compatibility with guardrails dangerous-event notifications
+  pi.events.on(GUARDRAILS_DANGEROUS_EVENT, (data: unknown) => {
+    if (!lastCtx) return;
+    const event = data as GuardrailsDangerousEvent;
+    const message = `Dangerous command detected: ${event.description}`;
+    notify(lastCtx, message, ATTENTION_SOUND);
+  });
+}

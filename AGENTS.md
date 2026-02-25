@@ -16,7 +16,6 @@ All packages in this repository are published under the `@aliou` scope, not `@an
 - `introspection` - Inspect Pi agent internals: system prompt, tools, skills, context usage.
 - `neovim` - Bidirectional integration between Pi and Neovim.
 - `planning` - Turn conversations into implementation plans and manage saved plans.
-- `presenter` - Terminal-specific presentation for events emitted by other extensions.
 - `providers` - Register custom providers and show unified rate-limit and usage dashboards.
 - `subagents` - Framework for spawning specialized subagents with custom tools, consistent UI rendering, and logging.
 - `the-dumb-zone` - Detects when an AI session is degrading and shows a warning overlay.
