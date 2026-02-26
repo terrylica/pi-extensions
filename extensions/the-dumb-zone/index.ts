@@ -5,7 +5,7 @@ import { setupDumbZoneHooks } from "./hooks";
 /**
  * The Dumb Zone Extension
  *
- * Shows an overlay when the agent response contains matching phrases.
+ * Shows a warning widget when session quality signals degrade.
  */
 export default function (pi: ExtensionAPI) {
   setupDumbZoneHooks(pi);

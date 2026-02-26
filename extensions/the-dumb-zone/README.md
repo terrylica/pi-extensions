@@ -1,6 +1,6 @@
 # The Dumb Zone
 
-Detects when an AI session is degrading and shows a warning overlay.
+Detects when an AI session is degrading and shows a warning widget.
 
 Inspired by [this video](https://www.youtube.com/watch?v=rmvDxxNubIg).
 
@@ -28,9 +28,9 @@ Detects sycophantic/concerning phrases that indicate the model is in "please the
 
 ## Features
 
-- **Hook**: Runs after each agent turn, triggers overlay when violations detected
-- **Overlay**: Shows "YOU HAVE ENTERED THE DUMB ZONE" with context details (30s cooldown)
-- **Command**: `/dumb-zone-status` - shows current utilization with a progress bar
+- **Hook**: Runs after each agent turn and keeps a dumb-zone widget in sync
+- **Widget**: Shows "YOU HAVE ENTERED THE DUMB ZONE" with context details (30s alert cooldown)
+- **Command**: `/dumb-zone-status` - shows current utilization and refreshes widget state
 
 ## Configuration
 
@@ -51,7 +51,7 @@ export const DUMB_ZONE_PATTERNS: readonly RegExp[] = [
   /you are absolutely right/i,
 ];
 
-export const OVERLAY_COOLDOWN_MS = 30000;
+export const WIDGET_ALERT_COOLDOWN_MS = 30000;
 ```
 
 ## Dependencies

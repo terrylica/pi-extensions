@@ -90,5 +90,5 @@ export const DUMB_ZONE_PATTERNS: readonly RegExp[] = [
 // UI SETTINGS
 // ============================================================================
 
-/** Minimum time between overlay displays to avoid spam (ms) */
-export const OVERLAY_COOLDOWN_MS = 30000; // 30 seconds
+/** Minimum time between dumb-zone alerts to avoid spam (ms) */
+export const WIDGET_ALERT_COOLDOWN_MS = 30000; // 30 seconds
