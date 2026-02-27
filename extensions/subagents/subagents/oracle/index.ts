@@ -26,8 +26,9 @@ import type {
   ToolRenderResultOptions,
 } from "@mariozechner/pi-coding-agent";
 import { Type } from "@sinclair/typebox";
-import { getSubagentModelConfig, isDebugEnabled } from "../../config";
-import { executeSubagent, resolveModel, resolveSkillsByName } from "../../lib";
+import { isDebugEnabled } from "../../config";
+import { executeSubagent, resolveSkillsByName } from "../../lib";
+import { selectModelForSubagent } from "../../lib/subagent-model-selection";
 import { ORACLE_SYSTEM_PROMPT } from "./system-prompt";
 import { createOracleTools } from "./tools";
 import type { OracleDetails, OracleInput } from "./types";
@@ -168,8 +169,7 @@ Pass relevant skills (e.g., 'ios-26', 'drizzle-orm') to provide specialized cont
 
       let resolvedModel: { provider: string; id: string } | undefined;
 
-      const modelConfig = getSubagentModelConfig("oracle");
-      const model = resolveModel(modelConfig.provider, modelConfig.model, ctx);
+      const model = selectModelForSubagent("oracle", ctx);
       resolvedModel = { provider: model.provider, id: model.id };
 
       // Publish resolved provider/model as early as possible for footer rendering.

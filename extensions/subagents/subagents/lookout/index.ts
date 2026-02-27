@@ -27,13 +27,13 @@ import type {
 } from "@mariozechner/pi-coding-agent";
 import { createReadOnlyTools, type Theme } from "@mariozechner/pi-coding-agent";
 import { Type } from "@sinclair/typebox";
-import { getSubagentModelConfig, isDebugEnabled } from "../../config";
+import { isDebugEnabled } from "../../config";
 import {
   executeSubagent,
-  resolveModel,
   resolveSkillsByName,
   shouldFailToolCallForModelIssue,
 } from "../../lib";
+import { selectModelForSubagent } from "../../lib/subagent-model-selection";
 import type { SubagentToolCall } from "../../lib/types";
 import { LOOKOUT_SYSTEM_PROMPT } from "./system-prompt";
 import { createLookoutToolFormatter } from "./tool-formatter";
@@ -160,12 +160,7 @@ Pass relevant skills (e.g., 'ios-26', 'drizzle-orm') to provide specialized cont
       let currentToolCalls: SubagentToolCall[] = [];
 
       try {
-        const modelConfig = getSubagentModelConfig("lookout");
-        const model = resolveModel(
-          modelConfig.provider,
-          modelConfig.model,
-          ctx,
-        );
+        const model = selectModelForSubagent("lookout", ctx);
         resolvedModel = { provider: model.provider, id: model.id };
 
         // Publish resolved provider/model as early as possible for footer rendering.

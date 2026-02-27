@@ -28,13 +28,13 @@ import {
   type Theme,
 } from "@mariozechner/pi-coding-agent";
 import { Type } from "@sinclair/typebox";
-import { getSubagentModelConfig, isDebugEnabled } from "../../config";
+import { isDebugEnabled } from "../../config";
 import {
   executeSubagent,
-  resolveModel,
   resolveSkillsByName,
   shouldFailToolCallForModelIssue,
 } from "../../lib";
+import { selectModelForSubagent } from "../../lib/subagent-model-selection";
 import type { SubagentToolCall } from "../../lib/types";
 import { REVIEWER_SYSTEM_PROMPT } from "./system-prompt";
 import { createReviewerToolFormatter } from "./tool-formatter";
@@ -175,12 +175,7 @@ Pass relevant skills (e.g., 'ios-26', 'drizzle-orm') to provide specialized cont
       let currentToolCalls: SubagentToolCall[] = [];
 
       try {
-        const modelConfig = getSubagentModelConfig("reviewer");
-        const model = resolveModel(
-          modelConfig.provider,
-          modelConfig.model,
-          ctx,
-        );
+        const model = selectModelForSubagent("reviewer", ctx);
         resolvedModel = { provider: model.provider, id: model.id };
 
         // Publish resolved provider/model as early as possible for footer rendering.

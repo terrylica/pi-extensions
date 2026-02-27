@@ -20,12 +20,9 @@ import type {
   ToolRenderResultOptions,
 } from "@mariozechner/pi-coding-agent";
 import { Type } from "@sinclair/typebox";
-import { getSubagentModelConfig, isDebugEnabled } from "../../config";
-import {
-  executeSubagent,
-  resolveModel,
-  shouldFailToolCallForModelIssue,
-} from "../../lib";
+import { isDebugEnabled } from "../../config";
+import { executeSubagent, shouldFailToolCallForModelIssue } from "../../lib";
+import { selectModelForSubagent } from "../../lib/subagent-model-selection";
 import type { SubagentToolCall } from "../../lib/types";
 import { JESTER_SYSTEM_PROMPT } from "./system-prompt";
 import type { JesterDetails, JesterInput } from "./types";
@@ -90,12 +87,7 @@ export function createJesterTool(): ToolDefinition<
       const toolCalls: SubagentToolCall[] = [];
 
       try {
-        const modelConfig = getSubagentModelConfig("jester");
-        const model = resolveModel(
-          modelConfig.provider,
-          modelConfig.model,
-          ctx,
-        );
+        const model = selectModelForSubagent("jester", ctx);
         resolvedModel = { provider: model.provider, id: model.id };
 
         // Publish resolved provider/model as early as possible for footer rendering.

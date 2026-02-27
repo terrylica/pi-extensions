@@ -9,8 +9,14 @@ export const SUPPORTED_PROVIDERS = [
   "openrouter",
   "anthropic",
   "openai-codex",
+  "synthetic",
 ] as const;
 export type SupportedProvider = (typeof SUPPORTED_PROVIDERS)[number];
+
+export interface SubagentModelCandidate {
+  provider: SupportedProvider;
+  model: string;
+}
 
 /** Subagent names that can be configured. */
 export const SUBAGENT_NAMES = [
@@ -66,8 +72,7 @@ export interface ResolvedScoutWebConfig {
 }
 
 export interface SubagentModelConfig {
-  provider?: SupportedProvider;
-  model?: string;
+  candidates?: SubagentModelCandidate[];
   enabled?: boolean;
   web?: ScoutWebConfig;
 }
@@ -78,8 +83,7 @@ export interface SubagentsConfig {
 }
 
 export interface ResolvedSubagentModelConfig {
-  provider: SupportedProvider;
-  model: string;
+  candidates: SubagentModelCandidate[];
   enabled: boolean;
   web?: ResolvedScoutWebConfig;
 }
@@ -103,30 +107,50 @@ const DEFAULT_CONFIG: ResolvedSubagentsConfig = {
   debug: false,
   subagents: {
     scout: {
-      provider: "openrouter",
-      model: "z-ai/glm-5",
+      candidates: [
+        { provider: "openrouter", model: "google/gemini-2.5-flash-lite" },
+        { provider: "openrouter", model: "deepseek/deepseek-v3.2" },
+        { provider: "openrouter", model: "google/gemini-2.5-flash" },
+      ],
       enabled: true,
       web: DEFAULT_SCOUT_WEB_CONFIG,
     },
     lookout: {
-      provider: "openrouter",
-      model: "google/gemini-3-flash-preview",
+      candidates: [
+        { provider: "openrouter", model: "google/gemini-2.5-flash-lite" },
+        { provider: "openrouter", model: "google/gemini-2.5-flash" },
+        { provider: "openrouter", model: "deepseek/deepseek-v3.2" },
+      ],
       enabled: true,
     },
-    oracle: { provider: "openrouter", model: "openai/gpt-5.2", enabled: true },
+    oracle: {
+      candidates: [{ provider: "openai-codex", model: "gpt-5.3-codex" }],
+      enabled: true,
+    },
     reviewer: {
-      provider: "openrouter",
-      model: "anthropic/claude-sonnet-4.5",
+      candidates: [{ provider: "anthropic", model: "claude-sonnet-4-6" }],
       enabled: true,
     },
     jester: {
-      provider: "openrouter",
-      model: "anthropic/claude-haiku-4.5",
+      candidates: [
+        {
+          provider: "openrouter",
+          model: "meta-llama/llama-3.3-70b-instruct",
+        },
+        { provider: "openrouter", model: "openai/gpt-5-nano" },
+        { provider: "openrouter", model: "deepseek/deepseek-v3.2" },
+      ],
       enabled: true,
     },
     worker: {
-      provider: "openrouter",
-      model: "anthropic/claude-haiku-4.5",
+      candidates: [
+        { provider: "openrouter", model: "qwen/qwen3-coder-next" },
+        { provider: "openrouter", model: "qwen/qwen3-coder" },
+        {
+          provider: "synthetic",
+          model: "hf:Qwen/Qwen3-Coder-480B-A35B-Instruct",
+        },
+      ],
       enabled: true,
     },
   },
@@ -143,7 +167,12 @@ export const configLoader = new ConfigLoader<
 export function getSubagentModelConfig(
   name: SubagentName,
 ): ResolvedSubagentModelConfig {
-  return configLoader.getConfig().subagents[name];
+  const resolved = configLoader.getConfig().subagents[name];
+  if (resolved.candidates && resolved.candidates.length > 0) return resolved;
+  return {
+    ...resolved,
+    candidates: DEFAULT_CONFIG.subagents[name].candidates,
+  };
 }
 
 /** Whether debug logging is enabled for subagents. */

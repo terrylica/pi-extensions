@@ -27,13 +27,13 @@ import type {
   ToolRenderResultOptions,
 } from "@mariozechner/pi-coding-agent";
 import { Type } from "@sinclair/typebox";
-import { getSubagentModelConfig, isDebugEnabled } from "../../config";
+import { isDebugEnabled } from "../../config";
 import {
   executeSubagent,
-  resolveModel,
   resolveSkillsByName,
   shouldFailToolCallForModelIssue,
 } from "../../lib";
+import { selectModelForSubagent } from "../../lib/subagent-model-selection";
 import type { SubagentToolCall } from "../../lib/types";
 import { pluralize } from "../../lib/ui/stats";
 import { WORKER_SYSTEM_PROMPT } from "./system-prompt";
@@ -221,12 +221,7 @@ Pass relevant skills (e.g., 'ios-26', 'drizzle-orm') to provide specialized cont
       let currentToolCalls: SubagentToolCall[] = [];
 
       try {
-        const modelConfig = getSubagentModelConfig("worker");
-        const model = resolveModel(
-          modelConfig.provider,
-          modelConfig.model,
-          ctx,
-        );
+        const model = selectModelForSubagent("worker", ctx);
         resolvedModel = { provider: model.provider, id: model.id };
 
         // Publish resolved provider/model as early as possible

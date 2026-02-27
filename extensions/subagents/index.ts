@@ -6,6 +6,7 @@ import {
   SUBAGENT_NAMES,
   type SubagentName,
 } from "./config";
+import { clearSubagentModelSelections } from "./lib/subagent-model-selection";
 import { createJesterTool, JESTER_GUIDANCE } from "./subagents/jester";
 import { createLookoutTool, LOOKOUT_GUIDANCE } from "./subagents/lookout";
 import { createOracleTool, ORACLE_GUIDANCE } from "./subagents/oracle";
@@ -72,6 +73,11 @@ export default async function (pi: ExtensionAPI) {
       `subagents: missing env vars (${missing.join(", ")}). Some tools may fail when invoked.`,
     );
   }
+
+  // Reset per-session model selections so each session can re-pick randomly.
+  pi.on("session_start", async () => {
+    clearSubagentModelSelections();
+  });
 
   // Register settings command
   registerSubagentsSettings(pi);

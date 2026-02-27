@@ -1,23 +1,16 @@
 import {
-  FuzzySelector,
   registerSettingsCommand,
   type SettingsSection,
 } from "@aliou/pi-utils-settings";
-import {
-  type ExtensionAPI,
-  getSettingsListTheme,
-  type ModelRegistry,
-} from "@mariozechner/pi-coding-agent";
+import type { ExtensionAPI } from "@mariozechner/pi-coding-agent";
 import {
   configLoader,
   type ResolvedSubagentsConfig,
   SCOUT_WEB_FETCH_PROVIDERS,
   SCOUT_WEB_SEARCH_PROVIDERS,
   SUBAGENT_NAMES,
-  SUPPORTED_PROVIDERS,
   type SubagentName,
   type SubagentsConfig,
-  type SupportedProvider,
 } from "../config";
 
 const SUBAGENT_UI: Record<
@@ -51,19 +44,6 @@ const SUBAGENT_UI: Record<
   },
 };
 
-function getModelsForProvider(
-  registry: ModelRegistry | null,
-  provider: SupportedProvider,
-): string[] {
-  if (!registry) return [];
-  return registry
-    .getAvailable()
-    .filter((m) => m.provider === provider)
-    .map((m) => m.id);
-}
-
-let registry: ModelRegistry | null = null;
-
 function parseCsvOrder(value: string): string[] {
   return value
     .split(",")
@@ -72,13 +52,9 @@ function parseCsvOrder(value: string): string[] {
 }
 
 export function registerSubagentsSettings(pi: ExtensionAPI): void {
-  pi.on("session_start", async (_event, ctx) => {
-    registry = ctx.modelRegistry;
-  });
-
   registerSettingsCommand<SubagentsConfig, ResolvedSubagentsConfig>(pi, {
     commandName: "subagents:settings",
-    commandDescription: "Configure subagent providers and models",
+    commandDescription: "Configure subagent toggles and scout web routing",
     title: "Subagents Settings",
     configStore: configLoader,
     buildSections: (
@@ -102,16 +78,6 @@ export function registerSubagentsSettings(pi: ExtensionAPI): void {
 
       const subagentSections = SUBAGENT_NAMES.map((name) => {
         const ui = SUBAGENT_UI[name];
-        const currentProvider = (tabConfig?.subagents?.[name]?.provider ??
-          resolved.subagents[name].provider) as SupportedProvider;
-        const currentModel =
-          tabConfig?.subagents?.[name]?.model ?? resolved.subagents[name].model;
-
-        const modelValues = getModelsForProvider(registry, currentProvider);
-        if (!modelValues.includes(currentModel)) {
-          modelValues.unshift(currentModel);
-        }
-
         const currentEnabled =
           tabConfig?.subagents?.[name]?.enabled ??
           resolved.subagents[name].enabled;
@@ -125,28 +91,6 @@ export function registerSubagentsSettings(pi: ExtensionAPI): void {
               description: `Enable or disable ${ui.label}`,
               currentValue: currentEnabled ? "enabled" : "disabled",
               values: ["enabled", "disabled"],
-            },
-            {
-              id: `subagents.${name}.provider`,
-              label: "Provider",
-              description: `Provider for ${ui.label}`,
-              currentValue: currentProvider,
-              values: [...SUPPORTED_PROVIDERS],
-            },
-            {
-              id: `subagents.${name}.model`,
-              label: "Model",
-              description: `Model for ${ui.label}`,
-              currentValue: currentModel,
-              submenu: (currentValue: string, done: (v?: string) => void) =>
-                new FuzzySelector({
-                  label: `Select model for ${ui.label}`,
-                  items: modelValues,
-                  currentValue,
-                  theme: getSettingsListTheme(),
-                  onSelect: (value) => done(value),
-                  onDone: () => done(),
-                }),
             },
           ],
         };
@@ -273,23 +217,17 @@ export function registerSubagentsSettings(pi: ExtensionAPI): void {
 
       if (parts.length === 3) {
         const name = parts[1] as SubagentName;
-        const field = parts[2] as "provider" | "model" | "enabled";
+        const field = parts[2] as "enabled";
 
         const existing = updated.subagents[name] ?? {};
         updated.subagents[name] = existing;
 
         if (field === "enabled") {
           existing.enabled = newValue === "enabled";
-        } else if (field === "provider") {
-          const newProvider = newValue as SupportedProvider;
-          existing.provider = newProvider;
-          const models = getModelsForProvider(registry, newProvider);
-          existing.model = models[0] ?? "";
-        } else {
-          existing[field] = newValue;
+          return updated;
         }
 
-        return updated;
+        return null;
       }
 
       if (parts[1] !== "scout") return null;
