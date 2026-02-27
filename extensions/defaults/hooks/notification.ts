@@ -13,8 +13,9 @@ import type {
   ToolCallEvent,
 } from "@mariozechner/pi-coding-agent";
 
-const DEFAULT_SOUND = "/System/Library/Sounds/Blow.aiff";
-const ATTENTION_SOUND = "/System/Library/Sounds/Ping.aiff";
+// const DEFAULT_SOUND = "/System/Library/Sounds/Blow.aiff";
+const DEFAULT_SOUND = "/System/Library/Sounds/Funk.aiff";
+const ATTENTION_SOUND = "/System/Library/Sounds/Glass.aiff";
 
 const AD_NOTIFY_DANGEROUS_EVENT = "ad:notify:dangerous";
 const AD_NOTIFY_ATTENTION_EVENT = "ad:notify:attention";
