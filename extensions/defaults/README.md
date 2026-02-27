@@ -38,6 +38,8 @@ Sends OS-level terminal notifications directly (OSC) with optional macOS sounds.
 - Plays attention sound when `ask_user` tool is invoked
 - Sends summary notification when agent finishes (loop count, tool count, error status)
 - Listens for `guardrails:dangerous` events and alerts with attention sound
+  - event payload shape: `{ command, description, pattern }`
+  - compatibility note: other extensions can emit this same event to reuse the same attention sound path
 
 ### Terminal title
 
