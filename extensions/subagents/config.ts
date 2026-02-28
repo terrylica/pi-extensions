@@ -109,7 +109,6 @@ const DEFAULT_CONFIG: ResolvedSubagentsConfig = {
     scout: {
       candidates: [
         { provider: "openrouter", model: "google/gemini-2.5-flash-lite" },
-        { provider: "openrouter", model: "deepseek/deepseek-v3.2" },
         { provider: "openrouter", model: "google/gemini-2.5-flash" },
       ],
       enabled: true,
@@ -119,7 +118,6 @@ const DEFAULT_CONFIG: ResolvedSubagentsConfig = {
       candidates: [
         { provider: "openrouter", model: "google/gemini-2.5-flash-lite" },
         { provider: "openrouter", model: "google/gemini-2.5-flash" },
-        { provider: "openrouter", model: "deepseek/deepseek-v3.2" },
       ],
       enabled: true,
     },
@@ -138,7 +136,6 @@ const DEFAULT_CONFIG: ResolvedSubagentsConfig = {
           model: "meta-llama/llama-3.3-70b-instruct",
         },
         { provider: "openrouter", model: "openai/gpt-5-nano" },
-        { provider: "openrouter", model: "deepseek/deepseek-v3.2" },
       ],
       enabled: true,
     },
