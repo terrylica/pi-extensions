@@ -3,8 +3,13 @@
  *
  * Auto-discovers AGENTS.md files in subdirectories when the agent reads files.
  * Pi's built-in discovery only walks up from cwd. This hook fills the gap by
- * sending messages with AGENTS.md files found between cwd and the directory of
- * the file being read.
+ * injecting discovered AGENTS.md content into the system prompt.
+ *
+ * Pattern follows the modes extension:
+ * - Discovers AGENTS.md files on read tool results
+ * - Injects content into system prompt via before_agent_start hook
+ * - Filters agents-discovery messages from LLM context via context hook
+ * - Renders custom UI messages for user visibility
  */
 
 import type {
@@ -13,7 +18,10 @@ import type {
 } from "@mariozechner/pi-coding-agent";
 import { getMarkdownTheme } from "@mariozechner/pi-coding-agent";
 import { Box, Markdown, Text } from "@mariozechner/pi-tui";
-import type { AgentsDiscoveryManager } from "../lib/agents-discovery";
+import type {
+  AgentsDiscoveryManager,
+  DiscoveredFile,
+} from "../lib/agents-discovery";
 
 const AGENTS_DISCOVERY_MESSAGE_TYPE = "agents-discovery";
 
@@ -26,6 +34,10 @@ export function setupAgentsDiscoveryHook(
   pi: ExtensionAPI,
   manager: AgentsDiscoveryManager,
 ) {
+  // Track all discovered AGENTS.md files for system prompt injection
+  // These persist across turns once discovered (like breadcrumbs guidance)
+  const discoveredFiles: DiscoveredFile[] = [];
+
   // Register custom message renderer
   pi.registerMessageRenderer<AgentsDiscoveryDetails>(
     AGENTS_DISCOVERY_MESSAGE_TYPE,
@@ -54,8 +66,35 @@ export function setupAgentsDiscoveryHook(
     },
   );
 
+  // Filter agents-discovery messages from LLM context
+  pi.on("context", async (event) => {
+    const messages = event.messages.filter((message) => {
+      const maybeCustom = message as { customType?: unknown };
+      return maybeCustom.customType !== AGENTS_DISCOVERY_MESSAGE_TYPE;
+    });
+
+    return { messages };
+  });
+
+  // Inject discovered AGENTS.md content into system prompt on every turn
+  // This persists discovered files across turns (like breadcrumbs guidance)
+  pi.on("before_agent_start", async (event) => {
+    if (discoveredFiles.length === 0) return;
+
+    // Build injection content from all discovered files
+    const injections = discoveredFiles.map(
+      (file) =>
+        `<agents_md path="${file.path}">\n${file.content}\n</agents_md>`,
+    );
+
+    return {
+      systemPrompt: `${event.systemPrompt}\n\n## Discovered AGENTS.md files\n\n${injections.join("\n\n")}`,
+    };
+  });
+
   const handleSessionChange = (_event: unknown, ctx: ExtensionContext) => {
     manager.resetSession(ctx.cwd);
+    discoveredFiles.length = 0;
   };
 
   pi.on("session_start", handleSessionChange);
@@ -86,12 +125,20 @@ export function setupAgentsDiscoveryHook(
 
     const prettyPaths = discovered.map((f) => manager.prettyPath(f.path));
 
-    // Send custom messages for each discovered AGENTS.md
+    // Add newly discovered files to the persistent collection
+    // They will be injected into the system prompt on every subsequent turn
     for (const file of discovered) {
-      const wrapped = `Automated AGENTS.md file read\n<agents_md>${file.content}</agents_md>`;
+      // Avoid duplicates
+      if (!discoveredFiles.some((f) => f.path === file.path)) {
+        discoveredFiles.push(file);
+      }
+    }
+
+    // Send custom messages for UI display (filtered from LLM context)
+    for (const file of discovered) {
       pi.sendMessage({
         customType: AGENTS_DISCOVERY_MESSAGE_TYPE,
-        content: wrapped,
+        content: `Discovered AGENTS.md: ${manager.prettyPath(file.path)}`,
         display: true,
         details: { path: file.path, content: file.content },
       });
