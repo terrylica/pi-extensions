@@ -11,53 +11,53 @@ interface NvimConnectionDetails {
 export function registerNvimConnectionRenderer(pi: ExtensionAPI) {
   pi.registerMessageRenderer("nvim-connection", (message, _options, theme) => {
     const details = message.details as NvimConnectionDetails | undefined;
-    const box = new Box(1, 0, (s) => theme.bg("customMessageBg", s));
+    const box = new Box(1, 1, (s) => theme.bg("customMessageBg", s));
+
+    const tag = theme.fg("customMessageLabel", theme.bold("[nvim]"));
 
     if (!details) {
-      box.addChild(new Text(theme.fg("dim", message.content), 0, 0));
+      box.addChild(
+        new Text(`${tag} ${theme.fg("dim", message.content)}`, 0, 0),
+      );
       return box;
     }
 
     switch (details.status) {
       case "connected": {
-        const pid = details.pid ? theme.fg("dim", ` (PID ${details.pid})`) : "";
-        const content =
-          theme.fg("success", theme.bold("nvim ")) +
-          theme.fg("muted", "connected") +
-          pid;
-        box.addChild(new Text(content, 0, 0));
+        const pidInfo = details.pid
+          ? theme.fg("dim", ` PID ${details.pid}`)
+          : "";
+        const content = `${theme.fg("success", "Connected")}${pidInfo}`;
+        box.addChild(new Text(`${tag} ${content}`, 0, 0));
         return box;
       }
 
       case "disconnected": {
-        const content =
-          theme.fg("warning", theme.bold("nvim ")) +
-          theme.fg("muted", "disconnected");
-        box.addChild(new Text(content, 0, 0));
+        const content = theme.fg("warning", "Disconnected");
+        box.addChild(new Text(`${tag} ${content}`, 0, 0));
         return box;
       }
 
       case "multiple": {
-        const content =
-          theme.fg("warning", theme.bold("nvim ")) +
-          theme.fg(
-            "muted",
-            `${details.instanceCount ?? "multiple"} instances found, none selected`,
-          );
-        box.addChild(new Text(content, 0, 0));
+        const count = details.instanceCount ?? "multiple";
+        const content = theme.fg(
+          "warning",
+          `${count} instances found, none selected`,
+        );
+        box.addChild(new Text(`${tag} ${content}`, 0, 0));
         return box;
       }
 
       case "none": {
-        const content =
-          theme.fg("dim", theme.bold("nvim ")) +
-          theme.fg("dim", "no instance found");
-        box.addChild(new Text(content, 0, 0));
+        const content = theme.fg("dim", "No instance found");
+        box.addChild(new Text(`${tag} ${content}`, 0, 0));
         return box;
       }
 
       default: {
-        box.addChild(new Text(theme.fg("dim", message.content), 0, 0));
+        box.addChild(
+          new Text(`${tag} ${theme.fg("dim", message.content)}`, 0, 0),
+        );
         return box;
       }
     }

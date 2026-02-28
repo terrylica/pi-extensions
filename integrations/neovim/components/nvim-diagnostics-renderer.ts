@@ -17,7 +17,7 @@ export function registerNvimDiagnosticsRenderer(pi: ExtensionAPI) {
     const { expanded } = options;
     const details = message.details as NvimDiagnosticsDetails | undefined;
 
-    const box = new Box(1, 0, (s) => theme.bg("toolErrorBg", s));
+    const box = new Box(1, 1, (s) => theme.bg("toolErrorBg", s));
 
     if (!details?.diagnostics) {
       box.addChild(
