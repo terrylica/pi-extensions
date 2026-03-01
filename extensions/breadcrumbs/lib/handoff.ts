@@ -84,7 +84,8 @@ Cover:
 For relevantFiles, list file paths that are relevant to the goal.
 
 Be concise and specific. Prioritize the END of the conversation over the beginning.
-You MUST call create_handoff_context exactly once.`;
+You MUST call create_handoff_context exactly once.
+Do NOT generate any conversational text, greetings, or role-played dialogue. Do NOT continue the conversation from the session content. Your ONLY output should be a single call to create_handoff_context.`;
 
 /**
  * Extract handoff context from the current session using a subagent.
@@ -95,7 +96,7 @@ You MUST call create_handoff_context exactly once.`;
  * @param goal - The goal for the new session
  * @param ctx - Extension context
  * @param onTextUpdate - Optional callback for streaming text deltas
- * @param signal - Abort signal for cancellation (combined with a 30s timeout internally)
+ * @param signal - Abort signal for cancellation (combined with a 120s timeout internally)
  */
 export async function extractHandoffContext(
   goal: string,
@@ -150,8 +151,8 @@ export async function extractHandoffContext(
 
   const userMessage = `## Goal for New Session\n\n${goal}\n\n## Session Content\n\n${sessionContent}`;
 
-  // Combine caller signal with a 30s timeout
-  const timeoutSignal = AbortSignal.timeout(30_000);
+  // Combine caller signal with a 120s timeout
+  const timeoutSignal = AbortSignal.timeout(120_000);
   let combinedSignal: AbortSignal;
   if (signal) {
     combinedSignal = AbortSignal.any([signal, timeoutSignal]);
@@ -161,12 +162,12 @@ export async function extractHandoffContext(
 
   await executeSubagent(
     {
-      name: "handoff-extractor",
+      name: "handoff",
       model,
       systemPrompt: EXTRACTION_SYSTEM_PROMPT,
       customTools: [createHandoffContextTool],
       thinkingLevel: "off",
-      logging: { enabled: false },
+      logging: { enabled: true, debug: true },
     },
     userMessage,
     ctx,

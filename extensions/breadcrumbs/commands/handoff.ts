@@ -192,8 +192,15 @@ export function setupHandoffCommand(pi: ExtensionAPI) {
               finishOnce(result);
             })
             .catch((err) => {
+              const reason = err instanceof Error ? err.message : String(err);
+              const isTimeout =
+                reason.includes("abort") || reason.includes("timeout");
               console.error("Handoff extraction failed:", err);
-              view.finish("Extraction failed.");
+              view.finish(
+                isTimeout
+                  ? "Extraction timed out (120s limit)."
+                  : `Extraction failed: ${reason}`,
+              );
               finishOnce(null);
             });
 
@@ -202,6 +209,7 @@ export function setupHandoffCommand(pi: ExtensionAPI) {
       );
 
       if (extracted === null) {
+        // null can mean user-cancelled (Esc), timeout, or extraction error -- all logged above
         ctx.ui.notify("Handoff cancelled", "info");
         return;
       }
