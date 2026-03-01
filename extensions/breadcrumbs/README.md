@@ -36,6 +36,8 @@ Extract context from the current session for starting a new one. Disabled by def
 
 - `session:copy-path` - Copy the current session file path to clipboard
 - `session:copy-id` - Copy the current session ID to clipboard
+- `breadcrumbs:read-session-files [status|allow|confirm]` - Runtime toggle for direct session-file reads + session-dir bash access
+- `breadcrumb:read_session [status|allow|confirm]` - Alias of the same toggle
 - `/handoff <goal>` - Create a new session with extracted context
 
 The `/handoff` command extracts relevant context, lets you review and edit the prompt, then creates a new session with that context.
@@ -59,6 +61,12 @@ The extension gates direct agent access to the sessions directory (`~/.pi/agent/
 
 - Direct **read** attempts trigger a user confirmation prompt (UI required). Approval is remembered for the rest of the current Pi session.
 - Direct **write/edit** attempts remain blocked.
-- Direct **bash** commands referencing the sessions directory remain blocked.
+- Direct **bash** commands referencing the sessions directory are blocked in `confirm` mode.
+
+Use `breadcrumbs:read-session-files` to control gating in-memory for current runtime:
+- `breadcrumbs:read-session-files status` - show current mode (`confirm` or `allow`)
+- `breadcrumbs:read-session-files allow` - allow direct reads without confirmation and allow bash commands touching the sessions dir
+- `breadcrumbs:read-session-files confirm` - restore confirmation prompts and bash blocking
+- `breadcrumbs:read-session-files` - toggle between `confirm` and `allow`
 
 Agents should prefer `find_sessions` and `read_session` instead of reading raw session JSONL.

@@ -9,6 +9,25 @@ import { homedir } from "node:os";
 import { isAbsolute, join, relative, resolve } from "node:path";
 import type { ExtensionAPI } from "@mariozechner/pi-coding-agent";
 
+export type SessionReadAccessMode = "confirm" | "allow";
+
+// In-memory mode for current Pi runtime only.
+let sessionReadAccessMode: SessionReadAccessMode = "confirm";
+
+export function getSessionReadAccessMode(): SessionReadAccessMode {
+  return sessionReadAccessMode;
+}
+
+export function setSessionReadAccessMode(mode: SessionReadAccessMode): void {
+  sessionReadAccessMode = mode;
+}
+
+export function toggleSessionReadAccessMode(): SessionReadAccessMode {
+  sessionReadAccessMode =
+    sessionReadAccessMode === "confirm" ? "allow" : "confirm";
+  return sessionReadAccessMode;
+}
+
 function getSessionsDir(): string {
   const agentDir =
     process.env.PI_CODING_AGENT_DIR || join(homedir(), ".pi", "agent");
@@ -30,7 +49,7 @@ function isInSessionsDir(path: string): boolean {
 const BLOCK_MESSAGE =
   "Direct access to session files is restricted. " +
   "Prefer find_sessions + read_session. " +
-  "Direct read may be allowed with explicit user confirmation.";
+  "Direct reads may be allowed via runtime toggle or explicit user confirmation.";
 
 const FILE_TOOLS = new Set(["read", "write", "edit"]);
 
@@ -38,9 +57,13 @@ const FILE_TOOLS = new Set(["read", "write", "edit"]);
  * Hook that gates direct file access to the sessions directory.
  *
  * Default behavior:
- * - read: prompt the user for confirmation (requires UI). If no UI, deny.
+ * - read: prompt the user for confirmation (UI required). If no UI, deny.
  * - write/edit: still blocked unconditionally.
- * - bash: still blocked unconditionally (too hard to safely scope).
+ * - bash: still blocked for session-dir commands.
+ *
+ * Optional runtime override:
+ * - sessionReadAccessMode = "allow": direct session-file reads and bash
+ *   commands touching the sessions dir are allowed for current runtime.
  */
 export function setupProtectSessionsDirHook(pi: ExtensionAPI) {
   // Session-only allowlist for explicit user approvals.
@@ -64,6 +87,9 @@ export function setupProtectSessionsDirHook(pi: ExtensionAPI) {
           ctx.ui.notify("Blocked: session file write/edit", "warning");
           return { block: true, reason: BLOCK_MESSAGE };
         }
+
+        // read: allow all when runtime mode is "allow".
+        if (getSessionReadAccessMode() === "allow") return;
 
         // read: allow if previously approved for this session.
         if (allowedReadPaths.has(resolvedPath)) return;
@@ -118,6 +144,10 @@ export function setupProtectSessionsDirHook(pi: ExtensionAPI) {
         command.includes(sessionsDir) ||
         command.includes("/.pi/agent/sessions")
       ) {
+        if (getSessionReadAccessMode() === "allow") {
+          return;
+        }
+
         ctx.ui.notify("Blocked: use find_sessions / read_session", "warning");
         return { block: true, reason: BLOCK_MESSAGE };
       }
