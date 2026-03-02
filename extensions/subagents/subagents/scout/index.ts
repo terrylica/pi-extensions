@@ -543,7 +543,13 @@ Pass relevant skills (e.g., 'ios-26', 'drizzle-orm') to provide specialized cont
         fields.push({ label: "Error", value: error });
       } else if (response) {
         // Done state
-        fields.push(new ToolCallSummary(toolCalls, formatScoutToolCall, theme));
+        if (isDebugEnabled()) {
+          fields.push(new ToolCallList(toolCalls, formatScoutToolCall, theme));
+        } else {
+          fields.push(
+            new ToolCallSummary(toolCalls, formatScoutToolCall, theme),
+          );
+        }
         fields.push(new FailedToolCalls(toolCalls, formatScoutToolCall, theme));
 
         if (mdResponse) {

@@ -442,7 +442,11 @@ Pass relevant skills (e.g., 'ios-26', 'drizzle-orm') to provide specialized cont
         fields.push({ label: "Error", value: error });
       } else if (response) {
         // Done state
-        fields.push(new ToolCallSummary(toolCalls, formatToolCall, theme));
+        if (isDebugEnabled()) {
+          fields.push(new ToolCallList(toolCalls, formatToolCall, theme));
+        } else {
+          fields.push(new ToolCallSummary(toolCalls, formatToolCall, theme));
+        }
         fields.push(new FailedToolCalls(toolCalls, formatToolCall, theme));
 
         if (mdResponse) {
