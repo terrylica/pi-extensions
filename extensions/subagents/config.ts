@@ -128,7 +128,6 @@ const DEFAULT_CONFIG: ResolvedSubagentsConfig = {
     oracle: {
       candidates: [
         { provider: "openai-codex", model: "gpt-5.3-codex" },
-        { provider: "synthetic", model: "hf:Qwen/Qwen3.5-397B-A17B" },
         { provider: "mistral", model: "magistral-medium-2509" },
       ],
       enabled: true,
@@ -137,7 +136,6 @@ const DEFAULT_CONFIG: ResolvedSubagentsConfig = {
       candidates: [
         { provider: "anthropic", model: "claude-sonnet-4-6" },
         { provider: "mistral", model: "mistral-large-2512" },
-        { provider: "synthetic", model: "hf:Qwen/Qwen3.5-397B-A17B" },
       ],
       enabled: true,
     },
