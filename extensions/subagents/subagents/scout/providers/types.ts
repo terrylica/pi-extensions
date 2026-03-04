@@ -1,4 +1,4 @@
-export type ScoutProviderId = "exa" | "linkup" | "synthetic";
+export type ScoutProviderId = "exa" | "linkup" | "synthetic" | "markdownDotNew";
 export type ScoutCapability = "web_search" | "web_fetch";
 
 export interface AvailabilityOk {

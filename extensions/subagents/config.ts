@@ -36,7 +36,11 @@ export const SCOUT_WEB_SEARCH_PROVIDERS = [
   "linkup",
   "synthetic",
 ] as const;
-export const SCOUT_WEB_FETCH_PROVIDERS = ["exa", "linkup"] as const;
+export const SCOUT_WEB_FETCH_PROVIDERS = [
+  "exa",
+  "linkup",
+  "markdownDotNew",
+] as const;
 
 export type ScoutWebSearchProvider =
   (typeof SCOUT_WEB_SEARCH_PROVIDERS)[number];
@@ -56,6 +60,7 @@ export interface ScoutWebConfig {
       renderJsDefault?: boolean;
     };
     synthetic?: { enabled?: boolean };
+    markdownDotNew?: { enabled?: boolean };
   };
 }
 
@@ -70,6 +75,7 @@ export interface ResolvedScoutWebConfig {
       renderJsDefault: boolean;
     };
     synthetic: { enabled: boolean };
+    markdownDotNew: { enabled: boolean };
   };
 }
 
@@ -97,11 +103,12 @@ export interface ResolvedSubagentsConfig {
 
 const DEFAULT_SCOUT_WEB_CONFIG: ResolvedScoutWebConfig = {
   searchOrder: ["synthetic", "exa", "linkup"],
-  fetchOrder: ["exa", "linkup"],
+  fetchOrder: ["markdownDotNew", "exa", "linkup"],
   providers: {
     exa: { enabled: true, searchMode: "auto" },
     linkup: { enabled: true, searchDepth: "fast", renderJsDefault: false },
     synthetic: { enabled: true },
+    markdownDotNew: { enabled: true },
   },
 };
 
@@ -246,6 +253,11 @@ export function getScoutWebConfig(): ResolvedScoutWebConfig {
         enabled:
           web?.providers?.synthetic?.enabled ??
           DEFAULT_SCOUT_WEB_CONFIG.providers.synthetic.enabled,
+      },
+      markdownDotNew: {
+        enabled:
+          web?.providers?.markdownDotNew?.enabled ??
+          DEFAULT_SCOUT_WEB_CONFIG.providers.markdownDotNew.enabled,
       },
     },
   };

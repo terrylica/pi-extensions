@@ -125,7 +125,11 @@ export function registerSubagentsSettings(pi: ExtensionAPI): void {
               scoutWeb?.fetchOrder ??
               []
             ).join(","),
-            values: ["exa,linkup", "linkup,exa"],
+            values: [
+              "markdownDotNew,exa,linkup",
+              "exa,markdownDotNew,linkup",
+              "exa,linkup,markdownDotNew",
+            ],
           },
           {
             id: "subagents.scout.web.providers.exa.enabled",
@@ -145,6 +149,18 @@ export function registerSubagentsSettings(pi: ExtensionAPI): void {
             currentValue:
               (scoutWebTab?.providers?.linkup?.enabled ??
               scoutWeb?.providers.linkup.enabled)
+                ? "enabled"
+                : "disabled",
+            values: ["enabled", "disabled"],
+          },
+          {
+            id: "subagents.scout.web.providers.markdownDotNew.enabled",
+            label: "Markdown New enabled",
+            description:
+              "Enable Markdown New for web fetch (free, 500 req/day/IP)",
+            currentValue:
+              (scoutWebTab?.providers?.markdownDotNew?.enabled ??
+              scoutWeb?.providers.markdownDotNew.enabled)
                 ? "enabled"
                 : "disabled",
             values: ["enabled", "disabled"],
@@ -272,10 +288,14 @@ export function registerSubagentsSettings(pi: ExtensionAPI): void {
       if (!web.providers.synthetic) {
         web.providers.synthetic = {};
       }
+      if (!web.providers.markdownDotNew) {
+        web.providers.markdownDotNew = {};
+      }
 
       const exa = web.providers.exa;
       const linkup = web.providers.linkup;
       const synthetic = web.providers.synthetic;
+      const markdownDotNew = web.providers.markdownDotNew;
 
       if (id === "subagents.scout.web.providers.exa.enabled") {
         exa.enabled = newValue === "enabled";
@@ -289,6 +309,11 @@ export function registerSubagentsSettings(pi: ExtensionAPI): void {
 
       if (id === "subagents.scout.web.providers.synthetic.enabled") {
         synthetic.enabled = newValue === "enabled";
+        return updated;
+      }
+
+      if (id === "subagents.scout.web.providers.markdownDotNew.enabled") {
+        markdownDotNew.enabled = newValue === "enabled";
         return updated;
       }
 

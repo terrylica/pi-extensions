@@ -193,5 +193,7 @@ function isEnabled(providerId: ScoutProviderId): boolean {
   const config = getScoutWebConfig();
   if (providerId === "exa") return config.providers.exa.enabled;
   if (providerId === "linkup") return config.providers.linkup.enabled;
+  if (providerId === "markdownDotNew")
+    return config.providers.markdownDotNew.enabled;
   return config.providers.synthetic.enabled;
 }
