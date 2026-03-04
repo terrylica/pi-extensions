@@ -83,6 +83,7 @@ class UpdateView extends Container {
     this.clear();
     this.addChild(this.borderTop);
     this.addChild(this.loader);
+    this.addChild(new Spacer(1));
     this.addChild(new Text(this.theme.fg("dim", "  Esc to cancel"), 0, 0));
     this.addChild(this.borderBottom);
   }
