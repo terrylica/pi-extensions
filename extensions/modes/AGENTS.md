@@ -17,7 +17,7 @@ Hardcoded mode system for Pi with tool gating and model switching.
 ## Notes
 
 - No config file and no `enabled` toggle by design.
-- Uses `tool_call` hook for enforcement (not `setActiveTools`).
+- Uses `tool_call` hook for enforcement and `setActiveTools` for denylist-based filtering.
 - Persists mode per branch via custom `mode-state` entries.
 - Injects mode guidance via `before_agent_start`.
 - Sends `mode-switch` UI messages and filters them from LLM context.
