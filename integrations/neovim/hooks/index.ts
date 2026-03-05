@@ -1,4 +1,5 @@
 import type { ExtensionAPI } from "@mariozechner/pi-coding-agent";
+import type { ResolvedNvimConfig } from "../config";
 import {
   type NvimConnectionState,
   registerNvimContextHook,
@@ -6,6 +7,10 @@ import {
 
 export type { NvimConnectionState } from "./nvim-context";
 
-export function setupNvimHooks(pi: ExtensionAPI, state: NvimConnectionState) {
-  registerNvimContextHook(pi, state);
+export function setupNvimHooks(
+  pi: ExtensionAPI,
+  state: NvimConnectionState,
+  getConfig: () => ResolvedNvimConfig,
+) {
+  registerNvimContextHook(pi, state, getConfig);
 }

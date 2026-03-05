@@ -220,6 +220,9 @@ importers:
 
   integrations/neovim:
     dependencies:
+      '@aliou/pi-utils-settings':
+        specifier: ^0.7.1
+        version: 0.7.1(@mariozechner/pi-coding-agent@0.53.0(ws@8.19.0)(zod@3.25.76))
       '@aliou/pi-utils-ui':
         specifier: ^0.1.1
         version: 0.1.1(@mariozechner/pi-coding-agent@0.53.0(ws@8.19.0)(zod@3.25.76))(@mariozechner/pi-tui@0.53.0)

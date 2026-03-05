@@ -10,6 +10,7 @@
 
 import * as path from "node:path";
 import type { ExtensionAPI } from "@mariozechner/pi-coding-agent";
+import type { ResolvedNvimConfig } from "../config";
 
 import {
   type DiscoveredInstance,
@@ -167,7 +168,9 @@ function formatDiagnosticsMessage(
 export function registerNvimContextHook(
   pi: ExtensionAPI,
   state: NvimConnectionState,
+  getConfig: () => ResolvedNvimConfig,
 ) {
+  const shouldShowConnectionMessages = () => getConfig().showConnectionMessages;
   // -------------------------------------------------------------------------
   // Session start: auto-connect to Neovim
   // -------------------------------------------------------------------------
@@ -180,12 +183,14 @@ export function registerNvimContextHook(
 
     const instances = discoverNvim(ctx.cwd);
     if (instances.length === 0) {
-      pi.sendMessage({
-        customType: "nvim-connection",
-        content: "nvim: no instance found",
-        display: true,
-        details: { status: "none" },
-      });
+      if (shouldShowConnectionMessages()) {
+        pi.sendMessage({
+          customType: "nvim-connection",
+          content: "nvim: no instance found",
+          display: true,
+          details: { status: "none" },
+        });
+      }
       return;
     }
 
@@ -214,15 +219,17 @@ export function registerNvimContextHook(
       );
 
       if (!selected) {
-        pi.sendMessage({
-          customType: "nvim-connection",
-          content: `nvim: ${instances.length} instances found, none selected`,
-          display: true,
-          details: {
-            status: "multiple",
-            instanceCount: instances.length,
-          },
-        });
+        if (shouldShowConnectionMessages()) {
+          pi.sendMessage({
+            customType: "nvim-connection",
+            content: `nvim: ${instances.length} instances found, none selected`,
+            display: true,
+            details: {
+              status: "multiple",
+              instanceCount: instances.length,
+            },
+          });
+        }
         return;
       }
 
@@ -243,16 +250,18 @@ export function registerNvimContextHook(
     state.socket = selectedInstance.lockfile.socket;
     state.lockfile = selectedInstance.lockfilePath;
 
-    pi.sendMessage({
-      customType: "nvim-connection",
-      content: `nvim: connected (PID ${selectedInstance.lockfile.pid})`,
-      display: true,
-      details: {
-        status: "connected",
-        pid: selectedInstance.lockfile.pid,
-        socket: selectedInstance.lockfile.socket,
-      },
-    });
+    if (shouldShowConnectionMessages()) {
+      pi.sendMessage({
+        customType: "nvim-connection",
+        content: `nvim: connected (PID ${selectedInstance.lockfile.pid})`,
+        display: true,
+        details: {
+          status: "connected",
+          pid: selectedInstance.lockfile.pid,
+          socket: selectedInstance.lockfile.socket,
+        },
+      });
+    }
 
     // Notify Neovim via RPC
     try {

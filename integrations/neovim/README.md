@@ -10,6 +10,7 @@ Bidirectional integration between Pi and Neovim.
 - Inject visible splits into system prompt
 - Reload files in Neovim after write/edit
 - Send LSP errors for modified files at turn end
+- `/neovim:settings` command to configure Neovim integration behavior
 
 **Neovim Plugin (for the editor):**
 - RPC server exposing editor state
@@ -116,6 +117,10 @@ The `nvim_context` tool is available with these actions:
 - `splits`: All visible splits with metadata (excludes help, quickfix, terminal buffers)
 - `diagnostics`: LSP diagnostics for current buffer
 - `current_function`: Treesitter info about function at cursor
+
+Settings command:
+- `/neovim:settings` - Edit Neovim integration settings
+  - `Connection status messages`: `on/off` (global scope only, default: `on`)
 
 ### From Neovim
 

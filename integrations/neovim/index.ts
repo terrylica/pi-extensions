@@ -10,11 +10,15 @@
  */
 
 import type { ExtensionAPI } from "@mariozechner/pi-coding-agent";
+import { registerCommands } from "./commands";
 import { registerRenderers } from "./components";
+import { configLoader } from "./config";
 import { type NvimConnectionState, setupNvimHooks } from "./hooks";
 import { setupNvimTools } from "./tools";
 
-export default function nvimContextExtension(pi: ExtensionAPI) {
+export default async function nvimContextExtension(pi: ExtensionAPI) {
+  await configLoader.load();
+
   const state: NvimConnectionState = {
     socket: null,
     lockfile: null,
@@ -22,6 +26,7 @@ export default function nvimContextExtension(pi: ExtensionAPI) {
   };
 
   registerRenderers(pi);
+  registerCommands(pi);
   setupNvimTools(pi, state);
-  setupNvimHooks(pi, state);
+  setupNvimHooks(pi, state, () => configLoader.getConfig());
 }
