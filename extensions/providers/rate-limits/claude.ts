@@ -48,6 +48,59 @@ function createTimeoutSignal(
   return controller.signal;
 }
 
+async function getClaudeUsageError(response: Response): Promise<string> {
+  if (response.status === 401 || response.status === 403) {
+    return "Token expired";
+  }
+
+  const retryAfter = response.headers.get("retry-after");
+
+  let details: string | undefined;
+  try {
+    const body = (await response.json()) as
+      | {
+          message?: string;
+          error?: string | { message?: string };
+        }
+      | undefined;
+    details =
+      body?.message ??
+      (typeof body?.error === "string" ? body.error : body?.error?.message);
+  } catch {
+    // Ignore parse failures; keep fallback message below.
+  }
+
+  if (!details) {
+    try {
+      const text = (await response.text()).trim();
+      details = text || undefined;
+    } catch {
+      // Ignore read failures; keep fallback message below.
+    }
+  }
+
+  if (response.status === 429) {
+    const retryAfterSeconds = retryAfter ? Number(retryAfter) : Number.NaN;
+    if (Number.isFinite(retryAfterSeconds) && retryAfterSeconds > 0) {
+      return `Rate limited (429, retry-after ${retryAfterSeconds}s)`;
+    }
+    if (details) {
+      return `Rate limited (429, reset unknown): ${details}`;
+    }
+    return "Rate limited (429, reset unknown)";
+  }
+
+  if (response.status >= 500) {
+    return details
+      ? `Server error (${response.status}): ${details}`
+      : `Server error (${response.status})`;
+  }
+
+  return details
+    ? `Fetch failed (${response.status}): ${details}`
+    : `Fetch failed (${response.status})`;
+}
+
 export async function fetchClaudeRateLimits(
   authStorage: AuthStorage,
   signal?: AbortSignal,
@@ -67,6 +120,9 @@ export async function fetchClaudeRateLimits(
   const headers = {
     Authorization: `Bearer ${token}`,
     "anthropic-beta": "oauth-2025-04-20",
+    Accept: "application/json",
+    "Content-Type": "application/json",
+    "User-Agent": "CodexBar", // Matches known working client behavior
   };
 
   let status: StatusIndicator = "unknown";
@@ -95,11 +151,7 @@ export async function fetchClaudeRateLimits(
     }
 
     if (!usageResponse.ok) {
-      if (usageResponse.status === 401 || usageResponse.status === 403) {
-        error = "Token expired";
-      } else {
-        error = "Fetch failed";
-      }
+      error = await getClaudeUsageError(usageResponse);
     } else {
       try {
         const usageJson = (await usageResponse.json()) as {
