@@ -90,8 +90,13 @@ export function setupFindTool(pi: ExtensionAPI): void {
         };
       }
 
-      // Resolve the search path relative to the context's working directory
-      const absoluteSearchPath = resolve(ctx.cwd, searchPath || ".");
+      // Resolve the search path, expanding ~ to home directory
+      let resolvedPath = searchPath || ".";
+      // Expand ~ to home directory if path starts with ~ (but not ~something else like ~/foo)
+      if (resolvedPath === "~" || resolvedPath.startsWith("~/")) {
+        resolvedPath = resolvedPath.replace(/^~/, homedir());
+      }
+      const absoluteSearchPath = resolve(ctx.cwd, resolvedPath);
 
       // Block searching in overly broad directories
       if (BLOCKED_PATHS.has(absoluteSearchPath)) {
