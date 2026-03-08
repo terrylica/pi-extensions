@@ -8,10 +8,12 @@ interface PathPartsResult {
 
 /**
  * Build path and branch parts for footer line 1 left side
+ * @param minimal - If true, only show project name + branch (for small screens)
  */
 export function buildPathParts(
   theme: Theme,
   branch: string | null | undefined,
+  minimal: boolean = false,
 ): PathPartsResult {
   let cwd = process.cwd();
   const home = process.env.HOME || process.env.USERPROFILE;
@@ -28,18 +30,23 @@ export function buildPathParts(
   if (segments.length > 0) {
     const last_index = segments.length - 1;
     const last_segment = segments[last_index];
-    const all_middle = segments.slice(0, last_index);
-    const middle_segments = all_middle.slice(0, 2);
 
-    if (middle_segments.length > 0) {
-      const middle_truncated = middle_segments.map((s) => s[0] ?? "").join("/");
-      parts.push(
-        isHome
-          ? theme.fg("thinkingMinimal", `~/${middle_truncated}/`)
-          : theme.fg("thinkingMinimal", `${middle_truncated}/`),
-      );
-    } else if (isHome) {
-      parts.push(theme.fg("thinkingMinimal", "~/"));
+    if (!minimal) {
+      const all_middle = segments.slice(0, last_index);
+      const middle_segments = all_middle.slice(0, 2);
+
+      if (middle_segments.length > 0) {
+        const middle_truncated = middle_segments
+          .map((s) => s[0] ?? "")
+          .join("/");
+        parts.push(
+          isHome
+            ? theme.fg("thinkingMinimal", `~/${middle_truncated}/`)
+            : theme.fg("thinkingMinimal", `${middle_truncated}/`),
+        );
+      } else if (isHome) {
+        parts.push(theme.fg("thinkingMinimal", "~/"));
+      }
     }
 
     if (last_segment) {

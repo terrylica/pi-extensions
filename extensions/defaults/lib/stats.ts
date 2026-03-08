@@ -110,3 +110,33 @@ export function buildStatsParts(
 
   return parts;
 }
+
+/**
+ * Build minimal stats for small screens (context used + price only)
+ */
+export function buildMinimalStatsParts(
+  theme: Theme,
+  usage: CumulativeUsage,
+  contextUsage: ContextUsage | undefined,
+): string[] {
+  const parts: string[] = [];
+
+  if (contextUsage) {
+    let contextPercentStr: string;
+    if (contextUsage.percent > CONTEXT_ERROR_THRESHOLD) {
+      contextPercentStr = theme.fg("error", contextUsage.display);
+    } else if (contextUsage.percent > CONTEXT_WARNING_THRESHOLD) {
+      contextPercentStr = theme.fg("warning", contextUsage.display);
+    } else {
+      contextPercentStr = contextUsage.display;
+    }
+    parts.push(contextPercentStr);
+  }
+
+  if (usage.cost) {
+    const costStr = `$${usage.cost.toFixed(3)}`;
+    parts.push(costStr);
+  }
+
+  return parts;
+}

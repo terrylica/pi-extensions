@@ -20,3 +20,13 @@ export function buildModelLine(
 
   return theme.fg("thinkingMinimal", modelLine);
 }
+
+/**
+ * Build model ID only (no provider, no thinking level)
+ */
+export function buildModelIdLine(
+  theme: Theme,
+  modelId: string | undefined,
+): string {
+  return theme.fg("thinkingMinimal", modelId ?? "no-model");
+}

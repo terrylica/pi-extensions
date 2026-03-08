@@ -12,9 +12,10 @@ import type {
   Theme,
 } from "@mariozechner/pi-coding-agent";
 import { truncateToWidth, visibleWidth } from "@mariozechner/pi-tui";
-import { buildModelLine } from "../lib/model";
+import { buildModelIdLine, buildModelLine } from "../lib/model";
 import { buildPathParts } from "../lib/path-parts";
 import {
+  buildMinimalStatsParts,
   buildStatsParts,
   getContextUsage,
   getCumulativeUsage,
@@ -38,13 +39,13 @@ export function createCustomFooter(pi: ExtensionAPI) {
     const branch = footer_data.getGitBranch();
     const sessionName = ctx.sessionManager.getSessionName();
 
-    // Build left side: path + branch
-    const { parts, width: leftWidth } = buildPathParts(theme, branch);
-
     // Calculate cumulative usage and context
     const usage = getCumulativeUsage(ctx);
     const contextUsage = getContextUsage(ctx);
     const tpsStr = getTPS();
+
+    // Build left side: path + branch
+    const { parts, width: leftWidth } = buildPathParts(theme, branch);
 
     // Build stats (line 1 right side)
     const statsParts = buildStatsParts(theme, usage, contextUsage, tpsStr);
@@ -62,32 +63,51 @@ export function createCustomFooter(pi: ExtensionAPI) {
       parts.join("") + padding1 + theme.fg("thinkingMinimal", statsLine);
 
     const line1Width = visibleWidth(line1);
-    let line2Override = "";
+    let useMinimal = false;
 
     if (line1Width > width) {
-      // If line 1 doesn't fit, move all stats to line 2 and just show path + branch on line 1
-      const pathOnlyWidth = leftWidth;
-      if (pathOnlyWidth < width) {
-        line1 = parts.join(""); // Just path + branch
-        line2Override = theme.fg("thinkingMinimal", statsLine); // All stats on line 2
-      }
+      // If line 1 doesn't fit, use minimal layout for small screens
+      useMinimal = true;
+
+      // Rebuild with minimal layout: project name + branch only on line 1
+      const { parts: minimalParts } = buildPathParts(
+        theme,
+        branch,
+        true, // minimal mode
+      );
+      line1 = minimalParts.join("");
     }
 
-    // Build model (line 2 right side)
-    const thinkingLevel = pi.getThinkingLevel();
-    const modelLine = buildModelLine(
-      theme,
-      ctx.model?.provider,
-      ctx.model?.id,
-      !!ctx.model?.reasoning,
-      thinkingLevel ?? "off",
-    );
-
-    // Line 2: Stats (if moved from line 1) or Session name + Model
+    // Line 2: Context + Price + Model ID (if minimal) or Session name + Model (if normal)
     let line2: string;
-    if (line2Override) {
-      line2 = line2Override;
+    if (useMinimal) {
+      // Small screen: Show context used + price + model ID only
+      const minimalStatsParts = buildMinimalStatsParts(
+        theme,
+        usage,
+        contextUsage,
+      );
+      const modelIdLine = buildModelIdLine(theme, ctx.model?.id);
+
+      const leftWidth2 = minimalStatsParts.reduce(
+        (sum, part) => sum + visibleWidth(part),
+        0,
+      );
+      const modelIdWidth = visibleWidth(modelIdLine);
+
+      const paddingWidth2 = width - leftWidth2 - modelIdWidth;
+      const padding2 =
+        paddingWidth2 > 0
+          ? theme.fg("thinkingMinimal", " ".repeat(Math.max(0, paddingWidth2)))
+          : "";
+
+      line2 = minimalStatsParts.join("") + padding2 + modelIdLine;
+
+      if (visibleWidth(line2) > width) {
+        line2 = truncateToWidth(modelIdLine, width, "...");
+      }
     } else {
+      // Normal layout
       const left_parts2: string[] = [sessionName ?? ""].filter(Boolean);
       const left_parts2_colored = left_parts2.map((s) =>
         theme.fg("thinkingMinimal", s),
@@ -96,7 +116,18 @@ export function createCustomFooter(pi: ExtensionAPI) {
         (sum, part) => sum + visibleWidth(part),
         0,
       );
+
+      // Build model (line 2 right side)
+      const thinkingLevel = pi.getThinkingLevel();
+      const modelLine = buildModelLine(
+        theme,
+        ctx.model?.provider,
+        ctx.model?.id,
+        !!ctx.model?.reasoning,
+        thinkingLevel ?? "off",
+      );
       const modelWidth = visibleWidth(modelLine);
+
       const paddingWidth2 = width - leftWidth2 - modelWidth;
       const padding2 =
         paddingWidth2 > 0
