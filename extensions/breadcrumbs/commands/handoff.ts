@@ -75,8 +75,9 @@ class HandoffExtractionView extends Container {
     this.addChild(this.borderTop);
     this.addChild(this.loader);
 
+    this.addChild(new Spacer(1));
+
     if (this.expanded && this.streamBuffer) {
-      this.addChild(new Spacer(1));
       this.addChild(this.streamText);
     } else {
       this.addChild(this.hintText);
