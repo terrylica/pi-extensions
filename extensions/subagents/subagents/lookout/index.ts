@@ -1,7 +1,7 @@
 /**
  * Lookout subagent - local codebase search by functionality or concept.
  *
- * Uses osgrep for semantic search combined with Pi's built-in tools
+ * Uses ast-grep structural search combined with Pi's built-in tools
  * (grep, find, read, ls) for comprehensive code discovery.
  */
 
@@ -40,6 +40,8 @@ import { createLookoutToolFormatter } from "./tool-formatter";
 import { createLookoutTools } from "./tools";
 import type { LookoutDetails, LookoutInput } from "./types";
 
+const LOOKOUT_DEFAULT_SKILLS = ["ast-grep"] as const;
+
 /** System prompt guidance for lookout tool usage */
 export const LOOKOUT_GUIDANCE = `
 ## Lookout - Local Code Search
@@ -61,6 +63,8 @@ Use the \`lookout\` tool to find code by functionality or concept in the local c
 \`\`\`json
 { "query": "Where is the database connection pool configured?" }
 \`\`\`
+
+Lookout automatically loads the vendored \`ast-grep\` skill for structural-search guidance. You can still pass extra skills.
 
 **Custom directory:** Pass \`cwd\` to search a specific directory instead of the current project:
 \`\`\`json
@@ -106,12 +110,13 @@ export function createLookoutTool(): ToolDefinition<
     label: "Lookout",
     description: `Local codebase search by functionality or concept.
 
-Uses semantic search (osgrep) + grep/find for comprehensive code discovery.
+Uses ast-grep structural search + grep/find for comprehensive code discovery.
 Returns relevant files with line ranges.
 
 Example: { "query": "where do we handle authentication" }
 
-Pass relevant skills (e.g., 'ios-26', 'drizzle-orm') to provide specialized context for the task.`,
+Pass relevant skills (e.g., 'ios-26', 'drizzle-orm') to provide specialized context for the task.
+Automatically loads the vendored 'ast-grep' skill for structural search guidance.`,
     parameters,
 
     async execute(
@@ -122,13 +127,16 @@ Pass relevant skills (e.g., 'ios-26', 'drizzle-orm') to provide specialized cont
       ctx: ExtensionContext,
     ) {
       const { query, cwd: customCwd, skills: skillNames } = args;
+      const effectiveSkillNames = [
+        ...new Set([...LOOKOUT_DEFAULT_SKILLS, ...(skillNames ?? [])]),
+      ];
 
-      // Resolve skills if provided
+      // Resolve requested + built-in skills
       let resolvedSkills: Skill[] = [];
       let notFoundSkills: string[] = [];
 
-      if (skillNames && skillNames.length > 0) {
-        const result = resolveSkillsByName(skillNames, ctx.cwd);
+      if (effectiveSkillNames.length > 0) {
+        const result = resolveSkillsByName(effectiveSkillNames, ctx.cwd);
         resolvedSkills = result.skills;
         notFoundSkills = result.notFound;
       }
@@ -141,7 +149,7 @@ Pass relevant skills (e.g., 'ios-26', 'drizzle-orm') to provide specialized cont
           details: {
             _renderKey: toolCallId,
             query: "",
-            skills: skillNames,
+            skills: effectiveSkillNames,
             skillsResolved: resolvedSkills.length,
             skillsNotFound:
               notFoundSkills.length > 0 ? notFoundSkills : undefined,
@@ -169,7 +177,7 @@ Pass relevant skills (e.g., 'ios-26', 'drizzle-orm') to provide specialized cont
           details: {
             _renderKey: toolCallId,
             query,
-            skills: skillNames,
+            skills: effectiveSkillNames,
             skillsResolved: resolvedSkills.length,
             skillsNotFound:
               notFoundSkills.length > 0 ? notFoundSkills : undefined,
@@ -196,7 +204,7 @@ Pass relevant skills (e.g., 'ios-26', 'drizzle-orm') to provide specialized cont
             systemPrompt,
             skills: resolvedSkills,
             tools: createReadOnlyTools(workingDir), // grep, find, read, ls
-            customTools: createLookoutTools(workingDir), // semantic_search
+            customTools: createLookoutTools(workingDir),
             thinkingLevel: "off",
             logging: {
               enabled: true,
@@ -212,7 +220,7 @@ Pass relevant skills (e.g., 'ios-26', 'drizzle-orm') to provide specialized cont
               details: {
                 _renderKey: toolCallId,
                 query,
-                skills: skillNames,
+                skills: effectiveSkillNames,
                 skillsResolved: resolvedSkills.length,
                 skillsNotFound:
                   notFoundSkills.length > 0 ? notFoundSkills : undefined,
@@ -231,7 +239,7 @@ Pass relevant skills (e.g., 'ios-26', 'drizzle-orm') to provide specialized cont
               details: {
                 _renderKey: toolCallId,
                 query,
-                skills: skillNames,
+                skills: effectiveSkillNames,
                 skillsResolved: resolvedSkills.length,
                 skillsNotFound:
                   notFoundSkills.length > 0 ? notFoundSkills : undefined,
@@ -252,7 +260,7 @@ Pass relevant skills (e.g., 'ios-26', 'drizzle-orm') to provide specialized cont
             details: {
               _renderKey: toolCallId,
               query,
-              skills: skillNames,
+              skills: effectiveSkillNames,
               skillsResolved: resolvedSkills.length,
               skillsNotFound:
                 notFoundSkills.length > 0 ? notFoundSkills : undefined,
@@ -277,7 +285,7 @@ Pass relevant skills (e.g., 'ios-26', 'drizzle-orm') to provide specialized cont
             details: {
               _renderKey: toolCallId,
               query,
-              skills: skillNames,
+              skills: effectiveSkillNames,
               skillsResolved: resolvedSkills.length,
               skillsNotFound:
                 notFoundSkills.length > 0 ? notFoundSkills : undefined,
@@ -304,7 +312,7 @@ Pass relevant skills (e.g., 'ios-26', 'drizzle-orm') to provide specialized cont
             details: {
               _renderKey: toolCallId,
               query,
-              skills: skillNames,
+              skills: effectiveSkillNames,
               skillsResolved: resolvedSkills.length,
               skillsNotFound:
                 notFoundSkills.length > 0 ? notFoundSkills : undefined,
@@ -322,7 +330,7 @@ Pass relevant skills (e.g., 'ios-26', 'drizzle-orm') to provide specialized cont
           details: {
             _renderKey: toolCallId,
             query,
-            skills: skillNames,
+            skills: effectiveSkillNames,
             skillsResolved: resolvedSkills.length,
             skillsNotFound:
               notFoundSkills.length > 0 ? notFoundSkills : undefined,
@@ -420,24 +428,6 @@ Pass relevant skills (e.g., 'ios-26', 'drizzle-orm') to provide specialized cont
       } else {
         // Running state
         fields.push(new ToolCallList(toolCalls, formatToolCall, theme));
-
-        // Show indexing progress when collapsed
-        const indexingCall = toolCalls.find(
-          (tc) =>
-            tc.toolName === "semantic_search" &&
-            tc.status === "running" &&
-            tc.partialResult &&
-            (tc.partialResult.details as { indexing?: boolean } | undefined)
-              ?.indexing === true,
-        );
-        const indexingText = indexingCall?.partialResult?.content?.[0]?.text;
-        if (indexingText) {
-          fields.push({
-            label: "Status",
-            value: indexingText,
-            showCollapsed: true,
-          });
-        }
       }
 
       // ToolDetails - reuse or create

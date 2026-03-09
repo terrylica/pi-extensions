@@ -15,14 +15,24 @@ export function createLookoutToolFormatter(
     const { toolName, args } = tc;
 
     switch (toolName) {
-      case "semantic_search": {
-        const query = args.query as string | undefined;
-        const truncated = query
-          ? `"${query.slice(0, 50)}${query.length > 50 ? "..." : ""}"`
+      case "ast_grep": {
+        const pattern = args.pattern as string | undefined;
+        const lang = args.lang as string | undefined;
+        const paths = Array.isArray(args.paths)
+          ? (args.paths as string[])
+          : undefined;
+        const truncated = pattern
+          ? `"${pattern.slice(0, 50)}${pattern.length > 50 ? "..." : ""}"`
           : "...";
+        const scope = paths?.length
+          ? ` in ${paths
+              .slice(0, 2)
+              .map((p) => sp(p))
+              .join(", ")}${paths.length > 2 ? ", ..." : ""}`
+          : "";
         return {
-          label: "Semantic",
-          detail: truncated,
+          label: "AST Grep",
+          detail: `${truncated}${lang ? ` (${lang})` : ""}${scope}`,
         };
       }
       case "grep": {
