@@ -1,11 +1,5 @@
-import {
-  type AssistantMessage,
-  completeSimple,
-  getModel,
-  type Message,
-  type TextContent,
-  type UserMessage,
-} from "@mariozechner/pi-ai";
+import { executeSubagent, resolveModel } from "@aliou/pi-agent-kit";
+import { getModel, type TextContent } from "@mariozechner/pi-ai";
 import type {
   ExtensionAPI,
   ExtensionContext,
@@ -21,7 +15,7 @@ const MAX_RETRIES = 2;
 const FALLBACK_LENGTH = 50;
 const TITLE_ENTRY_TYPE = "ad:session-title";
 
-const TITLE_PROMPT = `You are generating a succinct title for a coding session based on the provided conversation.
+const TITLE_SYSTEM_PROMPT = `You are generating a succinct title for a coding session based on the provided conversation.
 
 Requirements:
 - Maximum 50 characters
@@ -52,8 +46,8 @@ export function buildFallbackTitle(userText: string): string {
 export function postProcessTitle(raw: string): string {
   let title = raw;
 
-  // Strip <think>...</think> tags (some models leak these)
-  title = title.replace(/<think>[\s\S]*?<\/think>\s*/g, "");
+  // Strip <thinking> tags (some models leak these)
+  title = title.replace(/<thinking[\s\S]*?<\/thinking>\s*/g, "");
 
   // Strip wrapping quotes (single, double, backticks)
   title = title.replace(/^["'`]+|["'`]+$/g, "");
@@ -98,43 +92,32 @@ export async function generateTitle(
     );
   }
 
-  const apiKey = await ctx.modelRegistry.getApiKey(model);
-  if (!apiKey) {
-    throw new Error(`No API key for provider: ${TITLE_MODEL.provider}`);
-  }
+  const resolvedModel = resolveModel(
+    TITLE_MODEL.provider,
+    TITLE_MODEL.model,
+    ctx,
+  );
 
   // Build the conversation description using XML-style tags (like Claude Code)
-  // This avoids "User message:" labels that the model might echo as titles
   const description = assistantText
     ? `<user>${userText}</user>\n<assistant>${assistantText}</assistant>`
     : userText;
 
-  const messages: Message[] = [
-    {
-      role: "user",
-      content: [
-        {
-          type: "text",
-          text: `${TITLE_PROMPT}\n\n<conversation>\n${description}\n</conversation>\n\nGenerate a title:`,
-        },
-      ],
-      timestamp: Date.now(),
-    },
-  ];
+  const userMessage = `<conversation>\n${description}\n</conversation>\n\nGenerate a title:`;
 
-  const response = await completeSimple(
-    model,
-    { systemPrompt: TITLE_PROMPT, messages },
-    { apiKey },
+  const result = await executeSubagent(
+    {
+      name: "title-generation",
+      model: resolvedModel,
+      systemPrompt: TITLE_SYSTEM_PROMPT,
+      thinkingLevel: "off",
+      logging: { enabled: true, debug: false },
+    },
+    userMessage,
+    ctx,
   );
 
-  const raw = response.content
-    .filter((c): c is TextContent => c.type === "text")
-    .map((c) => c.text)
-    .join("")
-    .trim();
-
-  return postProcessTitle(raw);
+  return postProcessTitle(result.content);
 }
 
 export function getFirstUserText(ctx: ExtensionContext): string | null {
@@ -144,7 +127,7 @@ export function getFirstUserText(ctx: ExtensionContext): string | null {
   );
   if (!firstUserEntry || firstUserEntry.type !== "message") return null;
 
-  const msg = firstUserEntry.message as UserMessage;
+  const msg = firstUserEntry.message as { content: string | TextContent[] };
   if (typeof msg.content === "string") {
     return msg.content;
   }
@@ -162,9 +145,8 @@ export function getFirstAssistantText(ctx: ExtensionContext): string | null {
   if (!firstAssistantEntry || firstAssistantEntry.type !== "message")
     return null;
 
-  const msg = firstAssistantEntry.message as AssistantMessage;
+  const msg = firstAssistantEntry.message as { content: TextContent[] };
   // Filter for text content only -- this naturally excludes thinking blocks
-  // which have type "thinking", not "text".
   return msg.content
     .filter((c): c is TextContent => c.type === "text")
     .map((c) => c.text)
