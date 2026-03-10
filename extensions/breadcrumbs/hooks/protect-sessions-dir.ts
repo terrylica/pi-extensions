@@ -9,6 +9,8 @@ import { homedir } from "node:os";
 import { isAbsolute, join, relative, resolve } from "node:path";
 import type { ExtensionAPI } from "@mariozechner/pi-coding-agent";
 
+const AD_NOTIFY_ATTENTION_EVENT = "ad:notify:attention";
+
 export type SessionReadAccessMode = "confirm" | "allow";
 
 // In-memory mode for current Pi runtime only.
@@ -53,6 +55,24 @@ const BLOCK_MESSAGE =
 
 const FILE_TOOLS = new Set(["read", "write", "edit"]);
 
+function emitSessionGateEvent(
+  pi: ExtensionAPI,
+  description: string,
+  command = "",
+  toolName?: string,
+  toolCallId?: string,
+): void {
+  const payload = {
+    source: "breadcrumbs:protect-sessions-dir",
+    command,
+    description,
+    toolName,
+    toolCallId,
+  };
+
+  pi.events.emit(AD_NOTIFY_ATTENTION_EVENT, payload);
+}
+
 /**
  * Hook that gates direct file access to the sessions directory.
  *
@@ -87,6 +107,13 @@ export function setupProtectSessionsDirHook(pi: ExtensionAPI) {
 
       if (resolvedPath && isInSessionsDir(resolvedPath)) {
         if (event.toolName !== "read") {
+          emitSessionGateEvent(
+            pi,
+            `Blocked: direct session file ${event.toolName}`,
+            resolvedPath,
+            event.toolName,
+            event.toolCallId,
+          );
           ctx.ui.notify("Blocked: session file write/edit", "warning");
           return { block: true, reason: BLOCK_MESSAGE };
         }
@@ -99,6 +126,13 @@ export function setupProtectSessionsDirHook(pi: ExtensionAPI) {
 
         // In print/RPC mode, deny by default (safe fallback).
         if (!ctx.hasUI) {
+          emitSessionGateEvent(
+            pi,
+            "Blocked: session file read requires confirmation, but no UI is available",
+            resolvedPath,
+            event.toolName,
+            event.toolCallId,
+          );
           ctx.ui.notify(
             "Blocked: session file read (no UI to confirm)",
             "warning",
@@ -109,6 +143,14 @@ export function setupProtectSessionsDirHook(pi: ExtensionAPI) {
               "Direct access to session files requires explicit user confirmation, but no UI is available.",
           };
         }
+
+        emitSessionGateEvent(
+          pi,
+          "Confirmation required: direct session file read",
+          resolvedPath,
+          event.toolName,
+          event.toolCallId,
+        );
 
         const title = "Read session file?";
         const msg =
@@ -131,6 +173,13 @@ export function setupProtectSessionsDirHook(pi: ExtensionAPI) {
       // Note: isInSessionsDir() resolves paths internally; for relative paths we
       // don't know the correct base dir here, so treat these as suspicious.
       if (!resolvedPath && rawPath.includes("/.pi/agent/sessions")) {
+        emitSessionGateEvent(
+          pi,
+          "Blocked: suspicious relative path into sessions dir",
+          rawPath,
+          event.toolName,
+          event.toolCallId,
+        );
         ctx.ui.notify("Blocked: use find_sessions / read_session", "warning");
         return { block: true, reason: BLOCK_MESSAGE };
       }
