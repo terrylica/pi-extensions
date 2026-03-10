@@ -1,4 +1,4 @@
-import { writeFile } from "node:fs/promises";
+import { readFile, writeFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import { StringEnum } from "@mariozechner/pi-ai";
 import type {
@@ -7,6 +7,7 @@ import type {
 } from "@mariozechner/pi-coding-agent";
 import { Type } from "@sinclair/typebox";
 import {
+  addHashlineTags,
   applyEdits,
   type EditOp,
   generateDiff,
@@ -187,6 +188,10 @@ export function setupEditTool(pi: ExtensionAPI): void {
         path,
       );
 
+      // Re-read file and generate fresh hashline tags for continued editing
+      const updatedContent = await readFile(absolutePath, "utf-8");
+      const taggedContent = await addHashlineTags(updatedContent, 1);
+
       const details: EditToolDetails = {
         diff,
         firstChangedLine,
@@ -196,7 +201,7 @@ export function setupEditTool(pi: ExtensionAPI): void {
         content: [
           {
             type: "text" as const,
-            text: `Successfully applied ${edits.length} edit(s) to ${path}.`,
+            text: `Successfully applied ${edits.length} edit(s) to ${path}.\\n\\nUpdated file content:\\n\\n${taggedContent}`,
           },
         ],
         details,
