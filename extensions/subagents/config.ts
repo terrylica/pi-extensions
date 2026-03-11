@@ -138,7 +138,7 @@ const DEFAULT_CONFIG: ResolvedSubagentsConfig = {
     },
     oracle: {
       candidates: [
-        { provider: "openai-codex", model: "gpt-5.3-codex" },
+        { provider: "openai-codex", model: "gpt-5.4" },
         { provider: "mistral", model: "magistral-medium-2509" },
       ],
       enabled: true,
@@ -163,7 +163,7 @@ const DEFAULT_CONFIG: ResolvedSubagentsConfig = {
         { provider: "anthropic", model: "claude-sonnet-4-6" },
         // { provider: "synthetic", model: "hf:MiniMaxAI/MiniMax-M2.5" },
         { provider: "mistral", model: "devstral-2512" },
-        { provider: "zai", model: "glm-4.7" },
+        { provider: "zai", model: "glm-5" },
       ],
       enabled: true,
     },
