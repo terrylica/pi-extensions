@@ -1,4 +1,5 @@
 import { readFile } from "node:fs/promises";
+import * as Diff from "diff";
 import xxhash from "xxhash-wasm";
 
 // 16-char dictionary for 2-char hash encoding
@@ -300,70 +301,107 @@ export function generateDiff(
   newLines: string[],
   _path: string,
 ): { diff: string; firstChangedLine: number | undefined } {
-  // Find first and last change
-  let firstChange = -1;
-  let lastChange = -1;
-
-  const maxLen = Math.max(originalLines.length, newLines.length);
-  for (let i = 0; i < maxLen; i++) {
-    const origLine = originalLines[i];
-    const newLine = newLines[i];
-    if (origLine !== newLine) {
-      if (firstChange === -1) firstChange = i;
-      lastChange = i;
-    }
-  }
-
-  if (firstChange === -1) {
-    return { diff: "", firstChangedLine: undefined };
-  }
-
-  // Build diff with line numbers (matching native format)
   const contextLines = 4;
-  const start = Math.max(0, firstChange - contextLines);
-  const end = Math.min(newLines.length - 1, lastChange + contextLines);
-  const lineNumWidth = String(
-    Math.max(originalLines.length, newLines.length),
-  ).length;
+  const oldContent = originalLines.join("\n");
+  const newContent = newLines.join("\n");
 
-  const diffLines: string[] = [];
+  const parts = Diff.diffLines(oldContent, newContent);
+  const output: string[] = [];
+
+  const maxLineNum = Math.max(originalLines.length, newLines.length);
+  const lineNumWidth = String(maxLineNum).length;
+
+  let oldLineNum = 1;
+  let newLineNum = 1;
+  let lastWasChange = false;
   let firstChangedLine: number | undefined;
 
-  for (let i = start; i <= end; i++) {
-    const origLine = originalLines[i];
-    const newLine = newLines[i];
-    const newLineNum = i + 1;
-    const oldLineNum = i + 1;
+  for (let i = 0; i < parts.length; i++) {
+    const part = parts[i];
+    if (!part) continue;
+    const raw = part.value.split("\n");
+    // diffLines includes a trailing empty string from the final newline - strip it
+    if (raw.length > 1 && raw[raw.length - 1] === "") raw.pop();
 
-    if (origLine === undefined && newLine !== undefined) {
-      // Added line
+    if (part.added || part.removed) {
       if (firstChangedLine === undefined) firstChangedLine = newLineNum;
-      const num = String(newLineNum).padStart(lineNumWidth, " ");
-      diffLines.push(`+${num} ${newLine}`);
-    } else if (newLine === undefined && origLine !== undefined) {
-      // Removed line
-      if (firstChangedLine === undefined) firstChangedLine = newLineNum;
-      const num = String(oldLineNum).padStart(lineNumWidth, " ");
-      diffLines.push(`-${num} ${origLine}`);
-    } else if (
-      origLine !== undefined &&
-      newLine !== undefined &&
-      origLine !== newLine
-    ) {
-      // Changed line
-      if (firstChangedLine === undefined) firstChangedLine = newLineNum;
-      const oldNum = String(oldLineNum).padStart(lineNumWidth, " ");
-      const newNum = String(newLineNum).padStart(lineNumWidth, " ");
-      diffLines.push(`-${oldNum} ${origLine}`);
-      diffLines.push(`+${newNum} ${newLine}`);
-    } else if (origLine !== undefined) {
-      // Context line
-      const num = String(oldLineNum).padStart(lineNumWidth, " ");
-      diffLines.push(` ${num} ${origLine}`);
+
+      for (const line of raw) {
+        if (part.added) {
+          output.push(
+            `+${String(newLineNum).padStart(lineNumWidth, " ")} ${line}`,
+          );
+          newLineNum++;
+        } else {
+          output.push(
+            `-${String(oldLineNum).padStart(lineNumWidth, " ")} ${line}`,
+          );
+          oldLineNum++;
+        }
+      }
+      lastWasChange = true;
+    } else {
+      // Context lines
+      const nextIsChange =
+        i < parts.length - 1 && (parts[i + 1]?.added || parts[i + 1]?.removed);
+
+      if (raw.length <= 2 * contextLines) {
+        // Small context block: show entirely if adjacent to changes
+        if (lastWasChange || nextIsChange) {
+          for (const line of raw) {
+            output.push(
+              ` ${String(oldLineNum).padStart(lineNumWidth, " ")} ${line}`,
+            );
+            oldLineNum++;
+            newLineNum++;
+          }
+        } else {
+          oldLineNum += raw.length;
+          newLineNum += raw.length;
+        }
+      } else {
+        // Large context block: show trailing context from previous change,
+        // separator, and leading context for next change
+        if (lastWasChange) {
+          const trailing = raw.slice(0, contextLines);
+          for (const line of trailing) {
+            output.push(
+              ` ${String(oldLineNum).padStart(lineNumWidth, " ")} ${line}`,
+            );
+            oldLineNum++;
+            newLineNum++;
+          }
+        }
+
+        const alreadyShown = lastWasChange ? contextLines : 0;
+        const willShow = nextIsChange ? contextLines : 0;
+        const skipped = raw.length - alreadyShown - willShow;
+
+        if (skipped > 0) {
+          if (lastWasChange || nextIsChange) {
+            output.push(` ${" ".padStart(lineNumWidth, " ")} ...`);
+          }
+          oldLineNum += skipped;
+          newLineNum += skipped;
+        }
+
+        if (nextIsChange) {
+          const leading = raw.slice(raw.length - contextLines);
+          for (const line of leading) {
+            output.push(
+              ` ${String(oldLineNum).padStart(lineNumWidth, " ")} ${line}`,
+            );
+            oldLineNum++;
+            newLineNum++;
+          }
+        }
+      }
+
+      lastWasChange = false;
     }
   }
 
-  return { diff: diffLines.join("\n"), firstChangedLine };
+  return { diff: output.join("\n"), firstChangedLine };
 }
 
 /** Read file lines. */

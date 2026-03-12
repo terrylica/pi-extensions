@@ -53,6 +53,7 @@ export function createPiDeepMock(options: { cwd?: string } = {}) {
       );
     }
     return {
+      registered,
       execute(params: Parameters<typeof registered.execute>[1]) {
         const id = `tc_${++toolCallCounter}`;
         return registered.execute(id, params, undefined, undefined, toolCtx);
