@@ -11,12 +11,10 @@ import { addHashlineTags } from "../lib/hashline";
  */
 export function setupReadTool(pi: ExtensionAPI): void {
   const cwd = process.cwd();
-
-  const nativeRead = createReadTool(cwd);
-  const nativeLs = createLsTool(cwd);
+  const baseRead = createReadTool(cwd);
 
   pi.registerTool({
-    ...nativeRead,
+    ...baseRead,
     description:
       "Read file contents. Each line is tagged with LINE#HASH for use with the edit tool.",
     // TODO: promptGuidelines not recognized by current pi-coding-agent types
@@ -31,8 +29,12 @@ export function setupReadTool(pi: ExtensionAPI): void {
         limit?: number;
       };
 
+      const toolCwd = ctx?.cwd ?? cwd;
+      const nativeRead = createReadTool(toolCwd);
+      const nativeLs = createLsTool(toolCwd);
+
       // Resolve path relative to extension context's working directory
-      const absolutePath = resolve(ctx.cwd, path);
+      const absolutePath = resolve(toolCwd, path);
 
       try {
         const stat = await lstat(absolutePath);
