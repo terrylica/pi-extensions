@@ -5,11 +5,57 @@
  * Optionally accepts a note describing the focus for the new session.
  */
 
-import type { ExtensionAPI } from "@mariozechner/pi-coding-agent";
+import type { ExtensionAPI, SessionEntry } from "@mariozechner/pi-coding-agent";
 import {
+  messageContentToText,
   writeSessionLinkMarker,
   writeSessionLinkSource,
 } from "../lib/session-link";
+
+/**
+ * Extract the text of the last assistant message from a branch.
+ * Walks backward through entries, finds the last "message" entry
+ * with role "assistant", and returns its text content.
+ */
+function getLastAssistantMessage(
+  entries: SessionEntry[],
+): { role: string; text: string } | undefined {
+  for (let i = entries.length - 1; i >= 0; i--) {
+    const entry = entries[i];
+    if (entry?.type !== "message") continue;
+
+    const msg = entry.message;
+    if (msg.role !== "assistant") continue;
+
+    const text = messageContentToText(msg.content).trim();
+    if (text) {
+      return { role: msg.role, text };
+    }
+  }
+  return undefined;
+}
+
+function buildSpawnSourceContent(params: {
+  parentSessionId: string;
+  parentLastMessage?: { role: string; text: string };
+}): string {
+  const { parentSessionId, parentLastMessage } = params;
+  let sourceContent = `Session spawned from ${parentSessionId}. Use \`read_session\` to access the parent session context:
+
+read_session({ sessionId: "${parentSessionId}", goal: "Get the last assistant message with context" })`;
+
+  if (parentLastMessage) {
+    sourceContent += `
+
+## Last message in parent session
+
+Role: ${parentLastMessage.role}
+
+${parentLastMessage.text}`;
+  }
+
+  return sourceContent;
+}
 
 export function setupSpawnCommand(pi: ExtensionAPI) {
   pi.registerCommand("spawn", {
@@ -25,6 +71,12 @@ export function setupSpawnCommand(pi: ExtensionAPI) {
       const parentSessionId = ctx.sessionManager.getSessionId() ?? "unknown";
       const parentLeafId = ctx.sessionManager.getLeafId();
       const currentSessionFile = ctx.sessionManager.getSessionFile();
+
+      // Extract the last assistant message from the active parent branch
+      const parentBranch = ctx.sessionManager.getBranch(
+        parentLeafId ?? undefined,
+      );
+      const lastMessage = getLastAssistantMessage(parentBranch);
 
       if (!parentLeafId) {
         ctx.ui.notify("Failed to get parent session leaf ID", "error");
@@ -44,9 +96,10 @@ export function setupSpawnCommand(pi: ExtensionAPI) {
               parentLeafId,
             );
           }
-          const sourceContent = `Session spawned from ${parentSessionId}. Use \`read_session\` to access the parent session context:
-
-read_session({ sessionId: "${parentSessionId}", goal: "Get the last assistant message with context" })`;
+          const sourceContent = buildSpawnSourceContent({
+            parentSessionId,
+            parentLastMessage: lastMessage,
+          });
           writeSessionLinkSource(
             sm,
             parentSessionId,
