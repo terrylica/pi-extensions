@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import type { TextContent } from "@mariozechner/pi-ai";
-import { initTheme, type Theme } from "@mariozechner/pi-coding-agent";
+import { type AgentToolResult, initTheme } from "@mariozechner/pi-coding-agent";
 import {
   afterEach,
   assert,
@@ -14,8 +14,11 @@ import {
   expect,
   it,
 } from "vitest";
-import { createMock } from "../../../tests/utils/create-mock";
-import { createPiDeepMock } from "../../../tests/utils/pi";
+import {
+  createPiTestHarness,
+  type PiTestHarness,
+} from "../../../tests/utils/pi-test-harness";
+import { NOOP_THEME } from "../../../tests/utils/theme";
 import { setupReadTool } from "./read";
 
 const fixturesRoot = join(
@@ -23,24 +26,10 @@ const fixturesRoot = join(
   "__fixtures__/read",
 );
 
-function createMockTheme() {
-  return createMock<Theme>(
-    {
-      fg: (_color, text) => text,
-      bg: (_color, text) => text,
-      bold: (text) => text,
-      italic: (text) => text,
-      underline: (text) => text,
-      strikethrough: (text) => text,
-      inverse: (text) => text,
-    },
-    { name: "theme" },
-  );
-}
-
 /**
- * Extract the raw text from a Text component by calling render() with a wide width.
- * The Text class stores its content privately, so render() is the public access path.
+ * Extract the raw text from a Text component by calling render() with a
+ * wide width. The Text class stores its content privately, so render() is
+ * the public access path.
  */
 function extractText(component: { render(width: number): string[] }): string {
   const lines = component.render(1000);
@@ -55,12 +44,14 @@ describe("defaults read tool", () => {
 
   describe("directory reads", () => {
     let testDir: string;
+    let pi: PiTestHarness;
 
     beforeEach(async () => {
       testDir = mkdtempSync(join(tmpdir(), "read-test-"));
       await cp(join(fixturesRoot, "directory-input"), testDir, {
         recursive: true,
       });
+      pi = await createPiTestHarness(setupReadTool, { cwd: testDir });
     });
 
     afterEach(async () => {
@@ -68,12 +59,10 @@ describe("defaults read tool", () => {
     });
 
     it("delegates to ls using tool context cwd", async () => {
-      const { pi, tool } = createPiDeepMock({ cwd: testDir });
-      setupReadTool(pi);
       expect(pi).toHaveRegisteredTool("read");
 
-      const result = await tool("read").execute({ path: "." });
-      const textItem = result.content.find(
+      const result = await pi.tool("read").execute({ path: "." });
+      const textItem = (result as { content: TextContent[] }).content.find(
         (e): e is TextContent => e.type === "text",
       );
 
@@ -87,10 +76,12 @@ describe("defaults read tool", () => {
 
   describe("file reads", () => {
     let testDir: string;
+    let pi: PiTestHarness;
 
     beforeEach(async () => {
       testDir = mkdtempSync(join(tmpdir(), "read-test-"));
       await cp(join(fixturesRoot, "file-input"), testDir, { recursive: true });
+      pi = await createPiTestHarness(setupReadTool, { cwd: testDir });
     });
 
     afterEach(async () => {
@@ -98,12 +89,10 @@ describe("defaults read tool", () => {
     });
 
     it("adds LINE#HASH tags", async () => {
-      const { pi, tool } = createPiDeepMock({ cwd: testDir });
-      setupReadTool(pi);
       expect(pi).toHaveRegisteredTool("read");
 
-      const result = await tool("read").execute({ path: "file.txt" });
-      const textItem = result.content.find(
+      const result = await pi.tool("read").execute({ path: "file.txt" });
+      const textItem = (result as { content: TextContent[] }).content.find(
         (e): e is TextContent => e.type === "text",
       );
 
@@ -115,17 +104,19 @@ describe("defaults read tool", () => {
   });
 
   describe("renderCall", () => {
-    it("renders tool header with path", () => {
-      const { pi, tool } = createPiDeepMock();
-      setupReadTool(pi);
+    let pi: PiTestHarness;
 
-      const { registered } = tool("read");
+    beforeEach(async () => {
+      pi = await createPiTestHarness(setupReadTool);
+    });
+
+    it("renders tool header with path", () => {
+      const { registered } = pi.tool("read");
       assert(registered.renderCall, "renderCall should be defined");
 
-      const mockTheme = createMockTheme();
       const result = registered.renderCall(
         { path: "/some/file.ts" },
-        mockTheme,
+        NOOP_THEME,
       );
 
       assert(result, "renderCall should return a component");
@@ -135,16 +126,12 @@ describe("defaults read tool", () => {
     });
 
     it("renders line range when offset and limit are provided", () => {
-      const { pi, tool } = createPiDeepMock();
-      setupReadTool(pi);
-
-      const { registered } = tool("read");
+      const { registered } = pi.tool("read");
       assert(registered.renderCall);
 
-      const mockTheme = createMockTheme();
       const result = registered.renderCall(
         { path: "/some/file.ts", offset: 10, limit: 20 },
-        mockTheme,
+        NOOP_THEME,
       );
 
       assert(result);
@@ -153,16 +140,12 @@ describe("defaults read tool", () => {
     });
 
     it("renders offset-only range", () => {
-      const { pi, tool } = createPiDeepMock();
-      setupReadTool(pi);
-
-      const { registered } = tool("read");
+      const { registered } = pi.tool("read");
       assert(registered.renderCall);
 
-      const mockTheme = createMockTheme();
       const result = registered.renderCall(
         { path: "/some/file.ts", offset: 5 },
-        mockTheme,
+        NOOP_THEME,
       );
 
       assert(result);
@@ -175,10 +158,12 @@ describe("defaults read tool", () => {
 
   describe("renderResult", () => {
     let testDir: string;
+    let pi: PiTestHarness;
 
     beforeEach(async () => {
       testDir = mkdtempSync(join(tmpdir(), "read-test-"));
       await cp(join(fixturesRoot, "file-input"), testDir, { recursive: true });
+      pi = await createPiTestHarness(setupReadTool, { cwd: testDir });
     });
 
     afterEach(async () => {
@@ -186,11 +171,10 @@ describe("defaults read tool", () => {
     });
 
     it("strips LINE#HASH: tags from display", async () => {
-      const { pi, tool } = createPiDeepMock({ cwd: testDir });
-      setupReadTool(pi);
-
-      const readTool = tool("read");
-      const result = await readTool.execute({ path: "file.txt" });
+      const readTool = pi.tool("read");
+      const result = (await readTool.execute({
+        path: "file.txt",
+      })) as AgentToolResult<unknown>;
       assert(
         readTool.registered.renderResult,
         "renderResult should be defined",
@@ -204,11 +188,10 @@ describe("defaults read tool", () => {
       expect(textItem.text).toMatch(/^\d+#[A-Z]{2}:/m);
 
       // Verify the rendered display strips them
-      const mockTheme = createMockTheme();
       const rendered = readTool.registered.renderResult(
-        result,
+        result as AgentToolResult<unknown>,
         { expanded: true, isPartial: false },
-        mockTheme,
+        NOOP_THEME,
       );
 
       assert(rendered, "renderResult should return a component");
@@ -222,18 +205,16 @@ describe("defaults read tool", () => {
       const lines = Array.from({ length: 20 }, (_, i) => `line ${i + 1}`);
       await writeFile(join(testDir, "long.txt"), lines.join("\n"));
 
-      const { pi, tool } = createPiDeepMock({ cwd: testDir });
-      setupReadTool(pi);
-
-      const readTool = tool("read");
-      const result = await readTool.execute({ path: "long.txt" });
+      const readTool = pi.tool("read");
+      const result = (await readTool.execute({
+        path: "long.txt",
+      })) as AgentToolResult<unknown>;
       assert(readTool.registered.renderResult);
 
-      const mockTheme = createMockTheme();
       const rendered = readTool.registered.renderResult(
         result,
         { expanded: false, isPartial: false },
-        mockTheme,
+        NOOP_THEME,
       );
 
       assert(rendered);
@@ -245,18 +226,16 @@ describe("defaults read tool", () => {
       const lines = Array.from({ length: 20 }, (_, i) => `line ${i + 1}`);
       await writeFile(join(testDir, "long.txt"), lines.join("\n"));
 
-      const { pi, tool } = createPiDeepMock({ cwd: testDir });
-      setupReadTool(pi);
-
-      const readTool = tool("read");
-      const result = await readTool.execute({ path: "long.txt" });
+      const readTool = pi.tool("read");
+      const result = (await readTool.execute({
+        path: "long.txt",
+      })) as AgentToolResult<unknown>;
       assert(readTool.registered.renderResult);
 
-      const mockTheme = createMockTheme();
       const rendered = readTool.registered.renderResult(
         result,
         { expanded: true, isPartial: false },
-        mockTheme,
+        NOOP_THEME,
       );
 
       assert(rendered);
@@ -266,10 +245,7 @@ describe("defaults read tool", () => {
     });
 
     it("returns [image] for image content", () => {
-      const { pi, tool } = createPiDeepMock({ cwd: testDir });
-      setupReadTool(pi);
-
-      const readTool = tool("read");
+      const readTool = pi.tool("read");
       assert(readTool.registered.renderResult);
 
       // Simulate an image result (images come from reading image files)
@@ -284,11 +260,10 @@ describe("defaults read tool", () => {
         details: {},
       };
 
-      const mockTheme = createMockTheme();
       const rendered = readTool.registered.renderResult(
         imageResult,
         { expanded: false, isPartial: false },
-        mockTheme,
+        NOOP_THEME,
       );
 
       assert(rendered);
@@ -297,10 +272,7 @@ describe("defaults read tool", () => {
     });
 
     it("returns empty text for empty content", () => {
-      const { pi, tool } = createPiDeepMock({ cwd: testDir });
-      setupReadTool(pi);
-
-      const readTool = tool("read");
+      const readTool = pi.tool("read");
       assert(readTool.registered.renderResult);
 
       const emptyResult = {
@@ -308,11 +280,10 @@ describe("defaults read tool", () => {
         details: {},
       };
 
-      const mockTheme = createMockTheme();
       const rendered = readTool.registered.renderResult(
         emptyResult,
         { expanded: false, isPartial: false },
-        mockTheme,
+        NOOP_THEME,
       );
 
       assert(rendered);

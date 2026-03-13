@@ -171,15 +171,7 @@ export function setupSessionLinkSourceRenderer(pi: ExtensionAPI) {
     const label = theme.fg("muted", labelText);
     const header = `${label}${theme.fg("accent", displayName)}`;
 
-    const content =
-      typeof message.content === "string"
-        ? message.content
-        : Array.isArray(message.content)
-          ? message.content
-              .filter((c: { type: string; text?: string }) => c.type === "text")
-              .map((c: { type: string; text?: string }) => c.text ?? "")
-              .join("")
-          : "";
+    const content = messageContentToText(message.content);
 
     const box = new Box(1, 1, (t) => theme.bg("customMessageBg", t));
     box.addChild(new Text(header, 0, 0));
@@ -205,6 +197,22 @@ export function setupSessionLinkSourceRenderer(pi: ExtensionAPI) {
   };
 
   pi.registerMessageRenderer(SESSION_LINK_SOURCE_TYPE, renderSource);
+}
+
+/**
+ * Flatten message content into plain text.
+ * Handles both string content and content part arrays,
+ * keeping only text parts.
+ */
+export function messageContentToText(
+  content: string | Array<{ type: string; text?: string }>,
+): string {
+  if (typeof content === "string") return content;
+  if (!Array.isArray(content)) return "";
+  return content
+    .filter((c) => c.type === "text" && c.text)
+    .map((c) => c.text)
+    .join("\n");
 }
 
 /**

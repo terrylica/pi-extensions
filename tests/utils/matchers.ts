@@ -1,39 +1,40 @@
-import type { ExtensionAPI } from "@mariozechner/pi-coding-agent";
+/**
+ * Custom vitest matchers for Pi extension test harness.
+ *
+ * These matchers inspect the real `Extension` object produced by the
+ * harness, not proxy-based mock state.
+ */
+
 import { expect } from "vitest";
-import {
-  hasRegisteredCommand,
-  hasRegisteredTool,
-  listRegisteredCommands,
-  listRegisteredTools,
-} from "./pi";
+import type { PiTestHarness } from "./pi-test-harness";
 
 expect.extend({
   toHaveRegisteredTool(received: unknown, name: string) {
-    const pi = received as ExtensionAPI;
-    const pass = hasRegisteredTool(pi, name);
-    const registered = listRegisteredTools(pi);
+    const harness = received as PiTestHarness;
+    const registered = harness.listRegisteredTools();
+    const pass = registered.includes(name);
 
     return {
       pass,
       message: () =>
         pass
-          ? `expected pi mock not to have registered tool "${name}"`
-          : `expected pi mock to have registered tool "${name}", registered: [${registered.join(", ")}]`,
+          ? `expected harness not to have registered tool "${name}"`
+          : `expected harness to have registered tool "${name}", registered: [${registered.join(", ")}]`,
       actual: registered,
       expected: name,
     };
   },
   toHaveRegisteredCommand(received: unknown, name: string) {
-    const pi = received as ExtensionAPI;
-    const pass = hasRegisteredCommand(pi, name);
-    const registered = listRegisteredCommands(pi);
+    const harness = received as PiTestHarness;
+    const registered = harness.listRegisteredCommands();
+    const pass = registered.includes(name);
 
     return {
       pass,
       message: () =>
         pass
-          ? `expected pi mock not to have registered command "${name}"`
-          : `expected pi mock to have registered command "${name}", registered: [${registered.join(", ")}]`,
+          ? `expected harness not to have registered command "${name}"`
+          : `expected harness to have registered command "${name}", registered: [${registered.join(", ")}]`,
       actual: registered,
       expected: name,
     };

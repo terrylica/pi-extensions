@@ -10,6 +10,7 @@ All packages in this repository use the `@aliou` scope where applicable, not `@a
 - `integrations/` - Editor and browser integrations such as Neovim and Chrome
 - `packages/` - Shared internal package code
 - `scripts/` - Build and install helpers
+- `tests/` - Test utilities and harness. See [tests/README.md](tests/README.md) for usage.
 
 ## Extensions
 
