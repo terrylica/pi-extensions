@@ -36,6 +36,7 @@ import { selectModelForSubagent } from "../../lib/subagent-model-selection";
 import type { SubagentToolCall } from "../../lib/types";
 import { LOOKOUT_SYSTEM_PROMPT } from "./system-prompt";
 import { createLookoutToolFormatter } from "./tool-formatter";
+import { generateProjectContext } from "./tools/project-context";
 import type { LookoutDetails, LookoutInput } from "./types";
 
 /** System prompt guidance for lookout tool usage */
@@ -178,8 +179,12 @@ Pass relevant skills (e.g., 'ios-26', 'drizzle-orm') to provide specialized cont
           },
         });
 
-        // Replace {cwd} in system prompt with working directory
-        const systemPrompt = LOOKOUT_SYSTEM_PROMPT.replace("{cwd}", workingDir);
+        // Build system prompt with project context injected
+        const projectContext = await generateProjectContext(workingDir);
+        let systemPrompt = LOOKOUT_SYSTEM_PROMPT.replace("{cwd}", workingDir);
+        if (projectContext) {
+          systemPrompt += `\n\n${projectContext}`;
+        }
 
         let userMessage = query;
 
