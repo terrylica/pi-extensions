@@ -117,23 +117,32 @@ const DEFAULT_CONFIG: ResolvedSubagentsConfig = {
   subagents: {
     scout: {
       candidates: [
-        { provider: "openrouter", model: "google/gemini-2.5-flash-lite" },
-        { provider: "openrouter", model: "z-ai/glm-4.7-flash" },
-        // { provider: "synthetic", model: "hf:zai-org/GLM-4.7-Flash" },
-        { provider: "zai", model: "glm-4.7-flash" },
-        { provider: "mistral", model: "ministral-8b-2512" },
+        // Tested 2026-03-15: 100% tool-use reliability, sorted by latency.
+        // gpt-oss-20b: 173ms avg, $0.03/M input
+        // mistral-small-3.2: 632ms avg, $0.06/M input
+        // GLM-4.7-Flash (synthetic): 1868ms avg, free tier
+        // gemini-3-flash-preview: 1146ms avg, ~$0.10/M input
+        { provider: "openrouter", model: "openai/gpt-oss-20b" },
+        {
+          provider: "openrouter",
+          model: "mistralai/mistral-small-3.2-24b-instruct",
+        },
+        { provider: "synthetic", model: "hf:zai-org/GLM-4.7-Flash" },
+        { provider: "openrouter", model: "google/gemini-3-flash-preview" },
       ],
       enabled: true,
       web: DEFAULT_SCOUT_WEB_CONFIG,
     },
     lookout: {
       candidates: [
-        // gemini-2.5-flash-lite removed: 40% failure rate without semantic_search.
-        // It cannot do multi-step tool-use search with only grep/find/read/ls.
+        // Same pool as scout -- cheap, fast, reliable tool-callers.
+        { provider: "openrouter", model: "openai/gpt-oss-20b" },
+        {
+          provider: "openrouter",
+          model: "mistralai/mistral-small-3.2-24b-instruct",
+        },
+        { provider: "synthetic", model: "hf:zai-org/GLM-4.7-Flash" },
         { provider: "openrouter", model: "google/gemini-3-flash-preview" },
-        { provider: "openrouter", model: "z-ai/glm-4.7-flash" },
-        { provider: "zai", model: "glm-4.7-flash" },
-        { provider: "mistral", model: "ministral-8b-2512" },
       ],
       enabled: true,
     },
