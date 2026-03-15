@@ -1,7 +1,11 @@
+import { spawnSync } from "node:child_process";
 import type { ExtensionContext, Theme } from "@mariozechner/pi-coding-agent";
 import {
+  CombinedAutocompleteProvider,
   Key,
   matchesKey,
+  SelectList,
+  type SelectListTheme,
   truncateToWidth,
   visibleWidth,
   wrapTextWithAnsi,
@@ -22,8 +26,9 @@ interface ComponentState {
   currentIndex: number;
   highlightIndex: number;
   answers: string[][];
-  otherText: string;
-  otherCursorPos: number;
+  otherLines: string[];
+  otherCursorLine: number;
+  otherCursorCol: number;
 }
 
 export async function executeAskUserQuestion(
@@ -46,18 +51,47 @@ export async function executeAskUserQuestion(
     };
   }
 
+  // Find fd binary for autocomplete
+  const fdResult = spawnSync("which", ["fd"], { encoding: "utf-8" });
+  const fdPath = fdResult.status === 0 ? fdResult.stdout.trim() : null;
+  const autocompleteProvider = new CombinedAutocompleteProvider(
+    [],
+    process.cwd(),
+    fdPath ?? null,
+  );
+
   const initialAnswers: string[][] = params.questions.map(() => []);
   const state: ComponentState = {
     mode: "question",
     currentIndex: 0,
     highlightIndex: 0,
     answers: initialAnswers,
-    otherText: "",
-    otherCursorPos: 0,
+    otherLines: [""],
+    otherCursorLine: 0,
+    otherCursorCol: 0,
   };
 
   const result = await ctx.ui.custom<ExecuteResult | null>(
     (tui, theme, _kb, done) => {
+      const selectListTheme: SelectListTheme = {
+        selectedPrefix: (t) => theme.fg("accent", t),
+        selectedText: (t) => theme.fg("accent", t),
+        description: (t) => theme.fg("muted", t),
+        scrollInfo: (t) => theme.fg("muted", t),
+        noMatch: (t) => theme.fg("muted", t),
+      };
+      let autocompleteList: SelectList | null = null;
+      let autocompletePrefix = "";
+
+      const getAutocompleteList = () => autocompleteList;
+      const setAutocompleteList = (list: SelectList | null) => {
+        autocompleteList = list;
+      };
+      const getAutocompletePrefix = () => autocompletePrefix;
+      const setAutocompletePrefix = (prefix: string) => {
+        autocompletePrefix = prefix;
+      };
+
       return {
         render(width: number): string[] {
           if (state.mode === "confirm") {
@@ -70,7 +104,13 @@ export async function executeAskUserQuestion(
           }
 
           if (state.mode === "other-input") {
-            return renderOtherInput(width, params.questions, state, theme);
+            return renderOtherInput(
+              width,
+              params.questions,
+              state,
+              theme,
+              getAutocompleteList(),
+            );
           }
 
           // mode === "question"
@@ -85,7 +125,18 @@ export async function executeAskUserQuestion(
           if (state.mode === "question") {
             handleQuestionInput(data, state, params.questions, tui, done);
           } else if (state.mode === "other-input") {
-            handleOtherInput(data, state, params.questions, tui);
+            handleOtherInput(
+              data,
+              state,
+              params.questions,
+              tui,
+              autocompleteProvider,
+              selectListTheme,
+              getAutocompleteList,
+              setAutocompleteList,
+              getAutocompletePrefix,
+              setAutocompletePrefix,
+            );
           } else if (state.mode === "confirm") {
             handleConfirmInput(data, state, params, tui, done);
           }
@@ -282,12 +333,15 @@ function renderOtherInput(
   questions: Question[],
   state: ComponentState,
   theme: Theme,
+  autocompleteList: SelectList | null,
 ): string[] {
   const lines: string[] = [];
   const question = questions[state.currentIndex];
   if (!question) {
     throw new Error(`Invalid current index: ${state.currentIndex}`);
   }
+
+  const contentWidth = width - 4; // │ + space + ... + space + │
 
   // Top border with progress
   const progressDots = renderProgressDots(
@@ -327,30 +381,63 @@ function renderOtherInput(
       theme.fg("border", "│"),
   );
 
-  // "Other" input prompt with cursor and wrapping
+  // "Other" input prompt with multi-line support
   const prefix = theme.fg("warning", "Other: ");
-  const contentWidth = width - 4; // │ + space + ... + space + │
-  const beforeCursor = state.otherText.slice(0, state.otherCursorPos);
-  const afterCursor = state.otherText.slice(state.otherCursorPos);
-  const cursorCharRaw = afterCursor[0];
-  const cursorChar = cursorCharRaw !== undefined ? cursorCharRaw : " ";
-  const afterCursorRest = afterCursor.length > 0 ? afterCursor.slice(1) : "";
-  const inputDisplay = `${beforeCursor}\x1b[7m${cursorChar}\x1b[27m${afterCursorRest}`;
+  const prefixWidth = visibleWidth(prefix);
+  const indentSpaces = " ".repeat(prefixWidth);
 
-  // Wrap the input text if it exceeds available width
-  const fullInput = prefix + inputDisplay;
-  const wrappedInput = wrapTextWithAnsi(fullInput, contentWidth);
+  for (let lineIdx = 0; lineIdx < state.otherLines.length; lineIdx++) {
+    const lineText = state.otherLines[lineIdx];
+    if (lineText === undefined) {
+      throw new Error(`Invalid line index: ${lineIdx}`);
+    }
+    const isCurrentLine = lineIdx === state.otherCursorLine;
 
-  for (const inputLine of wrappedInput) {
-    const padNeeded = Math.max(0, contentWidth - visibleWidth(inputLine));
-    const paddedLine =
-      theme.fg("border", "│") +
-      " " +
-      inputLine +
-      " ".repeat(padNeeded) +
-      " " +
-      theme.fg("border", "│");
-    lines.push(truncateToWidth(paddedLine, width));
+    const linePrefix = lineIdx === 0 ? prefix : indentSpaces;
+
+    let inputDisplay: string;
+    if (isCurrentLine) {
+      const beforeCursor = lineText.slice(0, state.otherCursorCol);
+      const afterCursor = lineText.slice(state.otherCursorCol);
+      const cursorCharRaw = afterCursor[0];
+      const cursorChar = cursorCharRaw !== undefined ? cursorCharRaw : " ";
+      const afterCursorRest =
+        afterCursor.length > 0 ? afterCursor.slice(1) : "";
+      inputDisplay = `${beforeCursor}\x1b[7m${cursorChar}\x1b[27m${afterCursorRest}`;
+    } else {
+      inputDisplay = lineText;
+    }
+
+    const fullLine = linePrefix + inputDisplay;
+    const wrappedInput = wrapTextWithAnsi(fullLine, contentWidth);
+
+    for (const wrappedLine of wrappedInput) {
+      const padNeeded = Math.max(0, contentWidth - visibleWidth(wrappedLine));
+      const paddedLine =
+        theme.fg("border", "│") +
+        " " +
+        wrappedLine +
+        " ".repeat(padNeeded) +
+        " " +
+        theme.fg("border", "│");
+      lines.push(truncateToWidth(paddedLine, width));
+    }
+  }
+
+  // Render autocomplete list if active
+  if (autocompleteList !== null) {
+    const autocompleteLines = autocompleteList.render(contentWidth);
+    for (const acLine of autocompleteLines) {
+      const padNeeded = Math.max(0, contentWidth - visibleWidth(acLine));
+      const paddedLine =
+        theme.fg("border", "│") +
+        " " +
+        acLine +
+        " ".repeat(padNeeded) +
+        " " +
+        theme.fg("border", "│");
+      lines.push(truncateToWidth(paddedLine, width));
+    }
   }
 
   lines.push(
@@ -366,7 +453,7 @@ function renderOtherInput(
       theme.fg("border", "┤"),
   );
 
-  const controlsText = "Enter confirm · Esc cancel";
+  const controlsText = "Enter confirm · Shift+Enter newline · Esc cancel";
   const controlsPadded =
     theme.fg("border", "│") +
     " " +
@@ -490,6 +577,33 @@ function renderConfirmScreen(
   return lines;
 }
 
+function resetOtherState(state: ComponentState): void {
+  state.otherLines = [""];
+  state.otherCursorLine = 0;
+  state.otherCursorCol = 0;
+}
+
+function updateAutocomplete(
+  state: ComponentState,
+  autocompleteProvider: CombinedAutocompleteProvider,
+  selectListTheme: SelectListTheme,
+  setAutocompleteList: (list: SelectList | null) => void,
+  setAutocompletePrefix: (prefix: string) => void,
+): void {
+  const suggestions = autocompleteProvider.getSuggestions(
+    state.otherLines,
+    state.otherCursorLine,
+    state.otherCursorCol,
+  );
+  if (suggestions !== null && suggestions.items.length > 0) {
+    setAutocompleteList(new SelectList(suggestions.items, 6, selectListTheme));
+    setAutocompletePrefix(suggestions.prefix);
+  } else {
+    setAutocompleteList(null);
+    setAutocompletePrefix("");
+  }
+}
+
 function handleQuestionInput(
   data: string,
   state: ComponentState,
@@ -573,8 +687,7 @@ function handleQuestionInput(
       } else {
         // Open input for Other
         state.mode = "other-input";
-        state.otherText = "";
-        state.otherCursorPos = 0;
+        resetOtherState(state);
       }
     } else {
       const idx = currentAnswers.indexOf(highlighted.label);
@@ -596,8 +709,7 @@ function handleQuestionInput(
 
     if (highlighted.isOther) {
       state.mode = "other-input";
-      state.otherText = "";
-      state.otherCursorPos = 0;
+      resetOtherState(state);
     } else {
       state.answers[state.currentIndex] = [highlighted.label];
       moveToNextQuestion(state, questions);
@@ -627,15 +739,67 @@ function handleOtherInput(
   state: ComponentState,
   questions: Question[],
   tui: { requestRender: () => void },
+  autocompleteProvider: CombinedAutocompleteProvider,
+  selectListTheme: SelectListTheme,
+  getAutocompleteList: () => SelectList | null,
+  setAutocompleteList: (list: SelectList | null) => void,
+  getAutocompletePrefix: () => string,
+  setAutocompletePrefix: (prefix: string) => void,
 ): void {
+  const autocompleteList = getAutocompleteList();
+
+  // Escape: close autocomplete if active, else switch to question mode
   if (matchesKey(data, Key.escape)) {
-    state.mode = "question";
-    state.otherText = "";
-    state.otherCursorPos = 0;
+    if (autocompleteList !== null) {
+      setAutocompleteList(null);
+      setAutocompletePrefix("");
+    } else {
+      state.mode = "question";
+      resetOtherState(state);
+    }
     tui.requestRender();
     return;
   }
 
+  // When autocomplete is active, delegate up/down to it
+  if (autocompleteList !== null && matchesKey(data, Key.up)) {
+    autocompleteList.handleInput(data);
+    tui.requestRender();
+    return;
+  }
+  if (autocompleteList !== null && matchesKey(data, Key.down)) {
+    autocompleteList.handleInput(data);
+    tui.requestRender();
+    return;
+  }
+
+  // Tab or Enter when autocomplete is active: apply completion
+  if (
+    autocompleteList !== null &&
+    (matchesKey(data, Key.tab) || matchesKey(data, Key.enter))
+  ) {
+    const selectedItem = autocompleteList.getSelectedItem();
+    if (selectedItem !== null) {
+      const prefix = getAutocompletePrefix();
+      const result = autocompleteProvider.applyCompletion(
+        state.otherLines,
+        state.otherCursorLine,
+        state.otherCursorCol,
+        selectedItem,
+        prefix,
+      );
+      state.otherLines = result.lines;
+      state.otherCursorLine = result.cursorLine;
+      state.otherCursorCol = result.cursorCol;
+    }
+    // Close autocomplete — do not re-trigger (matches editor behaviour).
+    setAutocompleteList(null);
+    setAutocompletePrefix("");
+    tui.requestRender();
+    return;
+  }
+
+  // Enter (no autocomplete): confirm/submit
   if (matchesKey(data, Key.enter)) {
     const currentAnswers = state.answers[state.currentIndex];
     if (!currentAnswers) {
@@ -643,11 +807,11 @@ function handleOtherInput(
         `Invalid current index for answers: ${state.currentIndex}`,
       );
     }
-    if (state.otherText.trim()) {
-      currentAnswers.push(`Other: ${state.otherText}`);
+    const text = state.otherLines.join("\n");
+    if (text.trim()) {
+      currentAnswers.push(`Other: ${text}`);
     }
-    state.otherText = "";
-    state.otherCursorPos = 0;
+    resetOtherState(state);
 
     const question = questions[state.currentIndex];
     if (!question) {
@@ -664,82 +828,244 @@ function handleOtherInput(
     return;
   }
 
+  // Shift+Enter: insert newline
+  if (matchesKey(data, Key.shift("enter"))) {
+    const currentLine = state.otherLines[state.otherCursorLine];
+    if (currentLine === undefined) {
+      throw new Error(`Invalid cursor line: ${state.otherCursorLine}`);
+    }
+    const beforeCursor = currentLine.slice(0, state.otherCursorCol);
+    const afterCursor = currentLine.slice(state.otherCursorCol);
+    state.otherLines[state.otherCursorLine] = beforeCursor;
+    state.otherLines.splice(state.otherCursorLine + 1, 0, afterCursor);
+    state.otherCursorLine++;
+    state.otherCursorCol = 0;
+    tui.requestRender();
+    return;
+  }
+
+  // ctrl-d: clear input and exit back to question mode
+  if (matchesKey(data, Key.ctrl("d"))) {
+    setAutocompleteList(null);
+    setAutocompletePrefix("");
+    resetOtherState(state);
+    state.mode = "question";
+    tui.requestRender();
+    return;
+  }
+
+  // Backspace
   if (matchesKey(data, Key.backspace)) {
-    if (state.otherCursorPos > 0) {
-      state.otherText =
-        state.otherText.slice(0, state.otherCursorPos - 1) +
-        state.otherText.slice(state.otherCursorPos);
-      state.otherCursorPos--;
+    if (state.otherCursorCol > 0) {
+      // Delete char before cursor in current line
+      const currentLine = state.otherLines[state.otherCursorLine];
+      if (currentLine === undefined) {
+        throw new Error(`Invalid cursor line: ${state.otherCursorLine}`);
+      }
+      state.otherLines[state.otherCursorLine] =
+        currentLine.slice(0, state.otherCursorCol - 1) +
+        currentLine.slice(state.otherCursorCol);
+      state.otherCursorCol--;
+    } else if (state.otherCursorLine > 0) {
+      // At col 0 with previous line: merge with previous
+      const prevLine = state.otherLines[state.otherCursorLine - 1];
+      const currentLine = state.otherLines[state.otherCursorLine];
+      if (prevLine === undefined || currentLine === undefined) {
+        throw new Error(`Invalid cursor line: ${state.otherCursorLine}`);
+      }
+      const newCol = prevLine.length;
+      state.otherLines[state.otherCursorLine - 1] = prevLine + currentLine;
+      state.otherLines.splice(state.otherCursorLine, 1);
+      state.otherCursorLine--;
+      state.otherCursorCol = newCol;
     }
     tui.requestRender();
     return;
   }
 
-  // ctrl-a: beginning of line
+  // ctrl-a / Home: go to start of current line
   if (matchesKey(data, Key.ctrl("a")) || matchesKey(data, Key.home)) {
-    state.otherCursorPos = 0;
+    state.otherCursorCol = 0;
     tui.requestRender();
     return;
   }
 
-  // ctrl-e: end of line
+  // ctrl-e / End: go to end of current line
   if (matchesKey(data, Key.ctrl("e")) || matchesKey(data, Key.end)) {
-    state.otherCursorPos = state.otherText.length;
+    const currentLine = state.otherLines[state.otherCursorLine];
+    if (currentLine !== undefined) {
+      state.otherCursorCol = currentLine.length;
+    }
     tui.requestRender();
     return;
   }
 
   // ctrl-w: delete word backward
   if (matchesKey(data, Key.ctrl("w"))) {
-    const before = state.otherText.slice(0, state.otherCursorPos);
+    const currentLine = state.otherLines[state.otherCursorLine];
+    if (currentLine === undefined) {
+      throw new Error(`Invalid cursor line: ${state.otherCursorLine}`);
+    }
+    const before = currentLine.slice(0, state.otherCursorCol);
     const trimmed = before.replace(/\s+$/, "");
     const lastSpace = trimmed.lastIndexOf(" ");
     const newPos = lastSpace === -1 ? 0 : lastSpace + 1;
-    state.otherText =
-      state.otherText.slice(0, newPos) +
-      state.otherText.slice(state.otherCursorPos);
-    state.otherCursorPos = newPos;
+    state.otherLines[state.otherCursorLine] =
+      currentLine.slice(0, newPos) + currentLine.slice(state.otherCursorCol);
+    state.otherCursorCol = newPos;
     tui.requestRender();
     return;
   }
 
-  // ctrl-u: delete to beginning of line
+  // ctrl-u: delete from start of current line to cursor
   if (matchesKey(data, Key.ctrl("u"))) {
-    state.otherText = state.otherText.slice(state.otherCursorPos);
-    state.otherCursorPos = 0;
+    const currentLine = state.otherLines[state.otherCursorLine];
+    if (currentLine === undefined) {
+      throw new Error(`Invalid cursor line: ${state.otherCursorLine}`);
+    }
+    state.otherLines[state.otherCursorLine] = currentLine.slice(
+      state.otherCursorCol,
+    );
+    state.otherCursorCol = 0;
     tui.requestRender();
     return;
   }
 
-  // ctrl-k: delete to end of line
+  // ctrl-k: delete from cursor to end of current line
   if (matchesKey(data, Key.ctrl("k"))) {
-    state.otherText = state.otherText.slice(0, state.otherCursorPos);
+    const currentLine = state.otherLines[state.otherCursorLine];
+    if (currentLine === undefined) {
+      throw new Error(`Invalid cursor line: ${state.otherCursorLine}`);
+    }
+    state.otherLines[state.otherCursorLine] = currentLine.slice(
+      0,
+      state.otherCursorCol,
+    );
     tui.requestRender();
     return;
   }
 
-  // left/right arrow
-  if (matchesKey(data, Key.left)) {
-    if (state.otherCursorPos > 0) state.otherCursorPos--;
+  // Up arrow: move to previous line
+  if (matchesKey(data, Key.up)) {
+    if (state.otherCursorLine > 0) {
+      state.otherCursorLine--;
+      const prevLine = state.otherLines[state.otherCursorLine];
+      if (prevLine !== undefined) {
+        state.otherCursorCol = Math.min(state.otherCursorCol, prevLine.length);
+      }
+    }
     tui.requestRender();
     return;
   }
+
+  // Down arrow: move to next line
+  if (matchesKey(data, Key.down)) {
+    if (state.otherCursorLine < state.otherLines.length - 1) {
+      state.otherCursorLine++;
+      const nextLine = state.otherLines[state.otherCursorLine];
+      if (nextLine !== undefined) {
+        state.otherCursorCol = Math.min(state.otherCursorCol, nextLine.length);
+      }
+    }
+    tui.requestRender();
+    return;
+  }
+
+  // Left arrow
+  if (matchesKey(data, Key.left)) {
+    if (state.otherCursorCol > 0) {
+      state.otherCursorCol--;
+    } else if (state.otherCursorLine > 0) {
+      // Wrap to end of previous line
+      state.otherCursorLine--;
+      const prevLine = state.otherLines[state.otherCursorLine];
+      if (prevLine !== undefined) {
+        state.otherCursorCol = prevLine.length;
+      }
+    }
+    tui.requestRender();
+    return;
+  }
+
+  // Right arrow
   if (matchesKey(data, Key.right)) {
-    if (state.otherCursorPos < state.otherText.length) state.otherCursorPos++;
+    const currentLine = state.otherLines[state.otherCursorLine];
+    if (
+      currentLine !== undefined &&
+      state.otherCursorCol < currentLine.length
+    ) {
+      state.otherCursorCol++;
+    } else if (state.otherCursorLine < state.otherLines.length - 1) {
+      // Wrap to start of next line
+      state.otherCursorLine++;
+      state.otherCursorCol = 0;
+    }
+    tui.requestRender();
+    return;
+  }
+
+  // Tab (no autocomplete active): force file completion at cursor.
+  // Mirrors the editor's forceFileAutocomplete: if exactly one match, apply immediately.
+  if (matchesKey(data, Key.tab)) {
+    const forced = autocompleteProvider.getForceFileSuggestions(
+      state.otherLines,
+      state.otherCursorLine,
+      state.otherCursorCol,
+    );
+    if (forced !== null && forced.items.length > 0) {
+      if (forced.items.length === 1) {
+        // Single match: apply immediately and close
+        const result = autocompleteProvider.applyCompletion(
+          state.otherLines,
+          state.otherCursorLine,
+          state.otherCursorCol,
+          // biome-ignore lint/style/noNonNullAssertion: length checked above
+          forced.items[0]!,
+          forced.prefix,
+        );
+        state.otherLines = result.lines;
+        state.otherCursorLine = result.cursorLine;
+        state.otherCursorCol = result.cursorCol;
+        setAutocompleteList(null);
+        setAutocompletePrefix("");
+      } else {
+        // Multiple matches: open list
+        setAutocompleteList(new SelectList(forced.items, 6, selectListTheme));
+        setAutocompletePrefix(forced.prefix);
+      }
+    }
     tui.requestRender();
     return;
   }
 
   // Accept printable input (single chars or pasted text)
-  // Filter out control characters
-  // biome-ignore lint/suspicious/noControlCharactersInRegex: intentionally filtering control chars
-  const printable = data.replace(/[\x00-\x1f\x7f]/g, "");
+  const printable = data
+    // biome-ignore lint/suspicious/noControlCharactersInRegex: intentionally filtering control chars
+    .replace(/\x1b\[200~/g, "")
+    // biome-ignore lint/suspicious/noControlCharactersInRegex: intentionally filtering control chars
+    .replace(/\x1b\[201~/g, "")
+    // biome-ignore lint/suspicious/noControlCharactersInRegex: intentionally filtering control chars
+    .replace(/[\x00-\x1f\x7f]/g, "");
   if (printable.length > 0) {
-    state.otherText =
-      state.otherText.slice(0, state.otherCursorPos) +
+    const currentLine = state.otherLines[state.otherCursorLine];
+    if (currentLine === undefined) {
+      throw new Error(`Invalid cursor line: ${state.otherCursorLine}`);
+    }
+    state.otherLines[state.otherCursorLine] =
+      currentLine.slice(0, state.otherCursorCol) +
       printable +
-      state.otherText.slice(state.otherCursorPos);
-    state.otherCursorPos += printable.length;
+      currentLine.slice(state.otherCursorCol);
+    state.otherCursorCol += printable.length;
+    // Trigger autocomplete when typing `@`, or keep it updated while a list is open
+    if (printable.endsWith("@") || getAutocompleteList() !== null) {
+      updateAutocomplete(
+        state,
+        autocompleteProvider,
+        selectListTheme,
+        setAutocompleteList,
+        setAutocompletePrefix,
+      );
+    }
     tui.requestRender();
     return;
   }
