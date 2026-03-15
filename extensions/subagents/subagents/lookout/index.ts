@@ -249,6 +249,30 @@ Pass relevant skills (e.g., 'ios-26', 'drizzle-orm') to provide specialized cont
         const finalToolCalls =
           result.toolCalls.length > 0 ? result.toolCalls : currentToolCalls;
 
+        // If the model responded without using any tools, the response is
+        // hallucinated. This happens with weaker models (e.g. gemini-flash-lite)
+        // that ignore tool-use instructions and fabricate file paths.
+        if (finalToolCalls.length === 0 && !result.aborted && !result.error) {
+          const error =
+            "Model responded without using any search tools. Response discarded to prevent hallucinated file paths.";
+          return {
+            content: [{ type: "text" as const, text: `Error: ${error}` }],
+            details: {
+              _renderKey: toolCallId,
+              query,
+              skills: effectiveSkillNames,
+              skillsResolved: resolvedSkills.length,
+              skillsNotFound:
+                notFoundSkills.length > 0 ? notFoundSkills : undefined,
+              toolCalls: finalToolCalls,
+              error,
+              usage: result.usage,
+              resolvedModel,
+              cwd: workingDir,
+            },
+          };
+        }
+
         if (result.aborted) {
           return {
             content: [{ type: "text" as const, text: "Aborted" }],

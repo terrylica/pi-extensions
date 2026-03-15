@@ -128,9 +128,10 @@ const DEFAULT_CONFIG: ResolvedSubagentsConfig = {
     },
     lookout: {
       candidates: [
-        { provider: "openrouter", model: "google/gemini-2.5-flash-lite" },
+        // gemini-2.5-flash-lite removed: 40% failure rate without semantic_search.
+        // It cannot do multi-step tool-use search with only grep/find/read/ls.
+        { provider: "openrouter", model: "google/gemini-3-flash-preview" },
         { provider: "openrouter", model: "z-ai/glm-4.7-flash" },
-        // { provider: "synthetic", model: "hf:zai-org/GLM-4.7-Flash" },
         { provider: "zai", model: "glm-4.7-flash" },
         { provider: "mistral", model: "ministral-8b-2512" },
       ],
