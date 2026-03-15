@@ -1,8 +1,10 @@
 /**
- * Main entrypoint for opening the palette overlay. Builds the command
- * context, resolves visibility/enabled state, and delegates to the
- * palette overlay component. Once a command is selected, runs it
- * through the IO interface.
+ * Main entrypoint for opening the palette overlay. The palette stays
+ * open as a single persistent overlay. When a command is selected,
+ * it runs within the palette shell -- io.pick() and io.input() push
+ * views onto the palette's internal stack instead of opening new
+ * overlays. Esc in a sub-view pops back; Esc at the root closes
+ * the palette.
  */
 
 import type {
@@ -11,7 +13,6 @@ import type {
 } from "@mariozechner/pi-coding-agent";
 import { PaletteOverlay } from "../components/palette-overlay";
 import type { ResolvedPaletteConfig } from "../config";
-import { createIO } from "../flows";
 import type { CommandRegistry } from "../registry/create-registry";
 import type { PaletteCommand, PaletteCommandContext } from "../registry/types";
 
@@ -63,6 +64,22 @@ export function buildCommandViews(
     });
   }
 
+  // Sort by group order, preserving original order within each group.
+  const groupOrder: Record<string, number> = {
+    appearance: 0,
+    model: 1,
+    session: 2,
+    clipboard: 3,
+    shell: 4,
+    context: 5,
+    files: 6,
+  };
+  views.sort((a, b) => {
+    const ga = groupOrder[a.command.group ?? ""] ?? 99;
+    const gb = groupOrder[b.command.group ?? ""] ?? 99;
+    return ga - gb;
+  });
+
   return views;
 }
 
@@ -77,23 +94,45 @@ export async function openPalette(
   const commandCtx: PaletteCommandContext = { pi, ctx, config };
   const views = buildCommandViews(registry, commandCtx);
 
-  const selected = await ctx.ui.custom<string | null>(
-    (_tui, theme, _kb, done) => new PaletteOverlay(theme, views, done),
+  await ctx.ui.custom<void>(
+    (_tui, theme, _kb, done) => {
+      const palette = new PaletteOverlay(
+        theme,
+        views,
+        async (commandId: string) => {
+          if (palette.isCommandRunning) return;
+
+          const cmd = registry.get(commandId);
+          if (!cmd) return;
+
+          const io = palette.createIO((msg, level) =>
+            ctx.ui.notify(msg, level),
+          );
+          palette.running = true;
+
+          try {
+            await cmd.run(commandCtx, io);
+          } finally {
+            palette.running = false;
+            palette.popToRoot();
+          }
+
+          // Close the palette after the command completes successfully
+          done();
+        },
+        () => done(),
+      );
+
+      return palette;
+    },
     {
       overlay: true,
       overlayOptions: {
         width: "70%",
         maxHeight: "60%",
         anchor: "center",
+        margin: { top: 2, bottom: 15 },
       },
     },
   );
-
-  if (!selected) return;
-
-  const cmd = registry.get(selected);
-  if (!cmd) return;
-
-  const io = createIO(ctx);
-  await cmd.run(commandCtx, io);
 }

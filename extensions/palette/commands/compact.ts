@@ -3,7 +3,6 @@ import type { PaletteCommand } from "../registry/types";
 export const compactCommand: PaletteCommand = {
   id: "compact",
   title: "Compact context",
-  description: "Run manual context compaction",
   keywords: ["compact", "context", "summarize"],
   group: "session",
 

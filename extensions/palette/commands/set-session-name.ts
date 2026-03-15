@@ -3,7 +3,7 @@ import type { PaletteCommand } from "../registry/types";
 export const setSessionNameCommand: PaletteCommand = {
   id: "session.name",
   title: "Set session name",
-  description: "Rename the current session",
+  description: "Rename session",
   keywords: ["name", "rename", "session"],
   group: "session",
 

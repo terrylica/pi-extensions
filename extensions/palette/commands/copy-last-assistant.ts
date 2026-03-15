@@ -5,7 +5,7 @@ import { getLastAssistantText } from "../utils/session";
 export const copyLastAssistantCommand: PaletteCommand = {
   id: "clipboard.copy-last",
   title: "Copy last assistant message",
-  description: "Copy latest assistant text to clipboard",
+  description: "Copy to clipboard",
   keywords: ["copy", "clipboard", "assistant"],
   group: "clipboard",
 

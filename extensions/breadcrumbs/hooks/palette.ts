@@ -35,7 +35,7 @@ function emitRegistrations(pi: ExtensionAPI): void {
   pi.events.emit(PALETTE_REGISTER, {
     id: "session.spawn",
     title: "Spawn session",
-    description: "New session linked to this one",
+    description: "Fork linked session",
     keywords: ["spawn", "new", "session", "fork"],
     group: "session",
     input: {
@@ -58,7 +58,7 @@ function emitRegistrations(pi: ExtensionAPI): void {
   pi.events.emit(PALETTE_REGISTER, {
     id: "session.handoff",
     title: "Handoff session",
-    description: "New session with extracted context",
+    description: "Extract context to new session",
     keywords: ["handoff", "context", "extract", "session"],
     group: "session",
     input: {

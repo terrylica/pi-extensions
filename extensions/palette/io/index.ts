@@ -32,7 +32,7 @@ export function createIO(ctx: ExtensionContext): CommandIO {
           overlayOptions: {
             width: options.width ?? ("60%" as SizeValue),
             maxHeight: options.maxHeight ?? ("80%" as SizeValue),
-            anchor: "center",
+            anchor: "top-center",
           },
         },
       );
@@ -50,7 +50,7 @@ export function createIO(ctx: ExtensionContext): CommandIO {
           overlayOptions: {
             width: options.width ?? ("60%" as SizeValue),
             maxHeight: options.maxHeight ?? ("30%" as SizeValue),
-            anchor: "center",
+            anchor: "top-center",
           },
         },
       );

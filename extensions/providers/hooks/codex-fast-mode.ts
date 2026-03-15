@@ -85,14 +85,14 @@ function emitPaletteRegistration(pi: ExtensionAPI): void {
   pi.events.emit(PALETTE_REGISTER, {
     id: "providers.codex-fast.toggle",
     title: "Toggle Codex fast mode",
-    description: "Use priority service tier for OpenAI Codex requests",
+    description: "Priority service tier",
     keywords: ["codex", "fast", "priority", "service tier", "providers"],
     group: "model",
     isEnabled: (c: { ctx: ExtensionContext }) => {
       if (c.ctx.model?.provider !== "openai-codex") {
         return {
           enabled: false,
-          reason: "Requires an OpenAI Codex model",
+          reason: "Requires a Codex model",
         };
       }
 

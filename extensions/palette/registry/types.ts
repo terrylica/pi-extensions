@@ -73,7 +73,8 @@ export type CommandGroup =
   | "shell"
   | "files"
   | "clipboard"
-  | "context";
+  | "context"
+  | "appearance";
 
 // ---------------------------------------------------------------------------
 // The command interface

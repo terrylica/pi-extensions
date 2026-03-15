@@ -6,19 +6,28 @@
 import type { PaletteCommand } from "../registry/types";
 import { compactCommand } from "./compact";
 import { copyLastAssistantCommand } from "./copy-last-assistant";
+import { reloadCommand } from "./reload";
 import {
   shellWithContextCommand,
   shellWithoutContextCommand,
 } from "./run-shell";
 import { selectModelCommand } from "./select-model";
+import { selectThemeCommand } from "./select-theme";
 import { setSessionNameCommand } from "./set-session-name";
 
 export function getPaletteCommands(): PaletteCommand[] {
   return [
-    compactCommand,
+    // appearance
+    selectThemeCommand,
+    // model
     selectModelCommand,
+    // session
+    compactCommand,
     setSessionNameCommand,
+    reloadCommand,
+    // clipboard
     copyLastAssistantCommand,
+    // shell
     shellWithContextCommand,
     shellWithoutContextCommand,
   ];

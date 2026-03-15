@@ -3,7 +3,6 @@ import type { PaletteCommand } from "../registry/types";
 export const selectModelCommand: PaletteCommand = {
   id: "model.select",
   title: "Select model",
-  description: "Pick the active model",
   keywords: ["model", "provider", "switch"],
   group: "model",
 

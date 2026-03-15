@@ -4,7 +4,7 @@ import { formatShellResult } from "../utils/shell";
 export const shellWithContextCommand: PaletteCommand = {
   id: "shell.run",
   title: "Run shell command (!)",
-  description: "Execute command and add output to context",
+  description: "Add output to context",
   keywords: ["bash", "shell", "command", "!"],
   group: "shell",
 
@@ -22,7 +22,7 @@ export const shellWithContextCommand: PaletteCommand = {
 export const shellWithoutContextCommand: PaletteCommand = {
   id: "shell.run-excluded",
   title: "Run shell command (!!)",
-  description: "Execute command without adding output to context",
+  description: "Exclude from context",
   keywords: ["bash", "shell", "command", "!!", "no context"],
   group: "shell",
 
