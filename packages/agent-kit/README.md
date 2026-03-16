@@ -1,6 +1,6 @@
 # agent-kit
 
-Shared subagent infrastructure for my Pi harness. Import it internally through the root package `#agent-kit` subpath import.
+Shared subagent infrastructure for my Pi harness. Import it via a normal relative or package path from the consumer, not via a root `package.json#imports` alias.
 
 ## What's included
 
@@ -19,7 +19,7 @@ import {
   ToolPreview,
   type SubagentToolCall,
   type SubagentUsage,
-} from "#agent-kit";
+} from "../../../packages/agent-kit";
 ```
 
 ## Logging

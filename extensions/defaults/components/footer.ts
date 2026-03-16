@@ -12,6 +12,12 @@ import type {
   Theme,
 } from "@mariozechner/pi-coding-agent";
 import { truncateToWidth, visibleWidth } from "@mariozechner/pi-tui";
+import {
+  AD_PROVIDERS_CODEX_FAST_MODE_CHANGED_EVENT,
+  AD_PROVIDERS_CODEX_FAST_MODE_READY_EVENT,
+  AD_PROVIDERS_CODEX_FAST_MODE_REQUEST_EVENT,
+  type AdProvidersCodexFastModeChangedEvent,
+} from "../../../packages/events";
 import { buildModelIdLine, buildModelLine } from "../lib/model";
 import { buildPathParts } from "../lib/path-parts";
 import {
@@ -28,6 +34,20 @@ import { getTPS, setupTPSTracking } from "../lib/tps";
 export function createCustomFooter(pi: ExtensionAPI) {
   let ctx: ExtensionContext | undefined;
   setupTPSTracking(pi);
+  let requestRender: (() => void) | undefined;
+  let codexFastModeEnabled = false;
+
+  pi.events.on(AD_PROVIDERS_CODEX_FAST_MODE_READY_EVENT, () => {
+    if (!ctx) return;
+    pi.events.emit(AD_PROVIDERS_CODEX_FAST_MODE_REQUEST_EVENT, { ctx });
+  });
+
+  pi.events.on(AD_PROVIDERS_CODEX_FAST_MODE_CHANGED_EVENT, (data: unknown) => {
+    const event = (data ?? {}) as Partial<AdProvidersCodexFastModeChangedEvent>;
+    codexFastModeEnabled = event.enabled === true;
+    if (!ctx) return;
+    requestRender?.();
+  });
 
   const renderFooter = (
     width: number,
@@ -90,8 +110,8 @@ export function createCustomFooter(pi: ExtensionAPI) {
       const modelIdLine = buildModelIdLine(
         theme,
         ctx.model?.id,
-        ctx,
         ctx.model?.provider,
+        codexFastModeEnabled,
       );
 
       const leftWidth2 = minimalStatsParts.reduce(
@@ -126,11 +146,11 @@ export function createCustomFooter(pi: ExtensionAPI) {
       const thinkingLevel = pi.getThinkingLevel();
       const modelLine = buildModelLine(
         theme,
-        ctx,
         ctx.model?.provider,
         ctx.model?.id,
         !!ctx.model?.reasoning,
         thinkingLevel ?? "off",
+        codexFastModeEnabled,
       );
       const modelWidth = visibleWidth(modelLine);
 
@@ -173,14 +193,20 @@ export function createCustomFooter(pi: ExtensionAPI) {
   return {
     setup: (context: ExtensionContext) => {
       ctx = context;
+      pi.events.emit(AD_PROVIDERS_CODEX_FAST_MODE_REQUEST_EVENT, { ctx });
 
       ctx.ui.setFooter((tui, theme, footerData) => {
+        requestRender = () => tui.requestRender?.();
+
         const unsub = footerData.onBranchChange(() => {
-          tui.requestRender?.();
+          requestRender?.();
         });
 
         return {
-          dispose: unsub,
+          dispose: () => {
+            requestRender = undefined;
+            unsub();
+          },
           invalidate() {},
           render(width: number): string[] {
             return renderFooter(width, theme, footerData);

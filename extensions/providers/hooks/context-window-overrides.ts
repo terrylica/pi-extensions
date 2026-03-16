@@ -2,6 +2,7 @@ import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import type { ExtensionAPI } from "@mariozechner/pi-coding-agent";
 import { getAgentDir } from "@mariozechner/pi-coding-agent";
+import { AD_NOTIFY_ATTENTION_EVENT } from "../../../packages/events";
 
 /**
  * Map of "provider/modelId" to the desired context window size in tokens.
@@ -82,7 +83,7 @@ export function setupContextWindowOverrides(pi: ExtensionAPI): void {
         lines.join("\n"),
       "warning",
     );
-    pi.events.emit("ad:notify:attention", {
+    pi.events.emit(AD_NOTIFY_ATTENTION_EVENT, {
       description: "Context window overrides in models.json are out of date.",
     });
 

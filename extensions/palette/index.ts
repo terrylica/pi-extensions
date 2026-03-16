@@ -1,5 +1,6 @@
 import type { ExtensionAPI } from "@mariozechner/pi-coding-agent";
 import { Key } from "@mariozechner/pi-tui";
+import { AD_PALETTE_READY_EVENT } from "../../packages/events";
 import { getPaletteCommands } from "./commands";
 import { openPalette } from "./commands/open-palette";
 import { configLoader } from "./config";
@@ -31,7 +32,7 @@ export default async function (pi: ExtensionAPI): Promise<void> {
     registry.add(wrapExternalCommand(ext));
   });
 
-  pi.events.emit("palette:ready", undefined);
+  pi.events.emit(AD_PALETTE_READY_EVENT, undefined);
 
   registerRenderers(pi);
   registerContextFilter(pi);

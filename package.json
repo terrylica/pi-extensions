@@ -5,10 +5,6 @@
   "keywords": [
     "pi-package"
   ],
-  "imports": {
-    "#agent-kit": "./packages/agent-kit/index.ts",
-    "#agent-kit/*": "./packages/agent-kit/*"
-  },
   "repository": {
     "type": "git",
     "url": "https://github.com/aliou/pi-harness"

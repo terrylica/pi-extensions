@@ -1,36 +1,20 @@
-import type { ExtensionContext, Theme } from "@mariozechner/pi-coding-agent";
+import type { Theme } from "@mariozechner/pi-coding-agent";
 
-const CODEX_FAST_ENTRY_TYPE = "providers-codex-fast";
 const FAST_SYMBOL = "\u26A1 ";
-
-function isCodexFastEnabled(ctx: ExtensionContext): boolean {
-  const entries = ctx.sessionManager.getEntries();
-
-  for (let index = entries.length - 1; index >= 0; index -= 1) {
-    const entry = entries[index];
-    if (entry?.type !== "custom") continue;
-    if (entry.customType !== CODEX_FAST_ENTRY_TYPE) continue;
-
-    const data = entry.data as { enabled?: boolean } | undefined;
-    return data?.enabled === true;
-  }
-
-  return false;
-}
 
 /**
  * Build model line for footer line 2 right side
  */
 export function buildModelLine(
   theme: Theme,
-  ctx: ExtensionContext,
   provider: string | undefined,
   modelId: string | undefined,
   hasReasoning: boolean,
   thinkingLevel: string,
+  codexFastModeEnabled = false,
 ): string {
   const fastPrefix =
-    provider === "openai-codex" && isCodexFastEnabled(ctx) ? FAST_SYMBOL : "";
+    provider === "openai-codex" && codexFastModeEnabled ? FAST_SYMBOL : "";
   const providerName = `${fastPrefix}${provider ?? "unknown"}`;
   let modelLine = `${providerName}/${modelId ?? "no-model"}`;
 
@@ -48,12 +32,10 @@ export function buildModelLine(
 export function buildModelIdLine(
   theme: Theme,
   modelId: string | undefined,
-  ctx?: ExtensionContext,
   provider?: string | undefined,
+  codexFastModeEnabled = false,
 ): string {
   const fastPrefix =
-    ctx && provider === "openai-codex" && isCodexFastEnabled(ctx)
-      ? FAST_SYMBOL
-      : "";
+    provider === "openai-codex" && codexFastModeEnabled ? FAST_SYMBOL : "";
   return theme.fg("thinkingMinimal", `${fastPrefix}${modelId ?? "no-model"}`);
 }

@@ -31,16 +31,16 @@ Hardcoded mode system for Pi with tool gating, model switching, and per-branch r
 - Appends mode instructions to system prompt on each turn
 - Sends UI-visible custom `mode-switch` messages
 - Filters `mode-switch` messages out of LLM context via `context` hook
-- Emits `guardrails:dangerous` compatibility events when user attention is required by tool gating:
+- Emits `ad:notify:dangerous` when user attention is required by tool gating:
   - when `bash` is blocked by mode deny rules
   - when confirmation is required for a non-allowlisted tool
 
 ## Event compatibility pattern
 
-For cross-extension notification/sound interoperability, emit this event shape:
+For cross-extension notification and sound interoperability, emit this event shape:
 
 ```ts
-pi.events.emit("guardrails:dangerous", {
+pi.events.emit("ad:notify:dangerous", {
   command: string,
   description: string,
   pattern: string,

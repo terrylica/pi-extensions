@@ -3,9 +3,7 @@ import type {
   ExtensionAPI,
   ExtensionContext,
 } from "@mariozechner/pi-coding-agent";
-
-const AD_NOTIFY_DANGEROUS_EVENT = "ad:notify:dangerous";
-const GUARDRAILS_DANGEROUS_EVENT = "guardrails:dangerous"; // compat
+import { AD_NOTIFY_DANGEROUS_EVENT } from "../../../packages/events";
 
 import { showModeConfirmDialog } from "../components/mode-confirm";
 import {
@@ -83,7 +81,6 @@ function emitDangerousEvent(
   };
 
   pi.events.emit(AD_NOTIFY_DANGEROUS_EVENT, payload);
-  pi.events.emit(GUARDRAILS_DANGEROUS_EVENT, payload);
 }
 
 async function confirmUnlistedTool(

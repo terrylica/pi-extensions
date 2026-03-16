@@ -12,15 +12,16 @@ import type {
   ExtensionContext,
   ToolCallEvent,
 } from "@mariozechner/pi-coding-agent";
+import {
+  AD_NOTIFY_ATTENTION_EVENT,
+  AD_NOTIFY_DANGEROUS_EVENT,
+  AD_NOTIFY_DONE_EVENT,
+  AD_TERMINAL_TITLE_ATTENTION_EVENT,
+} from "../../../packages/events";
 
 // const DEFAULT_SOUND = "/System/Library/Sounds/Blow.aiff";
 const DEFAULT_SOUND = "/System/Library/Sounds/Funk.aiff";
 const ATTENTION_SOUND = "/System/Library/Sounds/Glass.aiff";
-
-const AD_NOTIFY_DANGEROUS_EVENT = "ad:notify:dangerous";
-const AD_NOTIFY_ATTENTION_EVENT = "ad:notify:attention";
-const AD_NOTIFY_DONE_EVENT = "ad:notify:done";
-const GUARDRAILS_DANGEROUS_EVENT = "guardrails:dangerous"; // compat
 
 interface DangerousEvent {
   description: string;
@@ -41,8 +42,6 @@ interface DoneEvent {
   loops?: number;
   toolCalls?: number;
 }
-
-const AD_TERMINAL_TITLE_ATTENTION_EVENT = "ad:terminal-title:attention";
 
 type AttentionTitleEvent = {
   source: string;
@@ -286,11 +285,6 @@ export function setupNotificationHook(pi: ExtensionAPI) {
   });
 
   pi.events.on(AD_NOTIFY_DANGEROUS_EVENT, (data: unknown) => {
-    handleDangerousLikeEvent(pi, lastCtx, data);
-  });
-
-  // Keep temporary compatibility with guardrails emitter.
-  pi.events.on(GUARDRAILS_DANGEROUS_EVENT, (data: unknown) => {
     handleDangerousLikeEvent(pi, lastCtx, data);
   });
 

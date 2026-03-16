@@ -5,10 +5,9 @@
  */
 
 import type { ExtensionAPI } from "@mariozechner/pi-coding-agent";
+import { AD_NOTIFY_ATTENTION_EVENT } from "../../../packages/events";
 import { selectUpdates } from "../components/update-selector";
 import { applyUpdates } from "../lib/update";
-
-const AD_NOTIFY_ATTENTION_EVENT = "ad:notify:attention";
 
 export function registerDefaultsUpdateCommand(pi: ExtensionAPI): void {
   pi.registerCommand("defaults:update", {

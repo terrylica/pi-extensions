@@ -1,7 +1,7 @@
 /**
  * Register breadcrumbs commands with the palette extension via EventBus.
  *
- * Emits "palette:register" events immediately and re-emits when
+ * Emits "ad:palette:register" events immediately and re-emits when
  * the palette signals readiness (handles load-order differences).
  */
 
@@ -9,11 +9,15 @@ import type {
   ExtensionAPI,
   ExtensionContext,
 } from "@mariozechner/pi-coding-agent";
+import {
+  AD_PALETTE_READY_EVENT,
+  AD_PALETTE_REGISTER_EVENT,
+} from "../../../packages/events";
 import type { PaletteCommandContext } from "../../palette/registry/types";
 import { submitSlashCommandViaEditor } from "../../palette/utils/submit-command";
 
-const PALETTE_REGISTER = "palette:register";
-const PALETTE_READY = "palette:ready";
+const PALETTE_REGISTER = AD_PALETTE_REGISTER_EVENT;
+const PALETTE_READY = AD_PALETTE_READY_EVENT;
 
 async function dispatchPaletteCommand(
   ctx: ExtensionContext,

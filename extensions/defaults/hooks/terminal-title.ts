@@ -11,8 +11,8 @@ import type {
   ExtensionAPI,
   ExtensionContext,
 } from "@mariozechner/pi-coding-agent";
+import { AD_TERMINAL_TITLE_ATTENTION_EVENT } from "../../../packages/events";
 
-const AD_TERMINAL_TITLE_ATTENTION_EVENT = "ad:terminal-title:attention";
 const ATTENTION_MARKER = "[!]";
 
 type TerminalTitleMode = "default" | "cmux";

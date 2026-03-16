@@ -2,15 +2,27 @@ import type {
   ExtensionAPI,
   ExtensionContext,
 } from "@mariozechner/pi-coding-agent";
+import {
+  AD_PALETTE_READY_EVENT,
+  AD_PALETTE_REGISTER_EVENT,
+  AD_PROVIDERS_CODEX_FAST_MODE_CHANGED_EVENT,
+  AD_PROVIDERS_CODEX_FAST_MODE_READY_EVENT,
+  AD_PROVIDERS_CODEX_FAST_MODE_REQUEST_EVENT,
+} from "../../../packages/events";
+import {
+  CODEX_FAST_ENTRY_TYPE,
+  DEFAULT_CODEX_FAST_MODE_ENABLED,
+  readCodexFastModeState,
+} from "../lib/codex-fast-mode";
 
-const SESSION_ENTRY_TYPE = "providers-codex-fast";
-const PALETTE_REGISTER = "palette:register";
+const PALETTE_REGISTER = AD_PALETTE_REGISTER_EVENT;
+const CODEX_FAST_MODE_READY_EVENT = AD_PROVIDERS_CODEX_FAST_MODE_READY_EVENT;
+const CODEX_FAST_MODE_REQUEST_EVENT =
+  AD_PROVIDERS_CODEX_FAST_MODE_REQUEST_EVENT;
+const CODEX_FAST_MODE_CHANGED_EVENT =
+  AD_PROVIDERS_CODEX_FAST_MODE_CHANGED_EVENT;
 
-type FastModeState = {
-  enabled?: boolean;
-};
-
-let fastModeEnabled = true;
+let fastModeEnabled = DEFAULT_CODEX_FAST_MODE_ENABLED;
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
@@ -20,23 +32,18 @@ function isOpenAICodexProvider(ctx: ExtensionContext): boolean {
   return ctx.model?.provider === "openai-codex";
 }
 
+function emitFastModeState(pi: ExtensionAPI, ctx: ExtensionContext): void {
+  pi.events.emit(CODEX_FAST_MODE_CHANGED_EVENT, {
+    enabled: isOpenAICodexProvider(ctx) ? fastModeEnabled : false,
+  });
+}
+
 function readFastModeState(ctx: ExtensionContext): boolean {
-  const entries = ctx.sessionManager.getEntries();
-
-  for (let index = entries.length - 1; index >= 0; index -= 1) {
-    const entry = entries[index];
-    if (entry?.type !== "custom") continue;
-    if (entry.customType !== SESSION_ENTRY_TYPE) continue;
-
-    const data = entry.data as FastModeState | undefined;
-    return data?.enabled === true;
-  }
-
-  return true;
+  return readCodexFastModeState(ctx);
 }
 
 function persistFastModeState(pi: ExtensionAPI, enabled: boolean): void {
-  pi.appendEntry(SESSION_ENTRY_TYPE, { enabled });
+  pi.appendEntry(CODEX_FAST_ENTRY_TYPE, { enabled });
 }
 
 function notifyFastModeState(ctx: ExtensionContext): void {
@@ -76,6 +83,8 @@ function setFastMode(
     persistFastModeState(pi, enabled);
   }
 
+  emitFastModeState(pi, ctx);
+
   if (options?.notify !== false) {
     notifyFastModeState(ctx);
   }
@@ -106,19 +115,29 @@ function emitPaletteRegistration(pi: ExtensionAPI): void {
 
 export function setupCodexFastModeHooks(pi: ExtensionAPI): void {
   emitPaletteRegistration(pi);
-  pi.events.on("palette:ready", () => {
+  pi.events.on(AD_PALETTE_READY_EVENT, () => {
     emitPaletteRegistration(pi);
+  });
+
+  pi.events.on(CODEX_FAST_MODE_REQUEST_EVENT, (data: unknown) => {
+    const event = (data ?? {}) as { ctx?: ExtensionContext };
+    if (!event.ctx) return;
+    emitFastModeState(pi, event.ctx);
   });
 
   pi.on("session_start", async (_event, ctx) => {
     fastModeEnabled = readFastModeState(ctx);
+    pi.events.emit(CODEX_FAST_MODE_READY_EVENT, {});
   });
 
   pi.on("session_switch", async (_event, ctx) => {
     fastModeEnabled = readFastModeState(ctx);
+    pi.events.emit(CODEX_FAST_MODE_READY_EVENT, {});
   });
 
   pi.on("model_select", async (event, ctx) => {
+    emitFastModeState(pi, ctx);
+
     if (!ctx.hasUI) return;
     if (event.source === "restore") return;
     if (event.model.provider !== "openai-codex") return;

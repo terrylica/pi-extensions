@@ -8,8 +8,7 @@
 import { homedir } from "node:os";
 import { isAbsolute, join, relative, resolve } from "node:path";
 import type { ExtensionAPI } from "@mariozechner/pi-coding-agent";
-
-const AD_NOTIFY_ATTENTION_EVENT = "ad:notify:attention";
+import { AD_NOTIFY_ATTENTION_EVENT } from "../../../packages/events";
 
 export type SessionReadAccessMode = "confirm" | "allow";
 

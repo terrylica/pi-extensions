@@ -1,13 +1,14 @@
 /**
  * Types and adapter for external palette commands registered via EventBus.
  *
- * External extensions emit "palette:register" events with an
+ * External extensions emit "ad:palette:register" events with an
  * ExternalPaletteCommand payload. The palette wraps these into
  * PaletteCommand objects that collect input via io.input() before
  * calling the external execute function.
  */
 
 import type { ExtensionContext } from "@mariozechner/pi-coding-agent";
+import { AD_PALETTE_REGISTER_EVENT } from "../../../packages/events";
 import type { CommandGroup, PaletteCommand } from "./types";
 
 /**
@@ -23,7 +24,7 @@ export interface ExternalCommandInput {
 }
 
 /**
- * The shape emitted by other extensions via pi.events.emit("palette:register", payload).
+ * The shape emitted by other extensions via pi.events.emit("ad:palette:register", payload).
  */
 export interface ExternalPaletteCommand {
   id: string;
@@ -43,7 +44,7 @@ export interface ExternalPaletteCommand {
 }
 
 /** Event name for external command registration. */
-export const PALETTE_REGISTER_EVENT = "palette:register";
+export const PALETTE_REGISTER_EVENT = AD_PALETTE_REGISTER_EVENT;
 
 /**
  * Wrap an ExternalPaletteCommand into a PaletteCommand that the

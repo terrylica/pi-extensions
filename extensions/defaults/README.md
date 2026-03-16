@@ -43,10 +43,10 @@ Sends OS-level terminal notifications directly (OSC) with optional macOS sounds.
   - For attention-triggering tool calls (e.g. `ask_user`), marker clears when that tool call finishes
 - Sends summary notification when agent finishes (loop count, tool count, error status)
   - Skips done notification when the run ends with assistant `stopReason: "aborted"`
-- Listens for `guardrails:dangerous` events and alerts with attention sound
+- Listens for `ad:notify:dangerous` events and alerts with attention sound
   - event payload shape: `{ command, description, pattern, toolName?, toolCallId? }`
   - `toolName`/`toolCallId` let title attention map to the exact triggering tool call
-  - compatibility note: other extensions can emit this same event to reuse the same attention sound path
+  - other extensions can emit this same event to reuse the same attention sound path
 
 ### Terminal title
 
