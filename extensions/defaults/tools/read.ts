@@ -47,7 +47,7 @@ export function setupReadTool(pi: ExtensionAPI): void {
   pi.registerTool({
     ...baseRead,
     description:
-      "Read file contents. Each line is tagged with LINE#HASH for use with the edit tool.",
+      "Read file contents. Each line is tagged with LINE#HASH for use with the edit tool. If the current model supports images, this tool can also read and display images (jpg, png, gif, webp).",
     // TODO: promptGuidelines not recognized by current pi-coding-agent types
     // promptGuidelines: [
     //   "read output uses LINE#HASH tags. Use these tags when editing with the edit tool.",

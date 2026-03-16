@@ -54,8 +54,7 @@ export function setupFindTool(pi: ExtensionAPI): void {
   pi.registerTool<typeof wrappedSchema, FindToolDetails>({
     name: "find",
     label: "Find Files",
-    description:
-      "Find files by name using the `fd` command-line tool. Supports glob patterns and regex. Searches recursively from the specified path.",
+    description: `Find files by name using the \`fd\` command-line tool. Supports glob patterns and regex. Searches recursively from the specified path. Respects .gitignore. Results are truncated to ${DEFAULT_LIMIT} entries.`,
     parameters: wrappedSchema,
     // TODO: promptGuidelines not recognized by current pi-coding-agent types
     // promptGuidelines: [
