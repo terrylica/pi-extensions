@@ -10,7 +10,7 @@ type FastModeState = {
   enabled?: boolean;
 };
 
-let fastModeEnabled = false;
+let fastModeEnabled = true;
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
@@ -32,7 +32,7 @@ function readFastModeState(ctx: ExtensionContext): boolean {
     return data?.enabled === true;
   }
 
-  return false;
+  return true;
 }
 
 function persistFastModeState(pi: ExtensionAPI, enabled: boolean): void {
