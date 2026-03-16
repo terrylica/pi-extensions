@@ -1,5 +1,5 @@
 import type { PaletteCommand } from "../registry/types";
-import { formatShellResult } from "../utils/shell";
+import { formatShellResult, sanitizeShellOutput } from "../utils/shell";
 
 export const shellWithContextCommand: PaletteCommand = {
   id: "shell.run",
@@ -15,7 +15,7 @@ export const shellWithContextCommand: PaletteCommand = {
     });
     if (!command) return;
 
-    await executeShell(c, io, command, false);
+    await executeShell(c, command, false);
   },
 };
 
@@ -33,19 +33,42 @@ export const shellWithoutContextCommand: PaletteCommand = {
     });
     if (!command) return;
 
-    await executeShell(c, io, command, true);
+    await executeShell(c, command, true);
   },
 };
 
 async function executeShell(
   c: Parameters<PaletteCommand["run"]>[0],
-  io: Parameters<PaletteCommand["run"]>[1],
   command: string,
   excludeFromContext: boolean,
 ): Promise<void> {
   try {
     const result = await c.pi.exec("sh", ["-lc", command], { cwd: c.ctx.cwd });
-    const summary = formatShellResult(command, result);
+    const sanitizedStdout = sanitizeShellOutput(result.stdout);
+    const sanitizedStderr = sanitizeShellOutput(result.stderr);
+    const sanitizedResult = {
+      ...result,
+      stdout: sanitizedStdout,
+      stderr: sanitizedStderr,
+    };
+    const summary = formatShellResult(command, sanitizedResult);
+
+    if (!excludeFromContext && result.code !== 0) {
+      const output = [sanitizedStdout, sanitizedStderr]
+        .filter((chunk) => chunk.length > 0)
+        .join("\n");
+      const maxChars = 4000;
+      const trimmedOutput =
+        output.length > maxChars
+          ? `${output.slice(0, maxChars)}\n\n[output truncated]`
+          : output || "(no output)";
+
+      c.ctx.ui.notify(
+        `Command failed (exit ${result.code})\n${trimmedOutput}`,
+        "error",
+      );
+      return;
+    }
 
     c.pi.sendMessage({
       customType: "palette:bash",
@@ -55,17 +78,19 @@ async function executeShell(
         command,
         exitCode: result.code,
         excluded: excludeFromContext,
-        stdout: result.stdout,
-        stderr: result.stderr,
+        stdout: sanitizedStdout,
+        stderr: sanitizedStderr,
       },
     });
 
     if (result.code !== 0) {
-      const suffix = excludeFromContext ? " (excluded from context)" : "";
-      io.notify(`Command failed (exit ${result.code})${suffix}`, "warning");
+      c.ctx.ui.notify(
+        `Command failed (exit ${result.code})${excludeFromContext ? " (excluded from context)" : ""}`,
+        "error",
+      );
     }
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
-    io.notify(`Command execution failed: ${message}`, "error");
+    c.ctx.ui.notify(`Command execution failed: ${message}`, "error");
   }
 }
