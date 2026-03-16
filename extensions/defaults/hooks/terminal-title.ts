@@ -15,6 +15,7 @@ import type {
 const AD_TERMINAL_TITLE_ATTENTION_EVENT = "ad:terminal-title:attention";
 const ATTENTION_MARKER = "[!]";
 
+type TerminalTitleMode = "default" | "cmux";
 // Maximum breadcrumb depth before truncation (root > ... > current)
 const MAX_BREADCRUMB_DEPTH = 2;
 
@@ -74,14 +75,36 @@ function getContextName(cwd: string): string {
   return `${rootName} > ... > ${parts[parts.length - 1]}`;
 }
 
-function setTitle(
-  ctx: ExtensionContext,
-  title: string,
-  onTitleChange?: (title: string) => void,
-) {
+function detectTerminalTitleMode(
+  env: NodeJS.ProcessEnv = process.env,
+): TerminalTitleMode {
+  if (env.CMUX_WORKSPACE_ID || env.CMUX_SURFACE_ID || env.CMUX_SOCKET_PATH) {
+    return "cmux";
+  }
+  return "default";
+}
+
+export function formatTerminalTitle(
+  cwd: string,
+  detail?: string,
+  env: NodeJS.ProcessEnv = process.env,
+): string {
+  const mode = detectTerminalTitleMode(env);
+  const trimmedDetail = detail?.trim();
+
+  if (mode === "cmux") {
+    return trimmedDetail ? `π: (${trimmedDetail})` : "π";
+  }
+
+  const contextName = getContextName(cwd);
+  return trimmedDetail
+    ? `π: ${contextName} (${trimmedDetail})`
+    : `π: ${contextName}`;
+}
+
+function setTitle(ctx: ExtensionContext, title: string) {
   if (!ctx.hasUI) return;
   ctx.ui.setTitle(title);
-  onTitleChange?.(title);
 }
 
 function appendAttentionMarker(title: string): string {
@@ -109,7 +132,7 @@ type AttentionTitleEvent = {
 
 export function setupTerminalTitleHook(pi: ExtensionAPI) {
   let lastCtx: ExtensionContext | undefined;
-  let currentTitle = "Terminal";
+  let currentBaseTitle = "Terminal";
   let globalAttentionCount = 0;
   const attentionToolCalls = new Set<string>();
 
@@ -117,37 +140,35 @@ export function setupTerminalTitleHook(pi: ExtensionAPI) {
     return globalAttentionCount > 0 || attentionToolCalls.size > 0;
   };
 
-  const updateTitle = (ctx: ExtensionContext, title: string): void => {
+  const updateTitle = (ctx: ExtensionContext, baseTitle: string): void => {
     lastCtx = ctx;
-    const baseTitle = removeAttentionMarker(title);
+    currentBaseTitle = removeAttentionMarker(baseTitle);
     const nextTitle = hasAttention()
-      ? appendAttentionMarker(baseTitle)
-      : baseTitle;
+      ? appendAttentionMarker(currentBaseTitle)
+      : currentBaseTitle;
 
-    setTitle(ctx, nextTitle, (savedTitle) => {
-      currentTitle = savedTitle;
-    });
+    setTitle(ctx, nextTitle);
   };
 
   pi.on("session_start", async (_event, ctx) => {
-    updateTitle(ctx, `π: ${getContextName(ctx.cwd)}`);
+    updateTitle(ctx, formatTerminalTitle(ctx.cwd));
   });
 
   pi.on("session_switch", async (_event, ctx) => {
-    updateTitle(ctx, `π: ${getContextName(ctx.cwd)}`);
+    updateTitle(ctx, formatTerminalTitle(ctx.cwd));
   });
 
   pi.on("agent_start", async (_event, ctx) => {
-    updateTitle(ctx, `π: ${getContextName(ctx.cwd)} (thinking...)`);
+    updateTitle(ctx, formatTerminalTitle(ctx.cwd, "thinking..."));
   });
 
   pi.on("tool_call", async (event, ctx) => {
-    updateTitle(ctx, `π: ${getContextName(ctx.cwd)} (${event.toolName})`);
+    updateTitle(ctx, formatTerminalTitle(ctx.cwd, event.toolName));
     return undefined;
   });
 
   pi.on("agent_end", async (_event, ctx) => {
-    updateTitle(ctx, `π: ${getContextName(ctx.cwd)}`);
+    updateTitle(ctx, formatTerminalTitle(ctx.cwd));
   });
 
   pi.on("session_shutdown", async (_event, ctx) => {
@@ -175,8 +196,8 @@ export function setupTerminalTitleHook(pi: ExtensionAPI) {
     if (!lastCtx) return;
 
     const baseTitle = event.toolName
-      ? `π: ${getContextName(lastCtx.cwd)} (${event.toolName})`
-      : currentTitle;
+      ? formatTerminalTitle(lastCtx.cwd, event.toolName)
+      : currentBaseTitle;
 
     updateTitle(lastCtx, baseTitle);
   });
