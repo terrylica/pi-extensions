@@ -8,8 +8,8 @@ import { AD_NOTIFY_ATTENTION_EVENT } from "../../../packages/events";
  * Map of "provider/modelId" to the desired context window size in tokens.
  */
 const CONTEXT_WINDOW_OVERRIDES: Record<string, number> = {
-  "anthropic/claude-opus-4-6": 200_000,
-  "anthropic/claude-sonnet-4-6": 200_000,
+  "anthropic/claude-opus-4-6": 272_000,
+  "anthropic/claude-sonnet-4-6": 272_000,
 };
 
 interface ModelsJsonConfig {
