@@ -10,6 +10,7 @@ import { getMarkdownTheme, keyHint } from "@mariozechner/pi-coding-agent";
 import { Container, Markdown, Text } from "@mariozechner/pi-tui";
 import { type Static, Type } from "@sinclair/typebox";
 import {
+  createGitHubHandler,
   createMarkdownNewHandler,
   createTwitterHandler,
   type ReadUrlHandler,
@@ -40,6 +41,7 @@ const COLLAPSED_PREVIEW_LINES = 8;
 export function setupReadUrlTool(pi: ExtensionAPI): void {
   const handlers: ReadUrlHandler[] = [
     createTwitterHandler(),
+    createGitHubHandler(),
     createMarkdownNewHandler(),
   ];
 
