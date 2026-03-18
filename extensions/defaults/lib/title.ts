@@ -120,51 +120,59 @@ export async function generateTitle(
   return postProcessTitle(result.content);
 }
 
-export function getFirstUserText(ctx: ExtensionContext): string | null {
+export function getLatestUserText(ctx: ExtensionContext): string | null {
   const entries = ctx.sessionManager.getEntries();
-  const firstUserEntry = entries.find(
-    (e) => e.type === "message" && e.message.role === "user",
-  );
-  if (!firstUserEntry || firstUserEntry.type !== "message") return null;
+  for (let i = entries.length - 1; i >= 0; i--) {
+    const entry = entries[i];
+    if (!entry || entry.type !== "message") continue;
+    if (entry.message.role !== "user") continue;
 
-  const msg = firstUserEntry.message as { content: string | TextContent[] };
-  if (typeof msg.content === "string") {
-    return msg.content;
+    const msg = entry.message as { content: string | TextContent[] };
+    if (typeof msg.content === "string") {
+      return msg.content;
+    }
+    return msg.content
+      .filter((c): c is TextContent => c.type === "text")
+      .map((c) => c.text)
+      .join(" ");
   }
-  return msg.content
-    .filter((c): c is TextContent => c.type === "text")
-    .map((c) => c.text)
-    .join(" ");
+
+  return null;
 }
 
-export function getFirstAssistantText(ctx: ExtensionContext): string | null {
+export function getLatestAssistantText(ctx: ExtensionContext): string | null {
   const entries = ctx.sessionManager.getEntries();
-  const firstAssistantEntry = entries.find(
-    (e) => e.type === "message" && e.message.role === "assistant",
-  );
-  if (!firstAssistantEntry || firstAssistantEntry.type !== "message")
-    return null;
+  for (let i = entries.length - 1; i >= 0; i--) {
+    const entry = entries[i];
+    if (!entry || entry.type !== "message") continue;
+    if (entry.message.role !== "assistant") continue;
 
-  const msg = firstAssistantEntry.message as { content: TextContent[] };
-  // Filter for text content only -- this naturally excludes thinking blocks
-  return msg.content
-    .filter((c): c is TextContent => c.type === "text")
-    .map((c) => c.text)
-    .join("\n");
+    const msg = entry.message as { content: TextContent[] };
+    // Filter for text content only -- this naturally excludes thinking blocks
+    return msg.content
+      .filter((c): c is TextContent => c.type === "text")
+      .map((c) => c.text)
+      .join("\n");
+  }
+
+  return null;
 }
 
 export async function generateAndSetTitle(
   pi: ExtensionAPI,
   ctx: ExtensionContext,
 ): Promise<void> {
-  const userText = getFirstUserText(ctx);
+  const userText = getLatestUserText(ctx);
   if (!userText?.trim()) {
     ctx.ui.notify("No user message to generate title from", "warning");
     return;
   }
 
-  const assistantText = getFirstAssistantText(ctx) ?? "";
-
+  const assistantText = getLatestAssistantText(ctx) ?? "";
+  if (!assistantText.trim()) {
+    ctx.ui.notify("No assistant response to generate title from", "warning");
+    return;
+  }
   let lastError: Error | null = null;
   for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
     try {

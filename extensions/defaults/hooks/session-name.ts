@@ -5,6 +5,14 @@ interface SessionNameState {
   hasAutoNamed: boolean;
 }
 
+function isTurnCompleted(event: unknown): boolean {
+  if (!event || typeof event !== "object") return false;
+  const message = (event as { message?: unknown }).message;
+  if (!message || typeof message !== "object") return false;
+  const stopReason = (message as { stopReason?: unknown }).stopReason;
+  return typeof stopReason === "string" && stopReason.toLowerCase() === "stop";
+}
+
 export function setupSessionNameHook(pi: ExtensionAPI) {
   const state: SessionNameState = {
     hasAutoNamed: false,
@@ -18,11 +26,15 @@ export function setupSessionNameHook(pi: ExtensionAPI) {
     state.hasAutoNamed = false;
   });
 
-  pi.on("turn_end", async (_event, ctx) => {
+  pi.on("turn_end", async (event, ctx) => {
     if (state.hasAutoNamed) return;
 
     if (pi.getSessionName()) {
       state.hasAutoNamed = true;
+      return;
+    }
+
+    if (!isTurnCompleted(event)) {
       return;
     }
 

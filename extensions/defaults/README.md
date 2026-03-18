@@ -71,7 +71,7 @@ Replaces the built-in `edit` tool with a hashline-based editor. The `read` tool 
 
 ### Auto session naming
 
-Automatically names sessions based on first user message after first turn completes.
+Automatically names sessions after the first agent loop whose assistant `stopReason` is `stop`, using both the triggering user message and the assistant response.
 
 Uses `google/gemini-2.5-flash-lite` to generate a 3-7 word title in sentence case.
 
