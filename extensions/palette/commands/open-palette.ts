@@ -83,6 +83,56 @@ export function buildCommandViews(
   return views;
 }
 
+function getPaletteOverlayMetrics(termRows: number): {
+  overlayHeight: number;
+  contentHeight: number;
+} {
+  const verticalMargin = 4; // margin: 2 => top + bottom
+  const maxOverlayHeight = Math.floor(termRows * 0.8);
+  const overlayHeight = Math.min(
+    Math.max(3, termRows - verticalMargin),
+    Math.max(3, maxOverlayHeight),
+  );
+
+  return {
+    overlayHeight,
+    contentHeight: Math.max(1, overlayHeight - 2),
+  };
+}
+
+function getPaletteOverlayWidth(termCols: number): number {
+  return Math.max(
+    60,
+    Math.min(Math.floor(termCols * 0.7), Math.max(20, termCols - 4)),
+  );
+}
+
+function getPaletteOverlayOptions(
+  termRows: number,
+  termCols: number,
+  palette: PaletteOverlay | undefined,
+): {
+  width: number;
+  minWidth: number;
+  maxHeight: number;
+  anchor: "center";
+  offsetY: number;
+  margin: number;
+} {
+  const { overlayHeight: maxHeight } = getPaletteOverlayMetrics(termRows);
+  const width = getPaletteOverlayWidth(termCols);
+  const overlayHeight = palette?.estimateOverlayHeight(width) ?? 3;
+
+  return {
+    width,
+    minWidth: 60,
+    maxHeight,
+    anchor: "center",
+    offsetY: -Math.floor(overlayHeight / 2),
+    margin: 2,
+  };
+}
+
 export async function openPalette(
   pi: ExtensionAPI,
   ctx: ExtensionContext,
@@ -94,48 +144,54 @@ export async function openPalette(
   const commandCtx: PaletteCommandContext = { pi, ctx, config };
   const views = buildCommandViews(registry, commandCtx);
 
+  let getTerminalRows = () => 24;
+  let getTerminalCols = () => 80;
+  let palette: PaletteOverlay | undefined;
+
   await ctx.ui.custom<void>(
     (tui, theme, _kb, done) => {
-      const palette = new PaletteOverlay(
+      getTerminalRows = () => tui.terminal.rows;
+      getTerminalCols = () => tui.terminal.columns;
+      const maxContentHeight = () =>
+        getPaletteOverlayMetrics(tui.terminal.rows).contentHeight;
+
+      const currentPalette = new PaletteOverlay(
         theme,
         views,
+        maxContentHeight,
         async (commandId: string) => {
-          if (palette.isCommandRunning) return;
+          if (currentPalette.isCommandRunning) return;
 
           const cmd = registry.get(commandId);
           if (!cmd) return;
 
-          const io = palette.createIO((msg, level) =>
+          const io = currentPalette.createIO((msg, level) =>
             ctx.ui.notify(msg, level),
           );
-          palette.running = true;
+          currentPalette.running = true;
           tui.requestRender();
 
           try {
             await cmd.run(commandCtx, io);
           } finally {
-            palette.running = false;
-            palette.popToRoot();
+            currentPalette.running = false;
+            currentPalette.popToRoot();
             tui.requestRender();
           }
 
-          // Close the palette after the command completes successfully
           done();
         },
         () => done(),
         () => tui.requestRender(),
       );
+      palette = currentPalette;
 
-      return palette;
+      return currentPalette;
     },
     {
       overlay: true,
-      overlayOptions: {
-        width: "70%",
-        maxHeight: "60%",
-        anchor: "center",
-        margin: { top: 2, bottom: 15 },
-      },
+      overlayOptions: () =>
+        getPaletteOverlayOptions(getTerminalRows(), getTerminalCols(), palette),
     },
   );
 }

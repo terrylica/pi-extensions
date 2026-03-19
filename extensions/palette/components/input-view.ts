@@ -55,7 +55,7 @@ export class InputView implements PaletteView {
     return true;
   }
 
-  renderContent(width: number): string[] {
+  renderContent(width: number, _height: number): string[] {
     const inputLine = this.input.render(width)[0] ?? "> ";
     return [inputLine.slice(2)];
   }

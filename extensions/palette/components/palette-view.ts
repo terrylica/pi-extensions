@@ -10,6 +10,9 @@ export interface PaletteView {
   /** Handle keyboard input. Return true if consumed. */
   handleInput(data: string): boolean;
 
-  /** Render content lines (no border). Width is the inner content width. */
-  renderContent(width: number): string[];
+  /**
+   * Render content lines (no border). Width is the inner content width.
+   * Height is the available inner content height, excluding shell borders.
+   */
+  renderContent(width: number, height: number): string[];
 }

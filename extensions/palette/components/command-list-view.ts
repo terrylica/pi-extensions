@@ -17,6 +17,18 @@ import type { PaletteView } from "./palette-view";
 
 type Theme = ExtensionContext["ui"]["theme"];
 
+const MIN_VISIBLE_ROWS = 5;
+const MAX_VISIBLE_ROWS = 12;
+
+function clampVisibleRows(count: number, available: number): number {
+  if (count <= 0) return 1;
+  return Math.min(
+    Math.max(count, MIN_VISIBLE_ROWS),
+    MAX_VISIBLE_ROWS,
+    available,
+  );
+}
+
 export class CommandListView implements PaletteView {
   readonly title = "Palette";
 
@@ -80,7 +92,7 @@ export class CommandListView implements PaletteView {
     return true;
   }
 
-  renderContent(width: number): string[] {
+  renderContent(width: number, height: number): string[] {
     const lines: string[] = [];
 
     // Search input
@@ -90,16 +102,32 @@ export class CommandListView implements PaletteView {
     // Separator
     lines.push(this.theme.fg("dim", "─".repeat(width)));
 
-    // Command list (fixed height)
-    const listHeight = Math.max(this.views.length, 7);
-    for (let i = 0; i < listHeight; i++) {
-      const view = this.filtered[i];
-      if (!view) {
-        lines.push("");
-        continue;
-      }
+    const availableListHeight = Math.max(1, height - 2);
+    const listCount = this.filtered.length;
+    const listHeight = clampVisibleRows(listCount, availableListHeight);
+    const selectedFilteredIndex = Math.min(
+      this.selectedIndex,
+      Math.max(0, this.filtered.length - 1),
+    );
+    const startIndex = Math.max(
+      0,
+      Math.min(
+        Math.max(0, this.filtered.length - listHeight),
+        selectedFilteredIndex - Math.floor(listHeight / 2),
+      ),
+    );
 
-      const selected = i === this.selectedIndex;
+    if (listCount === 0) {
+      lines.push(this.theme.fg("muted", "No commands"));
+      return lines;
+    }
+
+    for (let i = 0; i < listHeight; i++) {
+      const filteredIndex = startIndex + i;
+      const view = this.filtered[filteredIndex];
+      if (!view) break;
+
+      const selected = filteredIndex === this.selectedIndex;
       lines.push(this.renderRow(view, selected, width));
     }
 

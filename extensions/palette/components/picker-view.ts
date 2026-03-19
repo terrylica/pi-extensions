@@ -25,6 +25,18 @@ export interface PickerViewOptions {
   onCancel: () => void;
 }
 
+const MIN_VISIBLE_ROWS = 5;
+const MAX_VISIBLE_ROWS = 12;
+
+function clampVisibleRows(count: number, available: number): number {
+  if (count <= 0) return 1;
+  return Math.min(
+    Math.max(count, MIN_VISIBLE_ROWS),
+    MAX_VISIBLE_ROWS,
+    available,
+  );
+}
+
 export class PickerView implements PaletteView {
   readonly title: string;
 
@@ -91,7 +103,7 @@ export class PickerView implements PaletteView {
     return true;
   }
 
-  renderContent(width: number): string[] {
+  renderContent(width: number, height: number): string[] {
     const theme = this.theme;
     const accent = (s: string) => theme.fg("accent", s);
     const muted = (s: string) => theme.fg("muted", s);
@@ -105,20 +117,28 @@ export class PickerView implements PaletteView {
     // Separator
     lines.push(theme.fg("dim", "─".repeat(width)));
 
-    // Item list (fixed height)
-    const listHeight = Math.max(this.options.items.length, 7);
-    for (let i = 0; i < listHeight; i++) {
-      if (this.filtered.length === 0 && i === 0) {
-        lines.push(muted(this.options.emptyText));
-        continue;
-      }
-      const item = this.filtered[i];
-      if (!item) {
-        lines.push("");
-        continue;
-      }
+    const availableListHeight = Math.max(1, height - 2);
+    const listCount = this.filtered.length;
+    const listHeight = clampVisibleRows(listCount, availableListHeight);
+    const startIndex = Math.max(
+      0,
+      Math.min(
+        Math.max(0, this.filtered.length - listHeight),
+        this.selectedIndex - Math.floor(listHeight / 2),
+      ),
+    );
 
-      const selected = i === this.selectedIndex;
+    if (listCount === 0) {
+      lines.push(muted(this.options.emptyText));
+      return lines;
+    }
+
+    for (let i = 0; i < listHeight; i++) {
+      const filteredIndex = startIndex + i;
+      const item = this.filtered[filteredIndex];
+      if (!item) break;
+
+      const selected = filteredIndex === this.selectedIndex;
       const label = selected ? accent(item.label) : item.label;
       const description = item.description ? muted(` ${item.description}`) : "";
       lines.push(truncateToWidth(`${label}${description}`, width));

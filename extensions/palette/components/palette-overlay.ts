@@ -29,6 +29,7 @@ export class PaletteOverlay implements Component {
   constructor(
     private readonly theme: Theme,
     views: CommandView[],
+    private readonly maxContentHeight: () => number,
     private readonly onSelectCommand: (commandId: string) => void,
     private readonly closeOverlay: () => void,
     private readonly requestRender: () => void,
@@ -104,6 +105,7 @@ export class PaletteOverlay implements Component {
     const accent = (s: string) => theme.fg("accent", s);
 
     const innerWidth = width - 4; // "| " + content + " |"
+    const innerHeight = Math.max(1, this.maxContentHeight());
 
     const pad = (s: string): string => {
       const w = visibleWidth(s);
@@ -115,7 +117,6 @@ export class PaletteOverlay implements Component {
 
     const lines: string[] = [];
 
-    // Top border with title
     const title = ` ${top.title} `;
     const titleW = visibleWidth(title);
     const rightDash = Math.max(0, width - 2 - 2 - titleW);
@@ -123,16 +124,28 @@ export class PaletteOverlay implements Component {
       border("╭──") + accent(title) + border(`${"─".repeat(rightDash)}╮`),
     );
 
-    // Content from the active view
-    const contentLines = top.renderContent(innerWidth);
+    const contentLines = top
+      .renderContent(innerWidth, innerHeight)
+      .slice(0, innerHeight);
     for (const line of contentLines) {
       lines.push(row(line));
     }
 
-    // Bottom border
     lines.push(border(`╰${"─".repeat(width - 2)}╯`));
 
     return lines;
+  }
+
+  estimateOverlayHeight(width: number): number {
+    const top = this.viewStack[this.viewStack.length - 1];
+    if (!top) return 3;
+
+    const innerWidth = Math.max(1, width - 4);
+    const innerHeight = Math.max(1, this.maxContentHeight());
+    const contentHeight = top
+      .renderContent(innerWidth, innerHeight)
+      .slice(0, innerHeight).length;
+    return contentHeight + 2;
   }
 
   invalidate(): void {}
