@@ -95,7 +95,7 @@ export async function openPalette(
   const views = buildCommandViews(registry, commandCtx);
 
   await ctx.ui.custom<void>(
-    (_tui, theme, _kb, done) => {
+    (tui, theme, _kb, done) => {
       const palette = new PaletteOverlay(
         theme,
         views,
@@ -109,18 +109,21 @@ export async function openPalette(
             ctx.ui.notify(msg, level),
           );
           palette.running = true;
+          tui.requestRender();
 
           try {
             await cmd.run(commandCtx, io);
           } finally {
             palette.running = false;
             palette.popToRoot();
+            tui.requestRender();
           }
 
           // Close the palette after the command completes successfully
           done();
         },
         () => done(),
+        () => tui.requestRender(),
       );
 
       return palette;

@@ -40,6 +40,7 @@ export interface PickOptions {
   emptyText?: string;
   items: PickItem[];
   initialQuery?: string;
+  initialValue?: string;
   width?: SizeValue;
   maxHeight?: SizeValue;
 }

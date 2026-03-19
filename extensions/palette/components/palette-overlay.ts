@@ -31,6 +31,7 @@ export class PaletteOverlay implements Component {
     views: CommandView[],
     private readonly onSelectCommand: (commandId: string) => void,
     private readonly closeOverlay: () => void,
+    private readonly requestRender: () => void,
   ) {
     const root = new CommandListView(
       theme,
@@ -66,6 +67,7 @@ export class PaletteOverlay implements Component {
     while (this.viewStack.length > 1) {
       this.viewStack.pop();
     }
+    this.requestRender();
   }
 
   /** Resolve any pending sub-view promises by cancelling them. */
@@ -82,12 +84,15 @@ export class PaletteOverlay implements Component {
       // for null returns and exiting.
       void view; // views are already removed
     }
+    this.requestRender();
   }
 
   handleInput(data: string): boolean {
     const top = this.viewStack[this.viewStack.length - 1];
     if (!top) return false;
-    return top.handleInput(data);
+    const handled = top.handleInput(data);
+    if (handled) this.requestRender();
+    return handled;
   }
 
   render(width: number): string[] {
@@ -143,6 +148,7 @@ export class PaletteOverlay implements Component {
         emptyText: options.emptyText ?? "No items",
         items: options.items,
         initialQuery: options.initialQuery,
+        initialValue: options.initialValue,
         onSubmit: (result) => {
           this.popView(view);
           resolve(result);
@@ -153,6 +159,7 @@ export class PaletteOverlay implements Component {
         },
       });
       this.viewStack.push(view);
+      this.requestRender();
     });
   }
 
@@ -172,6 +179,7 @@ export class PaletteOverlay implements Component {
         },
       });
       this.viewStack.push(view);
+      this.requestRender();
     });
   }
 
@@ -179,6 +187,7 @@ export class PaletteOverlay implements Component {
     const idx = this.viewStack.indexOf(view);
     if (idx > 0) {
       this.viewStack.splice(idx, 1);
+      this.requestRender();
     }
   }
 }

@@ -20,6 +20,7 @@ export interface PickerViewOptions {
   emptyText: string;
   items: PickItem[];
   initialQuery?: string;
+  initialValue?: string;
   onSubmit: (result: PickResult) => void;
   onCancel: () => void;
 }
@@ -41,6 +42,10 @@ export class PickerView implements PaletteView {
     if (options.initialQuery) {
       this.input.setValue(options.initialQuery);
       this.updateFilter(options.initialQuery);
+    }
+
+    if (options.initialValue) {
+      this.selectValue(options.initialValue);
     }
 
     this.input.onSubmit = () => {
@@ -145,5 +150,10 @@ export class PickerView implements PaletteView {
       return;
     }
     this.selectedIndex = Math.min(this.selectedIndex, this.filtered.length - 1);
+  }
+
+  private selectValue(value: string): void {
+    const index = this.filtered.findIndex((item) => item.value === value);
+    if (index >= 0) this.selectedIndex = index;
   }
 }
