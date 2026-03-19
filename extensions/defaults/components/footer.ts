@@ -16,7 +16,11 @@ import {
   AD_PROVIDERS_CODEX_FAST_MODE_CHANGED_EVENT,
   AD_PROVIDERS_CODEX_FAST_MODE_READY_EVENT,
   AD_PROVIDERS_CODEX_FAST_MODE_REQUEST_EVENT,
+  AD_PROVIDERS_CODEX_VERBOSITY_CHANGED_EVENT,
+  AD_PROVIDERS_CODEX_VERBOSITY_READY_EVENT,
+  AD_PROVIDERS_CODEX_VERBOSITY_REQUEST_EVENT,
   type AdProvidersCodexFastModeChangedEvent,
+  type AdProvidersCodexVerbosityChangedEvent,
 } from "../../../packages/events";
 import { buildModelIdLine, buildModelLine } from "../lib/model";
 import { buildPathParts } from "../lib/path-parts";
@@ -36,15 +40,28 @@ export function createCustomFooter(pi: ExtensionAPI) {
   setupTPSTracking(pi);
   let requestRender: (() => void) | undefined;
   let codexFastModeEnabled = false;
+  let codexVerbosity: "low" | "medium" | "high" | undefined;
 
   pi.events.on(AD_PROVIDERS_CODEX_FAST_MODE_READY_EVENT, () => {
     if (!ctx) return;
     pi.events.emit(AD_PROVIDERS_CODEX_FAST_MODE_REQUEST_EVENT, { ctx });
   });
 
+  pi.events.on(AD_PROVIDERS_CODEX_VERBOSITY_READY_EVENT, () => {
+    pi.events.emit(AD_PROVIDERS_CODEX_VERBOSITY_REQUEST_EVENT, {});
+  });
+
   pi.events.on(AD_PROVIDERS_CODEX_FAST_MODE_CHANGED_EVENT, (data: unknown) => {
     const event = (data ?? {}) as Partial<AdProvidersCodexFastModeChangedEvent>;
     codexFastModeEnabled = event.enabled === true;
+    if (!ctx) return;
+    requestRender?.();
+  });
+
+  pi.events.on(AD_PROVIDERS_CODEX_VERBOSITY_CHANGED_EVENT, (data: unknown) => {
+    const event = (data ??
+      {}) as Partial<AdProvidersCodexVerbosityChangedEvent>;
+    codexVerbosity = event.verbosity;
     if (!ctx) return;
     requestRender?.();
   });
@@ -59,21 +76,17 @@ export function createCustomFooter(pi: ExtensionAPI) {
     const branch = footer_data.getGitBranch();
     const sessionName = ctx.sessionManager.getSessionName();
 
-    // Calculate cumulative usage and context
     const usage = getCumulativeUsage(ctx);
     const contextUsage = getContextUsage(ctx);
     const tpsStr = getTPS();
 
-    // Build left side: path + branch
     const { parts, width: leftWidth } = buildPathParts(theme, branch);
 
-    // Build stats (line 1 right side)
     const statsParts = buildStatsParts(theme, usage, contextUsage, tpsStr);
     const statsLine = statsParts.join(" ");
     const statsWidth = visibleWidth(statsLine);
     const minPadding = 4;
 
-    // Line 1: Path + Stats
     const paddingWidth1 = width - leftWidth - statsWidth;
     const padding1 =
       paddingWidth1 > 0
@@ -86,22 +99,13 @@ export function createCustomFooter(pi: ExtensionAPI) {
     let useMinimal = false;
 
     if (line1Width > width) {
-      // If line 1 doesn't fit, use minimal layout for small screens
       useMinimal = true;
-
-      // Rebuild with minimal layout: project name + branch only on line 1
-      const { parts: minimalParts } = buildPathParts(
-        theme,
-        branch,
-        true, // minimal mode
-      );
+      const { parts: minimalParts } = buildPathParts(theme, branch, true);
       line1 = minimalParts.join("");
     }
 
-    // Line 2: Context + Price + Model ID (if minimal) or Session name + Model (if normal)
     let line2: string;
     if (useMinimal) {
-      // Small screen: Show context used + price + model ID only
       const minimalStatsParts = buildMinimalStatsParts(
         theme,
         usage,
@@ -112,6 +116,7 @@ export function createCustomFooter(pi: ExtensionAPI) {
         ctx.model?.id,
         ctx.model?.provider,
         codexFastModeEnabled,
+        codexVerbosity,
       );
 
       const leftWidth2 = minimalStatsParts.reduce(
@@ -132,7 +137,6 @@ export function createCustomFooter(pi: ExtensionAPI) {
         line2 = truncateToWidth(modelIdLine, width, "...");
       }
     } else {
-      // Normal layout
       const left_parts2: string[] = [sessionName ?? ""].filter(Boolean);
       const left_parts2_colored = left_parts2.map((s) =>
         theme.fg("thinkingMinimal", s),
@@ -142,7 +146,6 @@ export function createCustomFooter(pi: ExtensionAPI) {
         0,
       );
 
-      // Build model (line 2 right side)
       const thinkingLevel = pi.getThinkingLevel();
       const modelLine = buildModelLine(
         theme,
@@ -151,6 +154,7 @@ export function createCustomFooter(pi: ExtensionAPI) {
         !!ctx.model?.reasoning,
         thinkingLevel ?? "off",
         codexFastModeEnabled,
+        codexVerbosity,
       );
       const modelWidth = visibleWidth(modelLine);
 
@@ -194,6 +198,7 @@ export function createCustomFooter(pi: ExtensionAPI) {
     setup: (context: ExtensionContext) => {
       ctx = context;
       pi.events.emit(AD_PROVIDERS_CODEX_FAST_MODE_REQUEST_EVENT, { ctx });
+      pi.events.emit(AD_PROVIDERS_CODEX_VERBOSITY_REQUEST_EVENT, {});
 
       ctx.ui.setFooter((tui, theme, footerData) => {
         requestRender = () => tui.requestRender?.();

@@ -1,5 +1,6 @@
 import type { ExtensionAPI } from "@mariozechner/pi-coding-agent";
 import { setupCodexFastModeHooks } from "./codex-fast-mode";
+import { setupCodexVerbosityHooks } from "./codex-verbosity";
 import { setupContextWindowOverrides } from "./context-window-overrides";
 import { setupRateLimitWarningHooks } from "./rate-limit-warning";
 import { setupUsageBarHooks } from "./usage-bar";
@@ -9,4 +10,5 @@ export function setupUsageHooks(pi: ExtensionAPI): void {
   setupRateLimitWarningHooks(pi);
   setupUsageBarHooks(pi);
   setupCodexFastModeHooks(pi);
+  setupCodexVerbosityHooks(pi);
 }

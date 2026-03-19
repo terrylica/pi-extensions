@@ -15,13 +15,28 @@ import type { CommandGroup, PaletteCommand } from "./types";
  * Input declaration for an external command. The palette collects
  * this via its IO system before calling execute.
  */
-export interface ExternalCommandInput {
-  type: "text";
-  title: string;
-  placeholder?: string;
-  /** If true, the user can submit without entering a value. */
-  optional?: boolean;
-}
+export type ExternalCommandInput =
+  | {
+      type: "text";
+      title: string;
+      placeholder?: string;
+      /** If true, the user can submit without entering a value. */
+      optional?: boolean;
+    }
+  | {
+      type: "pick";
+      title: string;
+      items: Array<{
+        value: string;
+        label: string;
+        description?: string;
+        keywords?: string;
+      }>;
+      emptyText?: string;
+      initialQuery?: string;
+      /** If true, cancel resolves to empty input instead of aborting. */
+      optional?: boolean;
+    };
 
 /**
  * The shape emitted by other extensions via pi.events.emit("ad:palette:register", payload).
@@ -67,20 +82,38 @@ export function wrapExternalCommand(
         return;
       }
 
-      const value = await io.input({
+      if (ext.input.type === "text") {
+        const value = await io.input({
+          title: ext.input.title,
+          placeholder: ext.input.placeholder,
+        });
+
+        if (value === null) {
+          if (!ext.input.optional) return;
+          await ext.execute(c.ctx, "");
+          return;
+        }
+
+        if (!value.trim() && !ext.input.optional) return;
+
+        await ext.execute(c.ctx, value.trim());
+        return;
+      }
+
+      const picked = await io.pick({
         title: ext.input.title,
-        placeholder: ext.input.placeholder,
+        items: ext.input.items,
+        emptyText: ext.input.emptyText,
+        initialQuery: ext.input.initialQuery,
       });
 
-      if (value === null) {
+      if (picked === null) {
         if (!ext.input.optional) return;
         await ext.execute(c.ctx, "");
         return;
       }
 
-      if (!value.trim() && !ext.input.optional) return;
-
-      await ext.execute(c.ctx, value.trim());
+      await ext.execute(c.ctx, picked.value);
     },
   };
 }

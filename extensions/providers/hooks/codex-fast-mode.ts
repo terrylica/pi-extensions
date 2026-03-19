@@ -143,9 +143,9 @@ export function setupCodexFastModeHooks(pi: ExtensionAPI): void {
     if (event.model.provider !== "openai-codex") return;
     if (event.previousModel?.provider === "openai-codex") return;
 
-    const suffix = fastModeEnabled ? " It is currently enabled." : "";
+    const suffix = fastModeEnabled ? " Fast mode is currently enabled." : "";
     ctx.ui.notify(
-      `Codex fast mode is available for this model. Toggle it from the palette.${suffix}`,
+      `Codex fast mode and verbosity are available for this model from the palette.${suffix}`,
       "info",
     );
   });

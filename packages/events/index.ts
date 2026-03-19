@@ -17,3 +17,14 @@ export const AD_PROVIDERS_CODEX_FAST_MODE_CHANGED_EVENT =
 export type AdProvidersCodexFastModeChangedEvent = {
   enabled: boolean;
 };
+
+export const AD_PROVIDERS_CODEX_VERBOSITY_READY_EVENT =
+  "ad:providers:codex-verbosity:ready";
+export const AD_PROVIDERS_CODEX_VERBOSITY_REQUEST_EVENT =
+  "ad:providers:codex-verbosity:request";
+export const AD_PROVIDERS_CODEX_VERBOSITY_CHANGED_EVENT =
+  "ad:providers:codex-verbosity:changed";
+
+export type AdProvidersCodexVerbosityChangedEvent = {
+  verbosity?: "low" | "medium" | "high";
+};

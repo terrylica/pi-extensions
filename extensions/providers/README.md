@@ -8,6 +8,7 @@ Rate limiting alerts, usage widgets, and dashboards for AI providers.
 - **Usage Bar**: Compact widget showing current provider usage
 - **Usage Dashboard**: Interactive `/providers:usage` command with session and historical stats
 - **Codex Fast Mode**: Session-local toggle for OpenAI Codex priority service tier, available from the palette
+- **Codex Verbosity**: Conversation-local OpenAI Codex `text.verbosity` override from the palette, shown in the footer as `🔈`, `🔉`, or `🔊`
 
 ## Commands
 
