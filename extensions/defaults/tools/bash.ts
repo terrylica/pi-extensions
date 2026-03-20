@@ -27,10 +27,11 @@ export function setupBashTool(pi: ExtensionAPI): void {
   pi.registerTool({
     ...nativeBash,
     parameters: schema,
-    // TODO: promptGuidelines not recognized by current pi-coding-agent types
-    // promptGuidelines: [
-    //   "Use the cwd parameter instead of 'cd dir && command'.",
-    // ],
+    promptGuidelines: [
+      "Use the cwd parameter instead of 'cd dir && command'.",
+      "Reserve bash for git, build/test, package managers, ssh, curl, and process management.",
+      "Prefer native tools like read, find, grep, edit, and write over shell commands when available.",
+    ],
     async execute(toolCallId, params, signal, onUpdate, ctx) {
       const effectiveCwd = params.cwd ? resolve(ctx.cwd, params.cwd) : ctx.cwd;
       const bashForCwd = createBashTool(effectiveCwd);

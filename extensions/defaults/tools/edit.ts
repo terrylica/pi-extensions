@@ -57,15 +57,12 @@ export function setupEditTool(pi: ExtensionAPI): void {
     description:
       "Edit a file using LINE#HASH tags from read output. Supports multiple operations per call.",
     parameters: editSchema,
-    // TODO: promptGuidelines not recognized by current pi-coding-agent types
-    // promptGuidelines: [
-    //   "Reference lines using LINE#HASH tags from read output.",
-    //   "Multiple edits per call. They are applied bottom-up (highest line first).",
-    //   "Operations: replace (single line or range), insert_after (single line only), insert_before (single line only), delete (single line or range).",
-    //   "For ranges: '5#KT-8#VR' covers lines 5 through 8 inclusive.",
-    //   "If tags are stale, the error shows updated tags. Retry with those.",
-    //   "Use edit instead of sed for in-place file edits.",
-    // ],
+    promptGuidelines: [
+      "Reference lines using LINE#HASH tags from read output.",
+      "Multiple edits per call are applied bottom-up (highest line first).",
+      "Use edit instead of sed for in-place file edits.",
+      "If tags are stale, retry with the updated tags from the error output.",
+    ],
     async execute(_toolCallId, params, _signal, _onUpdate, ctx) {
       const { path, edits } = params as {
         path: string;

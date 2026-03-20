@@ -127,6 +127,13 @@ Inputs:
 - context: Optional description of the change intent
 
 Pass relevant skills (e.g., 'ios-26', 'drizzle-orm') to provide specialized context for the task.`,
+    promptSnippet:
+      "Review a diff or change set for correctness, risks, and test gaps.",
+    promptGuidelines: [
+      "Use this tool for fast review of diffs, staged changes, or recent commits.",
+      "Prefer it when the user wants risks, correctness issues, test gaps, or a verdict on a change.",
+      "Focus on issues introduced by the diff, not unrelated code.",
+    ],
 
     parameters,
 

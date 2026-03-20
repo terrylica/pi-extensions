@@ -111,6 +111,13 @@ Returns relevant files with line ranges.
 Example: { "query": "where do we handle authentication" }
 
 Pass relevant skills (e.g., 'ios-26', 'drizzle-orm') to provide specialized context for the task.`,
+    promptSnippet: "Search the local codebase by functionality or concept.",
+    promptGuidelines: [
+      "Use this tool to find code by behavior, implementation, or code flow in the local codebase.",
+      "Prefer direct read when the file path is already known.",
+      "Prefer exact grep when searching for a literal string.",
+      "Do not use this for external research.",
+    ],
     parameters,
 
     async execute(

@@ -7,12 +7,12 @@ import {
   type SubagentName,
 } from "./config";
 import { clearSubagentModelSelections } from "./lib/subagent-model-selection";
-import { createJesterTool, JESTER_GUIDANCE } from "./subagents/jester";
-import { createLookoutTool, LOOKOUT_GUIDANCE } from "./subagents/lookout";
-import { createOracleTool, ORACLE_GUIDANCE } from "./subagents/oracle";
-import { createReviewerTool, REVIEWER_GUIDANCE } from "./subagents/reviewer";
-import { createScoutTool, SCOUT_GUIDANCE } from "./subagents/scout";
-import { createWorkerTool, WORKER_GUIDANCE } from "./subagents/worker";
+import { createJesterTool } from "./subagents/jester";
+import { createLookoutTool } from "./subagents/lookout";
+import { createOracleTool } from "./subagents/oracle";
+import { createReviewerTool } from "./subagents/reviewer";
+import { createScoutTool } from "./subagents/scout";
+import { createWorkerTool } from "./subagents/worker";
 
 /**
  * Subagents Extension
@@ -37,29 +37,6 @@ function checkApiKeys(): string[] {
 
   return missing;
 }
-
-/**
- * Shared guidance for the `skills` parameter accepted by most subagent tools.
- * Merged once into the system prompt so every tool benefits without repetition.
- */
-const SKILLS_GUIDANCE = `
-## Passing skills to subagents
-
-Most subagent tools (scout, lookout, oracle, reviewer, worker) accept an optional \`skills\` parameter.
-When you pass skill names, the skill content is injected into the subagent's system prompt so it has domain-specific knowledge without needing to read files itself.
-
-Use \`skills\` whenever the task involves a domain covered by an available skill. For example, when delegating iOS work to the worker, pass \`skills: ["ios-26"]\` instead of listing skill files in \`files\` or mentioning them in \`instructions\`.
-`;
-
-/** Mapping from subagent name to its guidance text. */
-const GUIDANCE_BY_NAME: Record<SubagentName, string> = {
-  scout: SCOUT_GUIDANCE,
-  lookout: LOOKOUT_GUIDANCE,
-  oracle: ORACLE_GUIDANCE,
-  reviewer: REVIEWER_GUIDANCE,
-  jester: JESTER_GUIDANCE,
-  worker: WORKER_GUIDANCE,
-};
 
 export default async function (pi: ExtensionAPI) {
   // Load config
@@ -90,27 +67,15 @@ export default async function (pi: ExtensionAPI) {
   pi.registerTool(createJesterTool());
   pi.registerTool(createWorkerTool());
 
-  // Before each agent turn: sync active tools and guidance with current config.
-  pi.on("before_agent_start", async (event) => {
-    // Determine which subagent tools should be disabled
+  // Before each agent turn: sync active tools with current config.
+  pi.on("before_agent_start", async () => {
     const disabledSubagents = new Set(
       SUBAGENT_NAMES.filter((name) => !isSubagentEnabled(name)),
     );
 
-    // Filter active tools: remove disabled subagents, keep everything else
     const activeTools = pi
       .getActiveTools()
       .filter((tool) => !disabledSubagents.has(tool as SubagentName));
     pi.setActiveTools(activeTools);
-
-    // Build guidance from enabled subagents only
-    const guidances = SUBAGENT_NAMES.filter(
-      (name) => !disabledSubagents.has(name),
-    ).map((name) => GUIDANCE_BY_NAME[name]);
-    guidances.push(SKILLS_GUIDANCE);
-
-    return {
-      systemPrompt: `${event.systemPrompt}\n${guidances.join("\n")}`,
-    };
   });
 }

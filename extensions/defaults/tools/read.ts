@@ -48,11 +48,10 @@ export function setupReadTool(pi: ExtensionAPI): void {
     ...baseRead,
     description:
       "Read file contents. Each line is tagged with LINE#HASH for use with the edit tool. If the current model supports images, this tool can also read and display images (jpg, png, gif, webp).",
-    // TODO: promptGuidelines not recognized by current pi-coding-agent types
-    // promptGuidelines: [
-    //   "read output uses LINE#HASH tags. Use these tags when editing with the edit tool.",
-    //   "Use read instead of cat, head, or tail in bash.",
-    // ],
+    promptGuidelines: [
+      "Read output uses LINE#HASH tags. Use these tags when editing with the edit tool.",
+      "Use read instead of cat, head, or tail in bash.",
+    ],
     async execute(toolCallId, params, signal, onUpdate, ctx) {
       const { path } = params as {
         path: string;

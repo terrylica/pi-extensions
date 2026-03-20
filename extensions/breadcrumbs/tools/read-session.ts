@@ -157,6 +157,13 @@ Examples:
 - Goal: "Summarize the final solution implemented"
 
 Input the session ID (UUID or path) and what you want to learn about it.`,
+    promptSnippet:
+      "Read a past session and extract a specific answer or summary.",
+    promptGuidelines: [
+      "Use this tool to extract specific information from a session found with find_sessions.",
+      "Use this when the user wants to recall a decision or summary from a past conversation.",
+      "Do not use this until you know which session to inspect.",
+    ],
 
     parameters,
 

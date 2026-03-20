@@ -71,6 +71,11 @@ export function createJesterTool(): ToolDefinition<
     label: "Jester",
     description:
       "Generate random, creative, and unexpected content. No tools, no browsing, no files.",
+    promptSnippet: "Generate random or creative content.",
+    promptGuidelines: [
+      "Use this tool for random data, placeholder text, brainstorming, or other creative outputs.",
+      "Do not use it for factual answers, web research, or codebase inspection.",
+    ],
     parameters,
 
     async execute(

@@ -182,6 +182,13 @@ Good use cases:
 - Cross-source investigation: { repo: "owner/repo", query: "related RFC", prompt: "Correlate code changes with issue/PR decisions" }
 
 Pass relevant skills (e.g., 'ios-26', 'drizzle-orm') to provide specialized context for the task.`,
+    promptSnippet:
+      "Do deep web or GitHub research that needs synthesis across sources.",
+    promptGuidelines: [
+      "Use this tool for multi-source research, deep repository exploration, or broad investigations that direct tools cannot answer quickly.",
+      "Do not use it for simple single-page fetches, exact local code search, or quick checks one direct command can answer.",
+      "Include a focused prompt explaining what to analyze from the fetched content.",
+    ],
 
     parameters,
 

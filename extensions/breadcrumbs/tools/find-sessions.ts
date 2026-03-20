@@ -144,6 +144,12 @@ WHEN TO USE:
 
 RESULTS: Returns matching sessions with metadata including name, directory, date, and matched snippet.
 Uses Sesame indexed search when available, with ripgrep fallback.`,
+    promptSnippet: "Find previous Pi sessions by topic, date, or project.",
+    promptGuidelines: [
+      "Use this tool when the user explicitly asks to find or search for a previous session or conversation.",
+      "Use this when the user wants past sessions by topic, date, or project.",
+      "Do not use this for the current session or for general codebase search.",
+    ],
 
     parameters: FindSessionsParams,
 

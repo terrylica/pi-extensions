@@ -145,6 +145,13 @@ WHEN NOT TO USE:
 - Basic code modifications (do it yourself or use task)
 
 Pass relevant skills (e.g., 'ios-26', 'drizzle-orm') to provide specialized context for the task.`,
+    promptSnippet:
+      "Ask an expert advisor for planning, debugging, or architecture feedback.",
+    promptGuidelines: [
+      "Use this tool for plans, architecture review, debugging guidance, and complex reasoning across files.",
+      "Before calling it, tell the user you are consulting the oracle and why.",
+      "Prefer read or lookout for simple file inspection or code search first.",
+    ],
 
     parameters,
 

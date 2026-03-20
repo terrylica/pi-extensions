@@ -76,6 +76,12 @@ Example goals:
 - "implement OAuth support for Linear API"
 - "write tests for the user service module"
 - "refactor database layer to use repository pattern"`,
+    promptSnippet: "Prepare a focused handoff into a new session.",
+    promptGuidelines: [
+      "Use this tool when the current session has become too long, drifted in topic, or the user explicitly asks for a handoff.",
+      "Provide a specific goal so context extraction can focus on the right files and discussion.",
+      "Prefer handoff when starting a distinct subtask that deserves fresh context.",
+    ],
 
     parameters: HandoffParams,
 

@@ -151,6 +151,13 @@ It must never use commit bypass flags like \`--no-verify\` and must not disable 
 Use for: file migrations, adding docs/types, applying refactoring patterns, adding error handling, fixing known bugs in specific files.
 
 Pass relevant skills (e.g., 'ios-26', 'drizzle-orm') to provide specialized context for the task.`,
+    promptSnippet:
+      "Delegate a well-defined implementation task on known files.",
+    promptGuidelines: [
+      "Use this tool when the task is implementation work and the exact files are already known.",
+      "Do not use it for exploration or planning; use lookout, scout, or oracle first when scope is unclear.",
+      "Expect it to run lint, typecheck, and tests before finishing.",
+    ],
 
     parameters,
 
