@@ -10,6 +10,7 @@ import { getMarkdownTheme, keyText } from "@mariozechner/pi-coding-agent";
 import { Container, Markdown, Text } from "@mariozechner/pi-tui";
 import { type Static, Type } from "@sinclair/typebox";
 import {
+  createGistHandler,
   createGitHubHandler,
   createMarkdownNewHandler,
   createTwitterHandler,
@@ -42,6 +43,7 @@ export function setupReadUrlTool(pi: ExtensionAPI): void {
   const handlers: ReadUrlHandler[] = [
     createTwitterHandler(),
     createGitHubHandler(),
+    createGistHandler(),
     createMarkdownNewHandler(),
   ];
 
