@@ -4,13 +4,15 @@ Sensible defaults and quality-of-life improvements for Pi.
 
 ## Features
 
-### Hashline-tagged read
+### Multi-edit `edit` tool
 
-Overrides the built-in `read` tool. File output is tagged with `LINE#HASH` markers on every line (for example `5#KT:content`), which the `edit` tool uses to identify lines precisely. It also handles directories gracefully: when the agent calls `read` on a directory path, it returns a directory listing via `ls` instead of failing with `EISDIR`.
+Overrides the built-in `edit` tool to support both the native single-replacement flow and a gist-style multi-replacement flow.
 
-- Files: delegated to native `read`, with hashline markers prepended to each text line
-- Directories: delegated to native `ls` (sorted entries, truncation)
-- Non-existent paths: error from underlying tool
+- Single replace: `path`, `oldText`, `newText`
+- Multi replace: `path`, `edits: [{ oldText, newText }]`
+- Keeps native fuzzy matching behavior
+- Preserves BOM and original line endings (`\r\n` vs `\n`)
+- Rejects overlapping or non-unique multi-edit matches
 
 ### `get_current_time` tool
 
@@ -59,15 +61,6 @@ Updates the terminal title with a project breadcrumb (e.g. `pi: project > subdir
 
 Breadcrumbs are built from the project root (detected via `.git`, `.root`, `pnpm-workspace.yaml`) to the current directory, truncated to 2 levels.
 
-### Hashline-based editing
-
-Replaces the built-in `edit` tool with a hashline-based editor. The `read` tool tags each line with a `LINE#HASH` marker, and the `edit` tool references those tags instead of requiring exact text matches. This avoids whitespace and exact-match failures.
-
-- Supports multiple edit operations per call, applied bottom-up to preserve line numbers
-- Operations: `replace`, `insert_after`, `insert_before`, `delete`
-- Targets use tag syntax: single line `5#KT` or range `5#KT-8#VR`
-- Stale tags are detected and errors include corrected tags with nearby context
-- Hashes use xxHash32 on whitespace-normalized content, with line-number mixing for symbol-only lines
 
 ### Auto session naming
 
