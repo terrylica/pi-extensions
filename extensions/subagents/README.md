@@ -8,7 +8,7 @@ Framework for spawning specialized subagents with custom tools, consistent UI re
 - **Streaming UI**: Tool call progress, spinner animation, markdown rendering
 - **Cost tracking**: LLM tokens and external API costs
 - **Logging**: Session-like logging in `~/.pi/agent/subagents/`
-- **Standalone tools**: Direct access to web fetching without LLM
+- **Direct tools**: `scout`, `lookout`, `oracle`, `reviewer`, `jester`, and `worker`
 
 ## Requirements
 
@@ -27,7 +27,7 @@ Only keys for enabled/selected providers are needed at runtime.
 
 | Subagent | Description | Requirements |
 |----------|-------------|--------------|
-| Scout | Web research and GitHub codebase exploration. Multi-provider web tools (`web_search`, `web_fetch`) with routing/fallback and Exa-first defaults. | `SCOUT_GITHUB_TOKEN` + provider keys used by your configured order |
+| Scout | Web research and GitHub codebase exploration. Uses routed multi-provider web tooling internally, with default search order `synthetic -> exa -> linkup` and default fetch order `markdownDotNew -> exa -> linkup`. | `SCOUT_GITHUB_TOKEN` + provider keys used by your configured order |
 | Lookout | Local codebase search by functionality/concept. Uses osgrep for semantic search + grep/find for exact matches. | [osgrep](https://github.com/Ryandonofrio3/osgrep) |
 | Oracle | AI advisor powered by GPT-5 for complex reasoning, code reviews, architecture planning, and debugging. | None |
 | Reviewer | Code review agent that analyzes diffs and returns structured feedback. Parses diff descriptions, focuses on security/performance/style, and flags issues with priority levels. | None |
@@ -36,10 +36,9 @@ Only keys for enabled/selected providers are needed at runtime.
 
 ## Standalone Tools
 
-| Tool | Description |
-|------|-------------|
-| `web_search` | Search web with provider routing and fallback. |
-| `web_fetch` | Fetch URL content with provider routing and fallback. Returns raw provider content (no summarization/rewrite). |
+This extension currently registers these direct tools: `scout`, `lookout`, `oracle`, `reviewer`, `jester`, and `worker`.
+
+> Note: `web_search` and `web_fetch` are used internally by Scout's provider/tooling layer and are not currently exposed as top-level tools by this extension.
 
 ## Creating New Subagents
 

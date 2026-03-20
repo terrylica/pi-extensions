@@ -5,7 +5,7 @@ Commands for turning conversations into implementation plans and managing saved 
 ## Features
 
 - **Command**: `/plan:save` - creates a structured plan from the current conversation
-- **Command**: `/plan:list` - lists saved plans with options to execute, edit, or archive
+- **Command**: `/plan:list` - lists saved plans with options to execute or edit; archiving is available from the picker UI
 
 ## Tools
 
@@ -21,10 +21,10 @@ Run `/plan:save` to generate a plan from the current conversation. The agent wil
 
 ### Managing Plans
 
-Run `/plan:list` to see all saved plans. Select a plan to:
+Run `/plan:list` to see all saved plans. From there you can:
 - **Execute** - Run the plan (optionally in a new session)
 - **Edit** - Open the plan in your `$VISUAL/$EDITOR`
-- **Archive** - Move the plan to an archive directory
+- **Archive** - Use `Ctrl+A` in the interactive picker to move the selected plan to the archive directory
 
 ## Configuration
 

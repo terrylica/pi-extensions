@@ -6,7 +6,7 @@ Rate limiting alerts, usage widgets, and dashboards for AI providers.
 
 - **Rate Limit Warnings**: Smart, time-aware alerts when approaching limits
 - **Usage Bar**: Compact widget showing current provider usage
-- **Usage Dashboard**: Interactive `/providers:usage` command with session and historical stats
+- **Usage Dashboard**: Interactive `/providers:usage` command for current provider rate limits
 - **Codex Fast Mode**: Session-local toggle for OpenAI Codex priority service tier, available from the palette
 - **Codex Verbosity**: Conversation-local OpenAI Codex `text.verbosity` override from the palette, shown in the footer as `🔈`, `🔉`, or `🔊`
 
@@ -39,31 +39,28 @@ Shows compact rate limit info below the editor. Configurable per-provider:
 
 ## Usage Dashboard
 
-Interactive UI with tabs:
+Interactive UI with one tab per provider for current rate limits.
 
-- **Session**: Current rate limits for all providers with hybrid layout (bar + metadata)
-- **Today**: Today's usage stats
-- **Week**: This week's usage stats  
-- **All Time**: All-time usage stats
+- The active session provider is shown first when available
+- Each provider tab shows current rate-limit windows and pacing metadata
+- No historical usage tabs are currently shown in this dashboard
 
 ### Controls
 
-- `Tab/Shift+Tab` or `←/→` - Switch tabs
+- `Tab/Shift+Tab` - Switch provider tabs
 - `j/k` or `↑/↓` - Scroll
-- `Enter` or `Space` - Expand/collapse provider in stats tabs
+- `Space` or `PageDown` - Page down
+- `PageUp` - Page up
 - `q` or `Esc` - Close
 
-### Session Tab Layout
+### Provider Tab Layout
 
 ```
-Anthropic ● Operational
-Daily tokens (1.2h/5h)
-  ████████████████████░░░░░░░░░░░░░░░░░░░░░░ 48%
-  proj 89% · 14% ahead pace · resets in 3.8h
+Status: ● Operational
 
-Weekly tokens (2.1d/7d)
-  ████████████░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░ 28%
-  proj 93% · within pace · resets in 4.9d
+  Daily tokens
+  ████████████████████░░░░░░░░░░░░░░░░░░░░░░ 48%
+  proj 89%  14% ahead pace               3h48m remaining
 ```
 
 The bar shows:

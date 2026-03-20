@@ -18,7 +18,7 @@ Returns the current date and time with structured fields: formatted string, date
 
 ### `read_url` tool
 
-Fetches pages as Markdown through a handler pipeline. It uses domain-specific handlers when available (for example, `x.com`/`twitter.com` status URLs via the `api.fxtwitter.com` rendering flow) and falls back to `https://markdown.new/<url>` for everything else.
+Fetches pages as Markdown through a handler pipeline. It uses domain-specific handlers when available (for example, `x.com`/`twitter.com` status URLs via the `api.fxtwitter.com` rendering flow, `github.com` URLs via the GitHub CLI, and `gist.github.com` URLs via the Gist API) and falls back to `https://markdown.new/<url>` for everything else.
 ### Subdirectory AGENTS.md discovery
 
 Pi's built-in discovery only loads AGENTS.md files from the cwd and its ancestors. This hook fills the gap: when the agent reads a file, it checks for AGENTS.md files in the directories between cwd and the file being read, and sends a custom message for each discovered file.
@@ -91,13 +91,10 @@ Theme selector with live preview. Browse all available themes (built-in and cust
 
 Multi-step wizard to configure packages, skills, and AGENTS.md for the current project.
 
-### `/ad:settings` command
+### `/defaults:settings` command
 
 Interactive editor for the extension's config (catalog paths, ignore paths, etc.).
 
-### `/defaults:update` command
-
-Runs `~/.pi/agent/bin/update` to update pinned package refs and refresh installed packages.
 
 ### Editor stash
 

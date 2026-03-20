@@ -32,19 +32,20 @@ Extract context from the current session for starting a new one. Disabled by def
 **Parameters:**
 - `goal` (required): Description of the task for the new session
 
+Note: the tool extracts handoff context only. Creating the new session is done via the `/handoff` command.
 ## Commands
 
 - `session:copy-path` - Copy the current session file path to clipboard
 - `session:copy-id` - Copy the current session ID to clipboard
-- `breadcrumbs:read-session-files [status|allow|confirm]` - Runtime toggle for direct session-file reads + session-dir bash access
-- `breadcrumb:read_session [status|allow|confirm]` - Alias of the same toggle
 - `/handoff <goal>` - Create a new session with extracted context
+- `/spawn [note]` - Create a linked session with parent-session instructions
+- `/continue` - Continue work from a linked parent session
 
 The `/handoff` command extracts relevant context, lets you review and edit the prompt, then creates a new session with that context.
 
 ## Configuration
 
-Create `~/.pi/agent/extensions/breadcrumbs.json` or `.pi/extensions/breadcrumbs.json`:
+Create `~/.pi/agent/extensions/breadcrumbs.json`:
 
 ```json
 {
@@ -63,10 +64,9 @@ The extension gates direct agent access to the sessions directory (`~/.pi/agent/
 - Direct **write/edit** attempts remain blocked.
 - Direct **bash** commands referencing the sessions directory trigger a user confirmation prompt (UI required). Approval is remembered for the rest of the current Pi session.
 
-Use `breadcrumbs:read-session-files` to control gating in-memory for current runtime:
-- `breadcrumbs:read-session-files status` - show current mode (`confirm` or `allow`)
-- `breadcrumbs:read-session-files allow` - allow direct reads and bash commands touching the sessions dir without confirmation
-- `breadcrumbs:read-session-files confirm` - restore confirmation prompts for reads and bash
-- `breadcrumbs:read-session-files` - toggle between `confirm` and `allow`
+Session-directory protection is enforced automatically for the current runtime:
+- direct reads trigger confirmation and can be remembered for the rest of the current Pi session
+- direct write/edit remains blocked
+- direct bash access touching the sessions directory triggers confirmation and can be remembered for the rest of the current Pi session
 
 Agents should prefer `find_sessions` and `read_session` instead of reading raw session JSONL.
