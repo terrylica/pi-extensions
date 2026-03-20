@@ -7,7 +7,6 @@ import type { ExtensionContext } from "@mariozechner/pi-coding-agent";
 import type { Component } from "@mariozechner/pi-tui";
 import {
   fuzzyFilter,
-  getEditorKeybindings,
   Input,
   truncateToWidth,
   visibleWidth,
@@ -15,6 +14,9 @@ import {
 import type { PickItem, PickResult } from "../registry/types";
 
 type Theme = ExtensionContext["ui"]["theme"];
+type KeybindingsLike = {
+  matches(data: string, id: string): boolean;
+};
 
 export class FuzzyPickerOverlay implements Component {
   private readonly input = new Input();
@@ -23,6 +25,7 @@ export class FuzzyPickerOverlay implements Component {
 
   constructor(
     private readonly theme: Theme,
+    private readonly keybindings: KeybindingsLike,
     private readonly title: string,
     private readonly emptyText: string,
     private readonly items: PickItem[],
@@ -51,24 +54,24 @@ export class FuzzyPickerOverlay implements Component {
   }
 
   handleInput(data: string): boolean {
-    const kb = getEditorKeybindings();
+    const kb = this.keybindings;
 
-    if (kb.matches(data, "selectCancel")) {
+    if (kb.matches(data, "tui.select.cancel")) {
       this.done(null);
       return true;
     }
 
-    if (kb.matches(data, "selectUp") || data === "k") {
+    if (kb.matches(data, "tui.select.up") || data === "k") {
       this.moveSelection(-1);
       return true;
     }
 
-    if (kb.matches(data, "selectDown") || data === "j") {
+    if (kb.matches(data, "tui.select.down") || data === "j") {
       this.moveSelection(1);
       return true;
     }
 
-    if (kb.matches(data, "selectConfirm")) {
+    if (kb.matches(data, "tui.select.confirm")) {
       this.input.onSubmit?.(this.input.getValue());
       return true;
     }

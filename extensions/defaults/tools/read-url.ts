@@ -6,7 +6,7 @@ import type {
   Theme,
   ToolRenderResultOptions,
 } from "@mariozechner/pi-coding-agent";
-import { getMarkdownTheme, keyHint } from "@mariozechner/pi-coding-agent";
+import { getMarkdownTheme, keyText } from "@mariozechner/pi-coding-agent";
 import { Container, Markdown, Text } from "@mariozechner/pi-tui";
 import { type Static, Type } from "@sinclair/typebox";
 import {
@@ -146,7 +146,7 @@ export function setupReadUrlTool(pi: ExtensionAPI): void {
               new Text(
                 theme.fg(
                   "muted",
-                  `... (${remaining} more lines, ${keyHint("expandTools", "to expand")})`,
+                  `... (${remaining} more lines, ${keyText("app.tools.expand")} to expand)`,
                 ),
                 0,
                 0,

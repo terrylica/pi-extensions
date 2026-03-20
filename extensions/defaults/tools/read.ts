@@ -16,7 +16,7 @@ import {
   formatSize,
   getLanguageFromPath,
   highlightCode,
-  keyHint,
+  keyText,
 } from "@mariozechner/pi-coding-agent";
 import { Text } from "@mariozechner/pi-tui";
 import { addHashlineTags } from "../lib/hashline";
@@ -157,7 +157,7 @@ export function setupReadTool(pi: ExtensionAPI): void {
       let text = displayLines.join("\n");
 
       if (remaining > 0) {
-        text += `${theme.fg("muted", `\n... (${remaining} more lines,`)} ${keyHint("expandTools", "to expand")})`;
+        text += `${theme.fg("muted", `\n... (${remaining} more lines,`)} ${theme.fg("dim", keyText("app.tools.expand"))} ${theme.fg("muted", "to expand)")}`;
       }
 
       // Truncation warnings

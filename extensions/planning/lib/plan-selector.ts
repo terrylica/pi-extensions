@@ -2,12 +2,15 @@ import type { ExtensionContext, Theme } from "@mariozechner/pi-coding-agent";
 import {
   type Component,
   fuzzyFilter,
-  getEditorKeybindings,
   matchesKey,
   truncateToWidth,
   visibleWidth,
 } from "@mariozechner/pi-tui";
 import type { PlanInfo } from "./types";
+
+type KeybindingsLike = {
+  matches(data: string, id: string): boolean;
+};
 
 export interface ArchiveResult {
   ok: boolean;
@@ -31,8 +34,8 @@ export async function selectPlan(
   if (!ctx.hasUI) return null;
 
   const result = await ctx.ui.custom<PlanSelectorResult>(
-    (tui, theme, _keybindings, done) =>
-      new PlanSelector(tui, theme, { plans, onArchive }, done),
+    (tui, theme, keybindings, done) =>
+      new PlanSelector(tui, theme, keybindings, { plans, onArchive }, done),
   );
 
   // RPC fallback: use select dialog
@@ -106,6 +109,7 @@ class PlanSelector implements Component {
   constructor(
     private readonly tui: { requestRender: () => void },
     private readonly theme: Theme,
+    private readonly keybindings: KeybindingsLike,
     private readonly options: PlanSelectorOptions,
     private readonly done: (result: PlanSelectorResult) => void,
   ) {
@@ -118,11 +122,11 @@ class PlanSelector implements Component {
     // Block all input while archiving
     if (this.archiving) return;
 
-    const kb = getEditorKeybindings();
+    const kb = this.keybindings;
 
     // Handle search mode input
     if (this.searchMode) {
-      if (kb.matches(data, "selectCancel")) {
+      if (kb.matches(data, "tui.select.cancel")) {
         // Escape: clear search and exit search mode
         this.searchQuery = "";
         this.searchMode = false;
@@ -130,7 +134,7 @@ class PlanSelector implements Component {
         return;
       }
 
-      if (kb.matches(data, "selectConfirm")) {
+      if (kb.matches(data, "tui.select.confirm")) {
         // Enter: exit search mode but keep filter active
         this.searchMode = false;
         this.tui.requestRender();
@@ -159,17 +163,17 @@ class PlanSelector implements Component {
       return;
     }
 
-    if (kb.matches(data, "selectUp") || data === "k") {
+    if (kb.matches(data, "tui.select.up") || data === "k") {
       this.moveSelection(-1);
       return;
     }
 
-    if (kb.matches(data, "selectDown") || data === "j") {
+    if (kb.matches(data, "tui.select.down") || data === "j") {
       this.moveSelection(1);
       return;
     }
 
-    if (kb.matches(data, "selectConfirm")) {
+    if (kb.matches(data, "tui.select.confirm")) {
       const selected = this.selectableNodes[this.selectedIndex];
       if (selected?.plan) {
         this.finish({ selected: selected.plan });
@@ -177,7 +181,7 @@ class PlanSelector implements Component {
       return;
     }
 
-    if (kb.matches(data, "selectCancel")) {
+    if (kb.matches(data, "tui.select.cancel")) {
       this.finish({ selected: null });
       return;
     }

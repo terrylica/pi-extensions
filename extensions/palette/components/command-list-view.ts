@@ -7,7 +7,6 @@
 import type { ExtensionContext } from "@mariozechner/pi-coding-agent";
 import {
   fuzzyFilter,
-  getEditorKeybindings,
   Input,
   truncateToWidth,
   visibleWidth,
@@ -16,6 +15,9 @@ import type { CommandView } from "../commands/open-palette";
 import type { PaletteView } from "./palette-view";
 
 type Theme = ExtensionContext["ui"]["theme"];
+type KeybindingsLike = {
+  matches(data: string, id: string): boolean;
+};
 
 const MIN_VISIBLE_ROWS = 5;
 const MAX_VISIBLE_ROWS = 12;
@@ -39,6 +41,7 @@ export class CommandListView implements PaletteView {
 
   constructor(
     private readonly theme: Theme,
+    private readonly keybindings: KeybindingsLike,
     private readonly views: CommandView[],
     private readonly onSelect: (commandId: string) => void,
     private readonly onCancel: () => void,
@@ -65,24 +68,24 @@ export class CommandListView implements PaletteView {
   }
 
   handleInput(data: string): boolean {
-    const kb = getEditorKeybindings();
+    const kb = this.keybindings;
 
-    if (kb.matches(data, "selectCancel")) {
+    if (kb.matches(data, "tui.select.cancel")) {
       this.onCancel();
       return true;
     }
 
-    if (kb.matches(data, "selectUp")) {
+    if (kb.matches(data, "tui.select.up")) {
       this.moveSelection(-1);
       return true;
     }
 
-    if (kb.matches(data, "selectDown")) {
+    if (kb.matches(data, "tui.select.down")) {
       this.moveSelection(1);
       return true;
     }
 
-    if (kb.matches(data, "selectConfirm")) {
+    if (kb.matches(data, "tui.select.confirm")) {
       this.searchInput.onSubmit?.(this.searchInput.getValue());
       return true;
     }

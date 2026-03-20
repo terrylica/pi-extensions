@@ -21,6 +21,9 @@ import type { PaletteView } from "./palette-view";
 import { PickerView } from "./picker-view";
 
 type Theme = ExtensionContext["ui"]["theme"];
+type KeybindingsLike = {
+  matches(data: string, id: string): boolean;
+};
 
 export class PaletteOverlay implements Component {
   private viewStack: PaletteView[] = [];
@@ -28,6 +31,7 @@ export class PaletteOverlay implements Component {
 
   constructor(
     private readonly theme: Theme,
+    private readonly keybindings: KeybindingsLike,
     views: CommandView[],
     private readonly maxContentHeight: () => number,
     private readonly onSelectCommand: (commandId: string) => void,
@@ -36,6 +40,7 @@ export class PaletteOverlay implements Component {
   ) {
     const root = new CommandListView(
       theme,
+      keybindings,
       views,
       (commandId) => this.onSelectCommand(commandId),
       () => this.closeOverlay(),
@@ -156,7 +161,7 @@ export class PaletteOverlay implements Component {
 
   private pushPick(options: PickOptions): Promise<PickResult | null> {
     return new Promise((resolve) => {
-      const view = new PickerView(this.theme, {
+      const view = new PickerView(this.theme, this.keybindings, {
         title: options.title,
         emptyText: options.emptyText ?? "No items",
         items: options.items,
@@ -178,7 +183,7 @@ export class PaletteOverlay implements Component {
 
   private pushInput(options: InputOptions): Promise<string | null> {
     return new Promise((resolve) => {
-      const view = new InputView({
+      const view = new InputView(this.keybindings, {
         title: options.title,
         initialValue: options.initialValue,
         placeholder: options.placeholder,

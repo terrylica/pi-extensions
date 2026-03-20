@@ -4,16 +4,14 @@
  */
 
 import type { ExtensionContext } from "@mariozechner/pi-coding-agent";
-import {
-  fuzzyFilter,
-  getEditorKeybindings,
-  Input,
-  truncateToWidth,
-} from "@mariozechner/pi-tui";
+import { fuzzyFilter, Input, truncateToWidth } from "@mariozechner/pi-tui";
 import type { PickItem, PickResult } from "../registry/types";
 import type { PaletteView } from "./palette-view";
 
 type Theme = ExtensionContext["ui"]["theme"];
+type KeybindingsLike = {
+  matches(data: string, id: string): boolean;
+};
 
 export interface PickerViewOptions {
   title: string;
@@ -46,6 +44,7 @@ export class PickerView implements PaletteView {
 
   constructor(
     private readonly theme: Theme,
+    private readonly keybindings: KeybindingsLike,
     private readonly options: PickerViewOptions,
   ) {
     this.title = options.title;
@@ -76,24 +75,24 @@ export class PickerView implements PaletteView {
   }
 
   handleInput(data: string): boolean {
-    const kb = getEditorKeybindings();
+    const kb = this.keybindings;
 
-    if (kb.matches(data, "selectCancel")) {
+    if (kb.matches(data, "tui.select.cancel")) {
       this.options.onCancel();
       return true;
     }
 
-    if (kb.matches(data, "selectUp")) {
+    if (kb.matches(data, "tui.select.up")) {
       this.moveSelection(-1);
       return true;
     }
 
-    if (kb.matches(data, "selectDown")) {
+    if (kb.matches(data, "tui.select.down")) {
       this.moveSelection(1);
       return true;
     }
 
-    if (kb.matches(data, "selectConfirm")) {
+    if (kb.matches(data, "tui.select.confirm")) {
       this.input.onSubmit?.(this.input.getValue());
       return true;
     }

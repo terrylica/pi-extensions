@@ -149,7 +149,7 @@ export async function openPalette(
   let palette: PaletteOverlay | undefined;
 
   await ctx.ui.custom<void>(
-    (tui, theme, _kb, done) => {
+    (tui, theme, keybindings, done) => {
       getTerminalRows = () => tui.terminal.rows;
       getTerminalCols = () => tui.terminal.columns;
       const maxContentHeight = () =>
@@ -157,6 +157,7 @@ export async function openPalette(
 
       const currentPalette = new PaletteOverlay(
         theme,
+        keybindings,
         views,
         maxContentHeight,
         async (commandId: string) => {

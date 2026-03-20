@@ -3,8 +3,12 @@
  * (no border chrome). Used by io.input().
  */
 
-import { getEditorKeybindings, Input } from "@mariozechner/pi-tui";
+import { Input } from "@mariozechner/pi-tui";
 import type { PaletteView } from "./palette-view";
+
+type KeybindingsLike = {
+  matches(data: string, id: string): boolean;
+};
 
 export interface InputViewOptions {
   title: string;
@@ -19,7 +23,10 @@ export class InputView implements PaletteView {
 
   private readonly input = new Input();
 
-  constructor(private readonly options: InputViewOptions) {
+  constructor(
+    private readonly keybindings: KeybindingsLike,
+    private readonly options: InputViewOptions,
+  ) {
     this.title = options.title;
 
     if (options.initialValue) {
@@ -39,14 +46,14 @@ export class InputView implements PaletteView {
   }
 
   handleInput(data: string): boolean {
-    const kb = getEditorKeybindings();
+    const kb = this.keybindings;
 
-    if (kb.matches(data, "selectCancel")) {
+    if (kb.matches(data, "tui.select.cancel")) {
       this.options.onCancel();
       return true;
     }
 
-    if (kb.matches(data, "selectConfirm")) {
+    if (kb.matches(data, "tui.select.confirm")) {
       this.input.onSubmit?.(this.input.getValue());
       return true;
     }

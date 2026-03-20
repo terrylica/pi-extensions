@@ -18,9 +18,10 @@ export function createIO(ctx: ExtensionContext): CommandIO {
   return {
     async pick(options: PickOptions): Promise<PickResult | null> {
       return ctx.ui.custom<PickResult | null>(
-        (_tui, theme, _kb, done) =>
+        (_tui, theme, keybindings, done) =>
           new FuzzyPickerOverlay(
             theme,
+            keybindings,
             options.title,
             options.emptyText ?? "No items",
             options.items,
@@ -40,8 +41,8 @@ export function createIO(ctx: ExtensionContext): CommandIO {
 
     async input(options: InputOptions): Promise<string | null> {
       return ctx.ui.custom<string | null>(
-        (_tui, theme, _kb, done) =>
-          new TextInputOverlay(theme, options.title, done, {
+        (_tui, theme, keybindings, done) =>
+          new TextInputOverlay(theme, keybindings, options.title, done, {
             initialValue: options.initialValue,
             placeholder: options.placeholder,
           }),

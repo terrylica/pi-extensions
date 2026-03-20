@@ -5,20 +5,19 @@
 
 import type { ExtensionContext } from "@mariozechner/pi-coding-agent";
 import type { Component } from "@mariozechner/pi-tui";
-import {
-  getEditorKeybindings,
-  Input,
-  truncateToWidth,
-  visibleWidth,
-} from "@mariozechner/pi-tui";
+import { Input, truncateToWidth, visibleWidth } from "@mariozechner/pi-tui";
 
 type Theme = ExtensionContext["ui"]["theme"];
+type KeybindingsLike = {
+  matches(data: string, id: string): boolean;
+};
 
 export class TextInputOverlay implements Component {
   private readonly input = new Input();
 
   constructor(
     private readonly theme: Theme,
+    private readonly keybindings: KeybindingsLike,
     private readonly title: string,
     private readonly done: (result: string | null) => void,
     options?: { initialValue?: string; placeholder?: string },
@@ -38,14 +37,14 @@ export class TextInputOverlay implements Component {
   }
 
   handleInput(data: string): boolean {
-    const kb = getEditorKeybindings();
+    const kb = this.keybindings;
 
-    if (kb.matches(data, "selectCancel")) {
+    if (kb.matches(data, "tui.select.cancel")) {
       this.done(null);
       return true;
     }
 
-    if (kb.matches(data, "selectConfirm")) {
+    if (kb.matches(data, "tui.select.confirm")) {
       this.input.onSubmit?.(this.input.getValue());
       return true;
     }
