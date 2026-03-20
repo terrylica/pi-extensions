@@ -6,6 +6,7 @@
 import type { PaletteCommand } from "../registry/types";
 import { compactCommand } from "./compact";
 import { copyLastAssistantCommand } from "./copy-last-assistant";
+import { exportSessionCommand } from "./export-session";
 import { reloadCommand } from "./reload";
 import {
   shellWithContextCommand,
@@ -23,6 +24,7 @@ export function getPaletteCommands(): PaletteCommand[] {
     selectModelCommand,
     // session
     compactCommand,
+    exportSessionCommand,
     setSessionNameCommand,
     reloadCommand,
     // clipboard
