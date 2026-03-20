@@ -98,3 +98,14 @@ Interactive editor for the extension's config (catalog paths, ignore paths, etc.
 ### `/defaults:update` command
 
 Runs `~/.pi/agent/bin/update` to update pinned package refs and refresh installed packages.
+
+### Editor stash
+
+In-memory LIFO stack for editor content, modeled after `git stash`. Stash the current editor text to save it for later, then pop it back when needed.
+
+- `ctrl+shift+s` stashes editor content and clears the editor
+- `ctrl+shift+r` pops the last stashed content into the editor
+- Pop swaps when the editor has content: current text is pushed onto the stash before restoring
+- Stash count shown in the footer (warning color) when non-empty
+- Also available as `/stash` and `/unstash` palette commands
+- Ephemeral: stash is cleared when the session ends

@@ -22,6 +22,8 @@ import {
   type AdProvidersCodexFastModeChangedEvent,
   type AdProvidersCodexVerbosityChangedEvent,
 } from "../../../packages/events";
+import { AD_DEFAULTS_STASH_CHANGED_EVENT } from "../hooks/editor-stash";
+import { stashCount } from "../lib/editor-stash";
 import { buildModelIdLine, buildModelLine } from "../lib/model";
 import { buildPathParts } from "../lib/path-parts";
 import {
@@ -66,6 +68,10 @@ export function createCustomFooter(pi: ExtensionAPI) {
     requestRender?.();
   });
 
+  pi.events.on(AD_DEFAULTS_STASH_CHANGED_EVENT, () => {
+    requestRender?.();
+  });
+
   const renderFooter = (
     width: number,
     theme: Theme,
@@ -80,6 +86,12 @@ export function createCustomFooter(pi: ExtensionAPI) {
     const contextUsage = getContextUsage(ctx);
     const tpsStr = getTPS();
 
+    // Stash indicator (before path)
+    const stashN = stashCount();
+    const stashPart =
+      stashN > 0 ? `${theme.fg("warning", `stash:${stashN}`)} ` : "";
+    const stashPartWidth = stashN > 0 ? visibleWidth(`stash:${stashN}`) + 1 : 0;
+
     const { parts, width: leftWidth } = buildPathParts(theme, branch);
 
     const statsParts = buildStatsParts(theme, usage, contextUsage, tpsStr);
@@ -87,13 +99,16 @@ export function createCustomFooter(pi: ExtensionAPI) {
     const statsWidth = visibleWidth(statsLine);
     const minPadding = 4;
 
-    const paddingWidth1 = width - leftWidth - statsWidth;
+    const paddingWidth1 = width - stashPartWidth - leftWidth - statsWidth;
     const padding1 =
       paddingWidth1 > 0
         ? theme.fg("thinkingMinimal", " ".repeat(Math.max(0, paddingWidth1)))
         : "";
     let line1 =
-      parts.join("") + padding1 + theme.fg("thinkingMinimal", statsLine);
+      stashPart +
+      parts.join("") +
+      padding1 +
+      theme.fg("thinkingMinimal", statsLine);
 
     const line1Width = visibleWidth(line1);
     let useMinimal = false;

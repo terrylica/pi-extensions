@@ -1,4 +1,5 @@
 import type { ExtensionAPI } from "@mariozechner/pi-coding-agent";
+import { setupEditorStashHook } from "./editor-stash";
 import { setupFooterHook } from "./footer";
 import { setupNotificationHook } from "./notification";
 import { setupSessionNameHook } from "./session-name";
@@ -9,4 +10,5 @@ export function setupHooks(pi: ExtensionAPI) {
   setupTerminalTitleHook(pi);
   setupNotificationHook(pi);
   setupFooterHook(pi);
+  setupEditorStashHook(pi);
 }
