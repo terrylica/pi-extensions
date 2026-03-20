@@ -94,6 +94,7 @@ async function showSessionGateDialog(
   ctx: ExtensionContext,
   toolName: string,
   target: string,
+  hintText: string,
 ): Promise<SessionGateResult> {
   const result = await ctx.ui.custom<SessionGateResult>(
     (_tui, theme, _kb, done) => {
@@ -135,16 +136,7 @@ async function showSessionGateDialog(
         ),
       );
       container.addChild(new Spacer(1));
-      container.addChild(
-        new Text(
-          theme.fg(
-            "dim",
-            "y/enter: allow | a: allow for session | n/esc: deny",
-          ),
-          1,
-          0,
-        ),
-      );
+      container.addChild(new Text(theme.fg("dim", hintText), 1, 0));
       container.addChild(new DynamicBorder(warnBorder));
 
       return {
@@ -185,14 +177,10 @@ async function showSessionGateDialog(
  * - bash: prompt the user for confirmation via styled dialog. If no UI, deny.
  *
  * Optional runtime override:
- * - sessionReadAccessMode = "allow": direct session-file reads and bash
- *   commands touching the sessions dir are allowed for current runtime.
+ * - sessionReadAccessMode = "allow": all direct session-file reads are
+ *   allowed for current runtime. Bash still requires per-command confirmation.
  */
 export function setupProtectSessionsDirHook(pi: ExtensionAPI) {
-  // Session-only allowlist for explicit user approvals.
-  // Keyed by resolved absolute path.
-  const allowedReadPaths = new Set<string>();
-
   // Set of bash commands (full command string) approved for this session.
   const allowedBashCommands = new Set<string>();
 
@@ -223,9 +211,6 @@ export function setupProtectSessionsDirHook(pi: ExtensionAPI) {
         // read: allow all when runtime mode is "allow".
         if (getSessionReadAccessMode() === "allow") return;
 
-        // read: allow if previously approved for this session.
-        if (allowedReadPaths.has(resolvedPath)) return;
-
         // In print/RPC mode, deny by default (safe fallback).
         if (!ctx.hasUI) {
           emitSessionGateEvent(
@@ -250,14 +235,20 @@ export function setupProtectSessionsDirHook(pi: ExtensionAPI) {
           event.toolCallId,
         );
 
-        const decision = await showSessionGateDialog(ctx, "read", resolvedPath);
+        const decision = await showSessionGateDialog(
+          ctx,
+          "read",
+          resolvedPath,
+          "y/enter: allow | a: allow all reads for session | n/esc: deny",
+        );
 
         if (decision === "deny") {
           return { block: true, reason: "User denied session file read" };
         }
 
         if (decision === "allow-session") {
-          allowedReadPaths.add(resolvedPath);
+          // Allow all future session-file reads for this runtime
+          setSessionReadAccessMode("allow");
         }
 
         return;
@@ -323,6 +314,7 @@ export function setupProtectSessionsDirHook(pi: ExtensionAPI) {
           ctx,
           "run bash on",
           command,
+          "y/enter: allow | a: allow this command for session | n/esc: deny",
         );
 
         if (decision === "deny") {
