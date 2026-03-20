@@ -1,15 +1,12 @@
 /**
- * Session search using ripgrep (rg) for fast keyword-based searching across session files.
+ * Session search using the Sesame indexed search library.
  *
  * Session files live at ~/.pi/agent/sessions/--encoded-cwd--/timestamp_uuid.jsonl
- * We use rg to efficiently search across 2263+ files without loading them all into memory.
  */
 
-import { execFile } from "node:child_process";
-import { readFileSync, statSync } from "node:fs";
+import { readdirSync, readFileSync, statSync } from "node:fs";
 import { homedir } from "node:os";
 import { join, resolve } from "node:path";
-import { promisify } from "node:util";
 import {
   getXDGPaths,
   openDatabase,
@@ -17,8 +14,6 @@ import {
   type SearchResult as SesameSearchResult,
   search,
 } from "@aliou/sesame";
-
-const execFileAsync = promisify(execFile);
 
 export interface SessionSearchResult {
   id: string;
@@ -39,13 +34,6 @@ export interface SearchOptions {
   after?: string;
   before?: string;
   limit?: number;
-}
-
-export type SearchBackend = "sesame" | "ripgrep";
-
-export interface SessionSearchResponse {
-  backend: SearchBackend;
-  results: SessionSearchResult[];
 }
 
 /**
@@ -111,6 +99,17 @@ export function encodeCwd(cwd: string): string {
 }
 
 /**
+ * Decode a session directory name back to a cwd path.
+ * "--Users-foo-code--" -> "/Users/foo/code"
+ */
+export function decodeCwd(encoded: string): string {
+  // Strip the leading and trailing "--"
+  const stripped = encoded.replace(/^--/, "").replace(/--$/, "");
+  // Replace hyphens with slashes and prepend leading slash
+  return `/${stripped.replace(/-/g, "/")}`;
+}
+
+/**
  * Parse JSON JSONL line and extract text content from a message or compaction entry.
  */
 function extractTextFromEntry(entry: unknown): string | undefined {
@@ -158,87 +157,48 @@ function extractTextFromEntry(entry: unknown): string | undefined {
   return undefined;
 }
 
-/**
- * Extract a single match snippet from a file using rg.
- * Returns the matched text truncated to 200 chars, or undefined if extraction fails.
- */
-async function extractSnippet(
-  filePath: string,
-  query: string,
-): Promise<string | undefined> {
-  try {
-    const { stdout } = await execFileAsync(
-      "rg",
-      ["-m", "1", "--fixed-strings", "--", query, filePath],
-      { maxBuffer: 1024 * 1024 },
-    );
-
-    if (!stdout) return undefined;
-
-    // The line is the JSONL entry itself
-    const line = stdout.trim();
-    try {
-      const entry = JSON.parse(line);
-      const text = extractTextFromEntry(entry);
-      if (text) {
-        return text.length > 200 ? `${text.slice(0, 200)}...` : text;
-      }
-    } catch {
-      // If JSON parsing fails, try to extract query from the raw line
-      const idx = line.indexOf(query);
-      if (idx !== -1) {
-        const start = Math.max(0, idx - 50);
-        const end = Math.min(line.length, idx + 100);
-        const snippet = line.slice(start, end);
-        return snippet.length > 200 ? `${snippet.slice(0, 200)}...` : snippet;
-      }
-    }
-  } catch {
-    // rg may fail if file can't be read or is not found
-  }
-
-  return undefined;
-}
-
-/**
- * Check if sesame database can be opened.
- * Cached after first check.
- */
-let sesameAvailable: boolean | null = null;
-async function isSesameAvailable(): Promise<boolean> {
-  if (sesameAvailable !== null) return sesameAvailable;
-
-  try {
-    const paths = getXDGPaths();
-    const dbPath = join(paths.data, "index.sqlite");
-    const db = openDatabase(dbPath);
-    db.close();
-    sesameAvailable = true;
-  } catch {
-    sesameAvailable = false;
-  }
-
-  return sesameAvailable;
-}
-
 interface SessionFileMetadata {
+  id: string;
+  cwd: string;
+  created: string;
   modified: string;
   messageCount: number;
   firstMessage: string;
   sessionName?: string;
 }
 
-function readSessionFileMetadata(filePath: string): SessionFileMetadata | null {
+/**
+ * Read metadata from a session file's header and first few hundred lines.
+ */
+export function readSessionFileMetadata(
+  filePath: string,
+): SessionFileMetadata | null {
   try {
     const content = readFileSync(filePath, "utf-8");
     const lines = content.split("\n");
     const stats = statSync(filePath);
 
+    if (lines.length === 0 || !lines[0]) return null;
+
+    let header: {
+      type?: string;
+      id?: string;
+      cwd?: string;
+      timestamp?: string;
+    };
+    try {
+      header = JSON.parse(lines[0]);
+    } catch {
+      return null;
+    }
+
+    if (header.type !== "session" || !header.id) return null;
+
     let messageCount = 0;
     let firstMessage = "";
     let sessionName: string | undefined;
 
-    for (let i = 0; i < Math.min(500, lines.length); i++) {
+    for (let i = 1; i < Math.min(500, lines.length); i++) {
       const line = lines[i];
       if (!line) continue;
 
@@ -266,6 +226,9 @@ function readSessionFileMetadata(filePath: string): SessionFileMetadata | null {
     }
 
     return {
+      id: header.id,
+      cwd: header.cwd ?? "",
+      created: header.timestamp ?? stats.mtime.toISOString(),
       modified: stats.mtime.toISOString(),
       messageCount,
       firstMessage: firstMessage || "(no messages yet)",
@@ -293,12 +256,17 @@ function toSesameDate(input?: string): string | undefined {
 }
 
 /**
- * Search sessions using the Sesame library (indexed BM25 search).
+ * Search sessions using the Sesame indexed search library.
+ * Respects cwd and date filters, returns sorted results up to limit.
  */
-async function searchWithSesame(
+export async function searchSessions(
   options: SearchOptions,
 ): Promise<SessionSearchResult[]> {
   const { query, cwd, after, before, limit = 10 } = options;
+
+  if (!query || query.trim() === "") {
+    return [];
+  }
 
   const sesameOptions: SesameSearchOptions = {
     cwd,
@@ -337,195 +305,112 @@ async function searchWithSesame(
   }
 }
 
+export interface SessionListResult {
+  id: string;
+  path: string;
+  cwd: string;
+  name?: string;
+  created: string;
+  modified: string;
+  messageCount: number;
+  firstMessage: string;
+}
+
 /**
- * Search for sessions by keyword. Uses Sesame library if available, falls back to ripgrep.
- * Respects cwd and date filters, returns sorted results up to limit.
- * Resilient: skips bad files, never throws.
+ * List sessions for a given directory (or child directories up to depth).
+ *
+ * Reads session files from the encoded cwd directory under the Pi sessions root.
+ * If depth > 0, also includes sessions from child directories whose decoded
+ * path starts with the given cwd.
  */
-export async function searchSessions(
-  options: SearchOptions,
-): Promise<SessionSearchResponse> {
-  const { query, cwd, after, before, limit = 10 } = options;
-
-  if (!query || query.trim() === "") {
-    return { backend: "ripgrep", results: [] };
-  }
-
-  // Use Sesame if available (indexed BM25 search, much faster)
-  if (await isSesameAvailable()) {
-    try {
-      const results = await searchWithSesame(options);
-      return { backend: "sesame", results };
-    } catch (err) {
-      console.error("[session-search] sesame failed, falling back to rg:", err);
-    }
-  }
-
-  // Fallback: ripgrep-based search
+export function listSessions(
+  cwd: string,
+  limit = 20,
+  depth = 0,
+): SessionListResult[] {
   const sessionsDir = getSessionsDir();
-  let searchDirs: string[] = [];
+  const targetEncoded = encodeCwd(cwd);
+  const targetResolved = resolve(cwd);
 
-  // Determine directories to search
-  if (cwd) {
-    const encoded = encodeCwd(cwd);
-    const cwdDir = join(sessionsDir, encoded);
-    searchDirs = [cwdDir];
-  } else {
-    // Search all subdirectories
-    searchDirs = [sessionsDir];
-  }
+  // Collect matching session directories
+  const matchingDirs: string[] = [];
 
-  // Parse date filters
-  let afterDate: Date | null = null;
-  let beforeDate: Date | null = null;
-
-  if (after) {
-    afterDate = parseRelativeDate(after);
-  }
-
-  if (before) {
-    beforeDate = parseRelativeDate(before);
-  }
-
-  // Use rg to find matching files
-  let matchingFiles: string[] = [];
+  // Always include exact cwd match
+  const exactDir = join(sessionsDir, targetEncoded);
   try {
-    const { stdout } = await execFileAsync(
-      "rg",
-      [
-        "--files-with-matches",
-        "--fixed-strings",
-        "--glob",
-        "*.jsonl",
-        "--",
-        query,
-        ...searchDirs,
-      ],
-      { maxBuffer: 10 * 1024 * 1024 }, // 10MB max output
-    );
-
-    if (stdout) {
-      matchingFiles = stdout
-        .split("\n")
-        .filter((line) => line.length > 0)
-        .slice(0, 100); // Cap at 100 files before detailed processing
-    }
-  } catch (err) {
-    // rg returns exit code 1 if no matches found - this is normal
-    const error = err as { status?: number };
-    if (error.status === 1) {
-      return { backend: "ripgrep", results: [] };
-    }
-    // For other errors, log but don't throw
-    console.error("[session-search] rg search error:", err);
-    return { backend: "ripgrep", results: [] };
+    statSync(exactDir);
+    matchingDirs.push(exactDir);
+  } catch {
+    // Directory doesn't exist
   }
 
-  // Process each matching file
-  const results: SessionSearchResult[] = [];
-
-  for (const filePath of matchingFiles) {
+  // If depth > 0, scan for child directories
+  if (depth > 0) {
     try {
-      // Read first line for session header
-      const content = readFileSync(filePath, "utf-8");
-      const lines = content.split("\n");
+      const allDirs = readdirSync(sessionsDir);
+      for (const dirName of allDirs) {
+        if (dirName === targetEncoded) continue; // Already added
+        if (!dirName.startsWith("--") || !dirName.endsWith("--")) continue;
 
-      if (lines.length === 0) continue;
-
-      let sessionHeader: {
-        type?: string;
-        id?: string;
-        cwd?: string;
-        timestamp?: string;
-      } = {};
-
-      try {
-        const firstLine = lines[0];
-        if (firstLine) {
-          sessionHeader = JSON.parse(firstLine);
-        }
-      } catch {
-        // Skip files with invalid first line
-        continue;
-      }
-
-      const sessionId = sessionHeader.id;
-      const sessionCwd = sessionHeader.cwd;
-
-      if (!sessionId || sessionCwd === undefined) {
-        continue;
-      }
-
-      // Get file modification time
-      const stats = statSync(filePath);
-      const modified = stats.mtime.toISOString();
-
-      // Apply date filters
-      const modifiedDate = new Date(modified);
-      if (afterDate && modifiedDate < afterDate) continue;
-      if (beforeDate && modifiedDate > beforeDate) continue;
-
-      // Bounded scan: extract metadata from up to 500 lines
-      let messageCount = 0;
-      let firstMessage = "";
-      let sessionName: string | undefined;
-
-      for (let i = 0; i < Math.min(500, lines.length); i++) {
-        const line = lines[i];
-        if (!line) continue;
-
-        try {
-          const entry = JSON.parse(line);
-
-          // Count messages
-          if (entry.type === "message") {
-            messageCount++;
-            // Capture first user message
-            if (!firstMessage && entry.message?.role === "user") {
-              firstMessage = extractTextFromEntry(entry) || "";
-              if (firstMessage.length > 100) {
-                firstMessage = `${firstMessage.slice(0, 100)}...`;
+        const decoded = decodeCwd(dirName);
+        // Check if this decoded path is a child of the target cwd
+        // and within the depth limit
+        if (decoded.startsWith(`${targetResolved}/`)) {
+          const relative = decoded.slice(targetResolved.length + 1);
+          const relativeDepth = relative.split("/").length;
+          if (relativeDepth <= depth) {
+            const childDir = join(sessionsDir, dirName);
+            try {
+              if (statSync(childDir).isDirectory()) {
+                matchingDirs.push(childDir);
               }
+            } catch {
+              // Skip unreadable
             }
           }
-
-          // Capture session name
-          if (!sessionName && entry.type === "session_info" && entry.name) {
-            sessionName = entry.name;
-          }
-
-          // Stop if we have all needed data
-          if (messageCount > 0 && firstMessage && sessionName) {
-            break;
-          }
-        } catch {
-          // Skip lines that can't be parsed
         }
       }
-
-      // Extract snippet for the match
-      const snippet = await extractSnippet(filePath, query);
-
-      results.push({
-        id: sessionId,
-        path: filePath,
-        cwd: sessionCwd,
-        name: sessionName,
-        created: sessionHeader.timestamp || modified,
-        modified,
-        messageCount,
-        firstMessage: firstMessage || "(no messages yet)",
-        matchedSnippet: snippet,
-      });
-    } catch (err) {
-      // Skip files that can't be processed
-      console.error(`[session-search] Error processing ${filePath}:`, err);
+    } catch {
+      // Can't read sessions dir
     }
   }
 
-  // Sort by modified date (descending), apply limit
+  // Collect sessions from matching directories
+  const results: SessionListResult[] = [];
+
+  for (const dir of matchingDirs) {
+    try {
+      const files = readdirSync(dir)
+        .filter((f) => f.endsWith(".jsonl"))
+        .sort()
+        .reverse(); // Most recent first (filenames start with timestamps)
+
+      for (const file of files) {
+        if (results.length >= limit * 2) break; // Over-collect then sort+trim
+
+        const filePath = join(dir, file);
+        const meta = readSessionFileMetadata(filePath);
+        if (!meta) continue;
+
+        results.push({
+          id: meta.id,
+          path: filePath,
+          cwd: meta.cwd,
+          name: meta.sessionName,
+          created: meta.created,
+          modified: meta.modified,
+          messageCount: meta.messageCount,
+          firstMessage: meta.firstMessage,
+        });
+      }
+    } catch {
+      // Skip unreadable directories
+    }
+  }
+
+  // Sort by modified date descending, apply limit
   results.sort(
     (a, b) => new Date(b.modified).getTime() - new Date(a.modified).getTime(),
   );
-  return { backend: "ripgrep", results: results.slice(0, limit) };
+  return results.slice(0, limit);
 }

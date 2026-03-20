@@ -7,7 +7,19 @@
 
 import { homedir } from "node:os";
 import { isAbsolute, join, relative, resolve } from "node:path";
-import type { ExtensionAPI } from "@mariozechner/pi-coding-agent";
+import type {
+  ExtensionAPI,
+  ExtensionContext,
+} from "@mariozechner/pi-coding-agent";
+import { DynamicBorder } from "@mariozechner/pi-coding-agent";
+import {
+  Container,
+  Key,
+  matchesKey,
+  Spacer,
+  Text,
+  wrapTextWithAnsi,
+} from "@mariozechner/pi-tui";
 import { AD_NOTIFY_ATTENTION_EVENT } from "../../../packages/events";
 
 export type SessionReadAccessMode = "confirm" | "allow";
@@ -72,13 +84,105 @@ function emitSessionGateEvent(
   pi.events.emit(AD_NOTIFY_ATTENTION_EVENT, payload);
 }
 
+type SessionGateResult = "allow" | "allow-session" | "deny";
+
+/**
+ * Show a styled confirmation dialog for session file access.
+ * Matches the pattern used by the modes extension tool gate.
+ */
+async function showSessionGateDialog(
+  ctx: ExtensionContext,
+  toolName: string,
+  target: string,
+): Promise<SessionGateResult> {
+  const result = await ctx.ui.custom<SessionGateResult>(
+    (_tui, theme, _kb, done) => {
+      const container = new Container();
+      const warnBorder = (s: string) => theme.fg("warning", s);
+
+      container.addChild(new DynamicBorder(warnBorder));
+      container.addChild(
+        new Text(theme.fg("warning", theme.bold("Session File Access")), 1, 0),
+      );
+      container.addChild(new Spacer(1));
+      container.addChild(
+        new Text(
+          theme.fg(
+            "text",
+            `The agent is trying to ${toolName} a session file directly.`,
+          ),
+          1,
+          0,
+        ),
+      );
+      container.addChild(new Spacer(1));
+
+      container.addChild(
+        new DynamicBorder((s: string) => theme.fg("muted", s)),
+      );
+      const targetText = new Text("", 1, 0);
+      container.addChild(targetText);
+      container.addChild(
+        new DynamicBorder((s: string) => theme.fg("muted", s)),
+      );
+
+      container.addChild(new Spacer(1));
+      container.addChild(
+        new Text(
+          theme.fg("muted", "Prefer find_sessions + read_session instead."),
+          1,
+          0,
+        ),
+      );
+      container.addChild(new Spacer(1));
+      container.addChild(
+        new Text(
+          theme.fg(
+            "dim",
+            "y/enter: allow | a: allow for session | n/esc: deny",
+          ),
+          1,
+          0,
+        ),
+      );
+      container.addChild(new DynamicBorder(warnBorder));
+
+      return {
+        render: (width: number) => {
+          targetText.setText(
+            wrapTextWithAnsi(theme.fg("text", target), width - 4).join("\n"),
+          );
+          return container.render(width);
+        },
+        invalidate: () => container.invalidate(),
+        handleInput: (data: string) => {
+          if (matchesKey(data, Key.enter) || data === "y" || data === "Y") {
+            done("allow");
+            return;
+          }
+          if (data === "a" || data === "A") {
+            done("allow-session");
+            return;
+          }
+          if (matchesKey(data, Key.escape) || data === "n" || data === "N") {
+            done("deny");
+          }
+        },
+      };
+    },
+  );
+
+  if (result === undefined) return "deny";
+  return result;
+}
+
 /**
  * Hook that gates direct file access to the sessions directory.
  *
  * Default behavior:
- * - read: prompt the user for confirmation (UI required). If no UI, deny.
- * - write/edit: still blocked unconditionally.
- * - bash: prompt the user for confirmation (UI required). If no UI, deny.
+ * - read: prompt the user for confirmation via styled dialog. If no UI, deny.
+ * - write/edit: blocked unconditionally.
+ * - bash: prompt the user for confirmation via styled dialog. If no UI, deny.
  *
  * Optional runtime override:
  * - sessionReadAccessMode = "allow": direct session-file reads and bash
@@ -113,7 +217,6 @@ export function setupProtectSessionsDirHook(pi: ExtensionAPI) {
             event.toolName,
             event.toolCallId,
           );
-          ctx.ui.notify("Blocked: session file write/edit", "warning");
           return { block: true, reason: BLOCK_MESSAGE };
         }
 
@@ -132,10 +235,6 @@ export function setupProtectSessionsDirHook(pi: ExtensionAPI) {
             event.toolName,
             event.toolCallId,
           );
-          ctx.ui.notify(
-            "Blocked: session file read (no UI to confirm)",
-            "warning",
-          );
           return {
             block: true,
             reason:
@@ -151,20 +250,16 @@ export function setupProtectSessionsDirHook(pi: ExtensionAPI) {
           event.toolCallId,
         );
 
-        const title = "Read session file?";
-        const msg =
-          "The agent is trying to read a Pi session JSONL file directly:\n\n" +
-          `${resolvedPath}\n\n` +
-          "Allow this read? (This approval is only for the current session.)";
+        const decision = await showSessionGateDialog(ctx, "read", resolvedPath);
 
-        const confirm = await ctx.ui.confirm(title, msg);
-        if (!confirm) {
-          ctx.ui.notify("Denied: session file read", "warning");
+        if (decision === "deny") {
           return { block: true, reason: "User denied session file read" };
         }
 
-        allowedReadPaths.add(resolvedPath);
-        ctx.ui.notify("Allowed: session file read (this session)", "info");
+        if (decision === "allow-session") {
+          allowedReadPaths.add(resolvedPath);
+        }
+
         return;
       }
 
@@ -179,7 +274,6 @@ export function setupProtectSessionsDirHook(pi: ExtensionAPI) {
           event.toolName,
           event.toolCallId,
         );
-        ctx.ui.notify("Blocked: use find_sessions / read_session", "warning");
         return { block: true, reason: BLOCK_MESSAGE };
       }
 
@@ -203,9 +297,12 @@ export function setupProtectSessionsDirHook(pi: ExtensionAPI) {
 
         // In print/RPC mode, deny by default (safe fallback).
         if (!ctx.hasUI) {
-          ctx.ui.notify(
-            "Blocked: session-dir bash (no UI to confirm)",
-            "warning",
+          emitSessionGateEvent(
+            pi,
+            "Blocked: session-dir bash requires confirmation, but no UI is available",
+            command,
+            event.toolName,
+            event.toolCallId,
           );
           return {
             block: true,
@@ -214,20 +311,28 @@ export function setupProtectSessionsDirHook(pi: ExtensionAPI) {
           };
         }
 
-        const title = "Run bash command on sessions dir?";
-        const msg =
-          "The agent is trying to run a bash command that targets the sessions directory:\n\n" +
-          `${command}\n\n` +
-          "Allow this command? (This approval is only for the current session.)";
+        emitSessionGateEvent(
+          pi,
+          "Confirmation required: bash command targets sessions directory",
+          command,
+          event.toolName,
+          event.toolCallId,
+        );
 
-        const confirm = await ctx.ui.confirm(title, msg);
-        if (!confirm) {
-          ctx.ui.notify("Denied: session-dir bash", "warning");
+        const decision = await showSessionGateDialog(
+          ctx,
+          "run bash on",
+          command,
+        );
+
+        if (decision === "deny") {
           return { block: true, reason: "User denied session-dir bash" };
         }
 
-        allowedBashCommands.add(command);
-        ctx.ui.notify("Allowed: session-dir bash (this session)", "info");
+        if (decision === "allow-session") {
+          allowedBashCommands.add(command);
+        }
+
         return;
       }
     }

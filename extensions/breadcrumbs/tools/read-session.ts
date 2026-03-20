@@ -14,8 +14,6 @@ import {
   SubagentFooter,
   type ToolCallFormatter,
   ToolCallHeader,
-  ToolCallList,
-  ToolCallSummary,
   ToolDetails,
   type ToolDetailsField,
 } from "@aliou/pi-utils-ui";
@@ -27,6 +25,8 @@ import type {
   Theme,
   ToolRenderResultOptions,
 } from "@mariozechner/pi-coding-agent";
+import type { Component } from "@mariozechner/pi-tui";
+import { Text, visibleWidth, wrapTextWithAnsi } from "@mariozechner/pi-tui";
 import { Type } from "@sinclair/typebox";
 import {
   createExecutionTimer,
@@ -138,6 +138,155 @@ Use read_session to extract specific information from a past session identified 
 - The current session already has the needed context
 - You haven't identified which session to read yet (use find_sessions first)
 `;
+
+/**
+ * Extract a text summary of a tool call's result content.
+ * Returns truncated text or undefined if no content available.
+ */
+function extractToolCallContent(
+  tc: SubagentToolCall,
+  maxLen = 300,
+): string | undefined {
+  if (tc.error) return `Error: ${tc.error}`;
+
+  const result = tc.result;
+  if (result === undefined || result === null) return undefined;
+
+  // String result
+  if (typeof result === "string") {
+    return result.length > maxLen ? `${result.slice(0, maxLen)}...` : result;
+  }
+
+  // Object with content array (standard tool result shape)
+  if (typeof result === "object" && !Array.isArray(result)) {
+    const obj = result as Record<string, unknown>;
+    if (Array.isArray(obj.content)) {
+      const texts = (obj.content as Array<{ type?: string; text?: string }>)
+        .filter((c) => c.type === "text" && typeof c.text === "string")
+        .map((c) => c.text as string);
+      if (texts.length > 0) {
+        const joined = texts.join("\n");
+        return joined.length > maxLen
+          ? `${joined.slice(0, maxLen)}...`
+          : joined;
+      }
+    }
+  }
+
+  // Fallback: JSON stringify
+  const serialized = JSON.stringify(result);
+  return serialized.length > maxLen
+    ? `${serialized.slice(0, maxLen)}...`
+    : serialized;
+}
+
+/**
+ * Custom component that renders tool calls with their result content,
+ * not just the tool call names.
+ */
+class ToolCallContentList implements Component {
+  constructor(
+    private toolCalls: SubagentToolCall[],
+    private formatter: ToolCallFormatter<SubagentToolCall>,
+    private theme: Theme,
+  ) {}
+
+  handleInput(_data: string): boolean {
+    return false;
+  }
+
+  invalidate(): void {}
+
+  render(width: number): string[] {
+    if (!this.toolCalls || this.toolCalls.length === 0) return [];
+
+    const th = this.theme;
+    const lines: string[] = [];
+
+    lines.push(th.fg("muted", `Tool calls (${this.toolCalls.length}):`));
+
+    for (const toolCall of this.toolCalls) {
+      const indicator =
+        toolCall.status === "running"
+          ? " "
+          : toolCall.status === "done"
+            ? th.fg("success", "✓")
+            : th.fg("error", "✗");
+
+      const { label, detail } = this.formatter(toolCall);
+      const text = detail ? `${th.bold(label)} ${detail}` : th.bold(label);
+
+      const prefix = `  ${indicator} `;
+      const prefixWidth = visibleWidth(prefix);
+      const textWidth = Math.max(1, width - prefixWidth);
+      const wrapped = wrapTextWithAnsi(text, textWidth);
+      const indent = " ".repeat(prefixWidth);
+
+      for (let i = 0; i < wrapped.length; i++) {
+        lines.push(i === 0 ? prefix + wrapped[i] : indent + wrapped[i]);
+      }
+
+      // Show result content for completed tool calls
+      if (toolCall.status === "done" || toolCall.status === "error") {
+        const content = extractToolCallContent(toolCall);
+        if (content) {
+          const contentIndent = "      ";
+          const contentWidth = Math.max(1, width - contentIndent.length);
+          // Truncate to a few lines max
+          const contentLines = content.split("\n").slice(0, 4);
+          for (const contentLine of contentLines) {
+            const wrappedContent = wrapTextWithAnsi(
+              th.fg("muted", contentLine),
+              contentWidth,
+            );
+            for (const wl of wrappedContent) {
+              lines.push(contentIndent + wl);
+            }
+          }
+        }
+      }
+    }
+
+    return lines;
+  }
+}
+
+/**
+ * Collapsed summary that includes tool names and counts only.
+ * Used in the done state to avoid large content in collapsed view.
+ */
+class ToolCallContentSummary implements Component {
+  constructor(
+    private toolCalls: SubagentToolCall[],
+    private formatter: ToolCallFormatter<SubagentToolCall>,
+    private theme: Theme,
+  ) {}
+
+  handleInput(_data: string): boolean {
+    return false;
+  }
+
+  invalidate(): void {}
+
+  render(width: number): string[] {
+    if (!this.toolCalls || this.toolCalls.length === 0) return [];
+
+    const th = this.theme;
+    const names = this.toolCalls.map((tc) => this.formatter(tc).label);
+    const counts: Record<string, number> = {};
+    for (const name of names) {
+      counts[name] = (counts[name] ?? 0) + 1;
+    }
+
+    const summary = Object.entries(counts)
+      .map(([name, count]) => (count > 1 ? `${name} x${count}` : name))
+      .join(", ");
+
+    const prefix = `${this.toolCalls.length} tool call${this.toolCalls.length === 1 ? "" : "s"}`;
+    const line = new Text(th.fg("muted", `${prefix}: `) + summary, 0, 0);
+    return line.render(width);
+  }
+}
 
 /**
  * Setup the read_session tool.
@@ -432,13 +581,17 @@ Input the session ID (UUID or path) and what you want to learn about it.`,
       } else if (error) {
         fields.push({ label: "Error", value: error });
       } else if (response) {
-        // Done state
-        fields.push(new ToolCallSummary(toolCalls, toolCallFormatter, theme));
+        // Done state: show summary in collapsed, content list in expanded
+        fields.push(
+          new ToolCallContentSummary(toolCalls, toolCallFormatter, theme),
+        );
         fields.push(new FailedToolCalls(toolCalls, toolCallFormatter, theme));
         fields.push(new MarkdownResponse(response, theme));
       } else {
-        // Running state
-        fields.push(new ToolCallList(toolCalls, toolCallFormatter, theme));
+        // Running state: show tool calls with content
+        fields.push(
+          new ToolCallContentList(toolCalls, toolCallFormatter, theme),
+        );
       }
 
       return new ToolDetails({ fields, footer }, options, theme);

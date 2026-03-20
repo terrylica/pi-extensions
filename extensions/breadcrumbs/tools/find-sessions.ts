@@ -1,7 +1,7 @@
 /**
  * Find Sessions tool - search past Pi sessions by keyword with optional filters.
  *
- * Uses ripgrep-based search for efficient scanning across session files.
+ * Uses Sesame indexed search for fast BM25-based session discovery.
  */
 
 import { ToolBody, ToolCallHeader, ToolFooter } from "@aliou/pi-utils-ui";
@@ -15,7 +15,6 @@ import type {
 import { Text } from "@mariozechner/pi-tui";
 import { Type } from "@sinclair/typebox";
 import {
-  type SearchBackend,
   type SearchOptions,
   type SessionSearchResult,
   searchSessions,
@@ -61,7 +60,6 @@ type FindSessionsParamsType = {
 
 interface FindSessionsDetails {
   query: string;
-  backend: SearchBackend;
   filters: {
     cwd?: string;
     after?: string;
@@ -143,7 +141,7 @@ WHEN TO USE:
 - Retrieve recent work to continue from
 
 RESULTS: Returns matching sessions with metadata including name, directory, date, and matched snippet.
-Uses Sesame indexed search when available, with ripgrep fallback.`,
+Uses Sesame indexed search.`,
     promptSnippet: "Find previous Pi sessions by topic, date, or project.",
     promptGuidelines: [
       "Use this tool when the user explicitly asks to find or search for a previous session or conversation.",
@@ -175,12 +173,9 @@ Uses Sesame indexed search when available, with ripgrep fallback.`,
       };
 
       // Execute search
-      let backend: SearchBackend = "ripgrep";
       let results: SessionSearchResult[] = [];
       try {
-        const response = await searchSessions(searchOpts);
-        backend = response.backend;
-        results = response.results;
+        results = await searchSessions(searchOpts);
         // Filter out current session - users searching for sessions want to find other sessions, not the one they're in
         results = results.filter((r) => r.id !== currentSessionId);
       } catch (err) {
@@ -192,7 +187,6 @@ Uses Sesame indexed search when available, with ripgrep fallback.`,
               type: "text",
               text: JSON.stringify({
                 query,
-                backend,
                 resultCount: 0,
                 results: [],
                 error: `Search failed: ${err instanceof Error ? err.message : String(err)}`,
@@ -201,7 +195,6 @@ Uses Sesame indexed search when available, with ripgrep fallback.`,
           ],
           details: {
             query,
-            backend,
             filters: { cwd, after, before, limit },
             resultCount: 0,
             results: [],
@@ -212,7 +205,6 @@ Uses Sesame indexed search when available, with ripgrep fallback.`,
       // Format result for LLM
       const resultJson = JSON.stringify({
         query,
-        backend,
         resultCount: results.length,
         results: results.map((r) => ({
           id: r.id,
@@ -232,7 +224,6 @@ Uses Sesame indexed search when available, with ripgrep fallback.`,
         content: [{ type: "text", text: resultJson }],
         details: {
           query,
-          backend,
           filters: { cwd, after, before, limit: limit || 10 },
           resultCount: results.length,
           results,
@@ -281,7 +272,7 @@ Uses Sesame indexed search when available, with ripgrep fallback.`,
         return new Text(content, 0, 0);
       }
 
-      const { query, backend, resultCount, results, filters } = details;
+      const { query, resultCount, results, filters } = details;
       const fields: Array<
         { label: string; value: string; showCollapsed?: boolean } | Text
       > = [];
@@ -326,11 +317,6 @@ Uses Sesame indexed search when available, with ripgrep fallback.`,
 
       const footer = new ToolFooter(theme, {
         items: [
-          {
-            label: "backend",
-            value: backend === "sesame" ? "sesame" : "ripgrep",
-            tone: "accent",
-          },
           { label: "matches", value: String(resultCount), tone: "success" },
           {
             label: "limit",
