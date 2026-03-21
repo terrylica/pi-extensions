@@ -17,6 +17,7 @@ export async function showModeConfirmDialog(
   toolName: string,
   bashCommand?: string,
   allowSession = true,
+  reasonText?: string,
 ): Promise<ConfirmResult> {
   const result = await ctx.ui.custom<ConfirmResult>(
     (_tui, theme, _kb, done) => {
@@ -28,16 +29,11 @@ export async function showModeConfirmDialog(
         new Text(theme.fg("error", theme.bold("Tool Not in Allowlist")), 1, 0),
       );
       container.addChild(new Spacer(1));
-      container.addChild(
-        new Text(
-          theme.fg(
-            "warning",
-            `The tool ${toolName} is not in the allowlist for ${modeName} mode.`,
-          ),
-          1,
-          0,
-        ),
-      );
+      const message =
+        reasonText ??
+        `The tool ${toolName} is not in the allowlist for ${modeName} mode.`;
+
+      container.addChild(new Text(theme.fg("warning", message), 1, 0));
 
       let commandText: Text | undefined;
       if (bashCommand) {

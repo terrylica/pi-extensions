@@ -60,8 +60,12 @@ function formatBlockedReason(modeName: string, toolName: string): string {
   return `Blocked by ${modeName} mode: ${toolName} is denied`;
 }
 
-function formatNoUiReason(modeName: string, toolName: string): string {
-  return `Blocked by ${modeName} mode: ${toolName} is not allowlisted (no UI to confirm)`;
+function formatNoUiReason(
+  modeName: string,
+  toolName: string,
+  reason = "not allowlisted",
+): string {
+  return `Blocked by ${modeName} mode: ${toolName} is ${reason} (no UI to confirm)`;
 }
 
 function emitDangerousEvent(
@@ -89,6 +93,7 @@ async function confirmUnlistedTool(
   toolName: string,
   bashCommand?: string,
   allowSession = true,
+  reasonText?: string,
 ): Promise<"allow" | "allow-session" | "deny"> {
   if (!ctx.hasUI) return "deny";
   return showModeConfirmDialog(
@@ -97,6 +102,7 @@ async function confirmUnlistedTool(
     toolName,
     bashCommand,
     allowSession,
+    reasonText,
   );
 }
 
@@ -164,16 +170,25 @@ export function setupToolGateHook(pi: ExtensionAPI): void {
       return;
     }
 
+    const isPerCallBashConfirm =
+      event.toolName === "bash" && mode.bashConfirmEachCall;
+
     if (!ctx.hasUI) {
       return {
         block: true,
-        reason: formatNoUiReason(mode.name, event.toolName),
+        reason: formatNoUiReason(
+          mode.name,
+          event.toolName,
+          isPerCallBashConfirm ? "confirmation-gated" : "not allowlisted",
+        ),
       };
     }
 
     emitDangerousEvent(
       pi,
-      `Confirmation required by ${mode.name} mode: ${event.toolName} is not allowlisted`,
+      isPerCallBashConfirm
+        ? `Confirmation required by ${mode.name} mode: bash requires per-call approval`
+        : `Confirmation required by ${mode.name} mode: ${event.toolName} is not allowlisted`,
       event.toolName === "bash" ? bashCommand : event.toolName,
       event.toolName,
       event.toolCallId,
@@ -185,6 +200,9 @@ export function setupToolGateHook(pi: ExtensionAPI): void {
       event.toolName,
       event.toolName === "bash" ? bashCommand : undefined,
       !(event.toolName === "bash" && mode.bashConfirmEachCall),
+      isPerCallBashConfirm
+        ? `Bash calls in ${mode.name} mode require explicit approval for each call.`
+        : undefined,
     );
 
     if (decision === "allow") {

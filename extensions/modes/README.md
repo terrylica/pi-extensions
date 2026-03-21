@@ -11,8 +11,9 @@ Hardcoded mode system for Pi with tool gating, model switching, and per-branch r
 
 - `research`
   - Read-only research mode
-  - Active tools include `read`, `ls`, `find`, `grep`, `find_sessions`, `read_session`, `scout`, `lookout`, `oracle`, `reviewer`, `jester`, `synthetic_web_search`, `get_current_time`, `create_plan`, `update_plan`, and `ask_user`
-  - Blocks `write`, `edit`, `bash`
+  - Active tools include `read`, `ls`, `find`, `grep`, `find_sessions`, `read_session`, `scout`, `lookout`, `oracle`, `reviewer`, `jester`, `synthetic_web_search`, `get_current_time`, `create_plan`, `update_plan`, `ask_user`, and `bash`
+  - Blocks `write`, `edit`
+  - Requires explicit confirmation for every `bash` call
   - Provider/model: `anthropic / claude-opus-4-6`
 
 ## Controls
@@ -32,7 +33,7 @@ Hardcoded mode system for Pi with tool gating, model switching, and per-branch r
 - Sends UI-visible custom `mode-switch` messages
 - Filters `mode-switch` messages out of LLM context via `context` hook
 - Emits `ad:notify:dangerous` when user attention is required by tool gating:
-  - when `bash` is blocked by mode deny rules
+  - when confirmation is required for per-call `bash` approval
   - when confirmation is required for a non-allowlisted tool
 
 ## Event compatibility pattern

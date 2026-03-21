@@ -53,12 +53,14 @@ export const MODES: Record<string, ModeDefinition> = {
       "create_plan",
       "update_plan",
       "ask_user",
+      "bash",
     ],
-    deniedTools: ["write", "edit", "bash"],
+    deniedTools: ["write", "edit"],
     labelColor: (text: string) => `\u001b[36m${text}\u001b[0m`,
     provider: "anthropic",
     model: "claude-opus-4-6",
     instructions: RESEARCH_INSTRUCTIONS,
+    bashConfirmEachCall: true,
   },
 };
 
