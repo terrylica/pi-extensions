@@ -121,6 +121,7 @@ export function setupEditor(ctx: ExtensionContext): void {
   ctx.ui.setEditorComponent((tui, theme, keybindings) => {
     const editor = new ModeEditor(tui, theme, keybindings);
     editor.modeProvider = () => getCurrentMode();
+    editor.appTheme = ctx.ui.theme;
     setRequestRender(() => editor.requestRenderNow());
     return editor;
   });

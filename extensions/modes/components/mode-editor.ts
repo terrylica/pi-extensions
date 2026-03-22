@@ -1,7 +1,8 @@
-import { CustomEditor } from "@mariozechner/pi-coding-agent";
+import { CustomEditor, type Theme } from "@mariozechner/pi-coding-agent";
 import type { ModeDefinition } from "../modes";
 
 export class ModeEditor extends CustomEditor {
+  public appTheme?: Theme;
   public modeProvider?: () => ModeDefinition;
 
   override render(width: number): string[] {
@@ -18,7 +19,7 @@ export class ModeEditor extends CustomEditor {
     const fillLen = width - prefix.length - label.length - suffix.length;
     if (fillLen < 1) return lines;
 
-    const colorFn = mode.labelColor;
+    const colorFn = (text: string) => mode.labelColor(text, this.appTheme);
     const fill = "─".repeat(fillLen);
 
     lines[0] = `${colorFn(prefix)}${colorFn(label)}${colorFn(`${suffix}${fill}`)}`;
