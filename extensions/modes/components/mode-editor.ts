@@ -18,10 +18,15 @@ export class ModeEditor extends CustomEditor {
     const fillLen = width - prefix.length - label.length - suffix.length;
     if (fillLen < 1) return lines;
 
-    const borderColor = this.borderColor ?? ((text: string) => text);
+    const colorFn = mode.labelColor;
     const fill = "─".repeat(fillLen);
 
-    lines[0] = `${borderColor(prefix)}${mode.labelColor(label)}${borderColor(`${suffix}${fill}`)}`;
+    lines[0] = `${colorFn(prefix)}${colorFn(label)}${colorFn(`${suffix}${fill}`)}`;
+
+    if (lines.length > 1) {
+      lines[lines.length - 1] = colorFn("─".repeat(width));
+    }
+
     return lines;
   }
 
