@@ -111,11 +111,14 @@ export async function generateTitle(
       model: resolvedModel,
       systemPrompt: TITLE_SYSTEM_PROMPT,
       thinkingLevel: "off",
-      logging: { enabled: true, debug: false },
     },
     userMessage,
     ctx,
   );
+
+  if (result.error) {
+    throw new Error(result.error);
+  }
 
   return postProcessTitle(result.content);
 }
