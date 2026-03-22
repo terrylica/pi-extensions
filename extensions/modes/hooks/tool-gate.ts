@@ -1,4 +1,3 @@
-import { parse } from "@aliou/sh";
 import type {
   ExtensionAPI,
   ExtensionContext,
@@ -6,12 +5,12 @@ import type {
 import { AD_NOTIFY_DANGEROUS_EVENT } from "../../../packages/events";
 
 import { showModeConfirmDialog } from "../components/mode-confirm";
+import { resolveToolPolicy } from "../modes";
 import {
   addSessionAllowedTool,
   getCurrentMode,
   getSessionAllowedTools,
 } from "../state";
-import { walkCommands, wordToString } from "../utils/shell";
 
 function getBashCommand(input: unknown): string {
   if (!input || typeof input !== "object") return "";
@@ -19,53 +18,16 @@ function getBashCommand(input: unknown): string {
   return typeof value === "string" ? value : "";
 }
 
-function extractBashCommandNames(command: string): string[] | null {
-  try {
-    const { ast } = parse(command);
-    const names: string[] = [];
-    walkCommands(ast, (cmd) => {
-      const first = cmd.words?.[0];
-      if (!first) return false;
-      const name = wordToString(first).trim();
-      if (name) names.push(name);
-      return false;
-    });
-    return names;
-  } catch {
-    return null;
-  }
-}
-
-function isSessionAllowedBash(
-  sessionAllowed: Set<string>,
-  commandNames: string[] | null,
-): boolean {
-  if (sessionAllowed.has("bash")) return true;
-  if (!commandNames || commandNames.length === 0) return false;
-  return commandNames.every((name) => sessionAllowed.has(`bash:${name}`));
-}
-
-function addSessionAllowForBash(commandNames: string[] | null): void {
-  if (!commandNames || commandNames.length === 0) {
-    addSessionAllowedTool("bash");
-    return;
-  }
-
-  for (const name of commandNames) {
-    addSessionAllowedTool(`bash:${name}`);
-  }
-}
-
-function formatBlockedReason(modeName: string, toolName: string): string {
-  return `Blocked by ${modeName} mode: ${toolName} is denied`;
-}
-
-function formatNoUiReason(
+function formatBlockedReason(
   modeName: string,
   toolName: string,
-  reason = "not allowlisted",
+  reason = "disabled",
 ): string {
-  return `Blocked by ${modeName} mode: ${toolName} is ${reason} (no UI to confirm)`;
+  return `Blocked by ${modeName} mode: ${toolName} is ${reason}`;
+}
+
+function formatNoUiReason(modeName: string, toolName: string): string {
+  return `Blocked by ${modeName} mode: ${toolName} requires confirmation (no UI to confirm)`;
 }
 
 function emitDangerousEvent(
@@ -87,15 +49,20 @@ function emitDangerousEvent(
   pi.events.emit(AD_NOTIFY_DANGEROUS_EVENT, payload);
 }
 
-async function confirmUnlistedTool(
+async function confirmToolCall(
   ctx: ExtensionContext,
   modeName: string,
   toolName: string,
-  bashCommand?: string,
-  allowSession = true,
-  reasonText?: string,
+  bashCommand: string | undefined,
+  allowSession: boolean,
 ): Promise<"allow" | "allow-session" | "deny"> {
   if (!ctx.hasUI) return "deny";
+
+  const reasonText =
+    toolName === "bash" && !allowSession
+      ? `Bash calls in ${modeName} mode require explicit approval for each call.`
+      : `The tool ${toolName} requires confirmation in ${modeName} mode.`;
+
   return showModeConfirmDialog(
     ctx,
     modeName,
@@ -114,11 +81,13 @@ export function setupToolGateHook(pi: ExtensionAPI): void {
       return;
     }
 
-    if (mode.deniedTools.includes(event.toolName)) {
+    const rule = resolveToolPolicy(mode, event.toolName);
+
+    if (rule.access === "disabled") {
       if (event.toolName === "bash") {
         emitDangerousEvent(
           pi,
-          `Blocked by ${mode.name} mode: bash is denied`,
+          formatBlockedReason(mode.name, event.toolName),
           getBashCommand(event.input),
           event.toolName,
           event.toolCallId,
@@ -131,90 +100,48 @@ export function setupToolGateHook(pi: ExtensionAPI): void {
       };
     }
 
-    const sessionAllowed = getSessionAllowedTools();
-    const bashCommand =
-      event.toolName === "bash" ? getBashCommand(event.input) : "";
-    const bashCommandNames =
-      event.toolName === "bash" ? extractBashCommandNames(bashCommand) : null;
-
-    if (mode.allowedTools.includes(event.toolName)) {
-      if (event.toolName !== "bash") {
-        return;
-      }
-
-      if (mode.bashConfirmEachCall) {
-        // explicit per-call confirmation required for bash
-      } else if (!mode.bashAllowedCommands) {
-        return;
-      } else {
-        const allowedBash = new Set(mode.bashAllowedCommands);
-        if (bashCommandNames && bashCommandNames.length > 0) {
-          const allAllowed = bashCommandNames.every((name) =>
-            allowedBash.has(name),
-          );
-          if (allAllowed) return;
-        }
-        // fall through to confirmation for parse failure or disallowed command
-      }
-    } else {
-      if (sessionAllowed.has(event.toolName)) {
-        return;
-      }
-    }
-
-    if (
-      event.toolName === "bash" &&
-      !mode.bashConfirmEachCall &&
-      isSessionAllowedBash(sessionAllowed, bashCommandNames)
-    ) {
+    if (rule.access === "enabled") {
       return;
     }
 
-    const isPerCallBashConfirm =
-      event.toolName === "bash" && mode.bashConfirmEachCall;
+    const allowSession = rule.allowSession ?? true;
+    const sessionAllowed = getSessionAllowedTools();
+    if (allowSession && sessionAllowed.has(event.toolName)) {
+      return;
+    }
+
+    const bashCommand =
+      event.toolName === "bash" ? getBashCommand(event.input) : undefined;
 
     if (!ctx.hasUI) {
       return {
         block: true,
-        reason: formatNoUiReason(
-          mode.name,
-          event.toolName,
-          isPerCallBashConfirm ? "confirmation-gated" : "not allowlisted",
-        ),
+        reason: formatNoUiReason(mode.name, event.toolName),
       };
     }
 
     emitDangerousEvent(
       pi,
-      isPerCallBashConfirm
-        ? `Confirmation required by ${mode.name} mode: bash requires per-call approval`
-        : `Confirmation required by ${mode.name} mode: ${event.toolName} is not allowlisted`,
-      event.toolName === "bash" ? bashCommand : event.toolName,
+      `Confirmation required by ${mode.name} mode: ${event.toolName}`,
+      bashCommand ?? event.toolName,
       event.toolName,
       event.toolCallId,
     );
 
-    const decision = await confirmUnlistedTool(
+    const decision = await confirmToolCall(
       ctx,
       mode.name,
       event.toolName,
-      event.toolName === "bash" ? bashCommand : undefined,
-      !(event.toolName === "bash" && mode.bashConfirmEachCall),
-      isPerCallBashConfirm
-        ? `Bash calls in ${mode.name} mode require explicit approval for each call.`
-        : undefined,
+      bashCommand,
+      allowSession,
     );
 
     if (decision === "allow") {
       return;
     }
 
-    if (decision === "allow-session") {
-      if (event.toolName === "bash" && !mode.bashConfirmEachCall) {
-        addSessionAllowForBash(bashCommandNames);
-      } else if (event.toolName !== "bash") {
-        addSessionAllowedTool(event.toolName);
-      }
+    if (decision === "allow-session" && allowSession) {
+      addSessionAllowedTool(event.toolName);
       return;
     }
 

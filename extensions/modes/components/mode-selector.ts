@@ -15,8 +15,11 @@ import { MODE_ORDER, MODES } from "../modes";
 import { getCurrentMode } from "../state";
 
 function modeDescription(name: string): string {
-  if (name === "default") return "No restrictions";
-  return "Read-only research mode (read + grep/find/ls only)";
+  if (name === "default") {
+    return "Native baseline + all extension tools";
+  }
+
+  return "Research policy: read tools on, side effects blocked or confirmed";
 }
 
 export async function showModeSelector(

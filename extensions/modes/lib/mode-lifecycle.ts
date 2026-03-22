@@ -3,7 +3,7 @@ import type {
   ExtensionContext,
 } from "@mariozechner/pi-coding-agent";
 import { ModeEditor } from "../components/mode-editor";
-import { DEFAULT_MODE, MODE_ORDER, MODES } from "../modes";
+import { DEFAULT_MODE, MODE_ORDER, MODES, resolveToolPolicy } from "../modes";
 import {
   clearPreviousModel,
   clearSessionAllowedTools,
@@ -15,6 +15,17 @@ import {
   triggerRender,
 } from "../state";
 import { sendModeSwitchMessage } from "./mode-switch";
+
+function computeActiveTools(
+  modeName: string,
+  allToolNames: string[],
+): string[] {
+  const mode = MODES[modeName] ?? DEFAULT_MODE;
+  return allToolNames.filter((toolName) => {
+    const rule = resolveToolPolicy(mode, toolName);
+    return rule.access === "enabled" || rule.access === "confirm";
+  });
+}
 
 export function getLastModeFromBranch(ctx: ExtensionContext): string | null {
   const entries = ctx.sessionManager.getBranch() as Array<{
@@ -69,9 +80,7 @@ export async function applyMode(
   clearSessionAllowedTools();
 
   const allToolNames = pi.getAllTools().map((tool) => tool.name);
-  const denied = new Set(mode.deniedTools);
-  const active = allToolNames.filter((name) => !denied.has(name));
-  pi.setActiveTools(active);
+  pi.setActiveTools(computeActiveTools(modeName, allToolNames));
 
   if (!options?.silent) {
     pi.appendEntry("mode-state", { mode: modeName });

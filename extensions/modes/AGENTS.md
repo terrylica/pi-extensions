@@ -1,11 +1,11 @@
 # modes
 
-Hardcoded mode system for Pi with tool gating and model switching.
+Hardcoded mode system for Pi with tool policy and model switching.
 
 ## Modes
 
-- `default`: no restrictions, mode label shown in editor.
-- `research`: read-only tooling + restricted bash (explicit confirm per call).
+- `default`: native baseline (`read`, `bash`, `edit`, `write`) + all extension tools.
+- `research`: read/research focused tooling; `write`/`edit` blocked; `bash` confirm each call; extension tools confirmation-gated by default, with side-effecting tools blocked.
 
 ## Controls
 
@@ -17,7 +17,7 @@ Hardcoded mode system for Pi with tool gating and model switching.
 ## Notes
 
 - No config file and no `enabled` toggle by design.
-- Uses `tool_call` hook for enforcement and `setActiveTools` for denylist-based filtering.
+- Uses `tool_call` hook for enforcement and `setActiveTools` for activation from policy.
 - Persists mode per branch via custom `mode-state` entries.
 - Injects mode guidance via `before_agent_start`.
 - Sends `mode-switch` UI messages and filters them from LLM context.
