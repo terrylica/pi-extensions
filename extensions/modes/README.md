@@ -86,5 +86,5 @@ Rules:
 ## Notes
 
 - No config file and no enabled toggle by design
-- Editor border line color follows normal thinking-level behavior
-- Mode label uses hardcoded ANSI color (research cyan)
+- Publishes mode label and border band color through editor decoration events
+- Editor rendering is owned by the `editor` extension

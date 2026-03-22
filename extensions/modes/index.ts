@@ -1,4 +1,9 @@
 import type { ExtensionAPI } from "@mariozechner/pi-coding-agent";
+import {
+  AD_EDITOR_BORDER_DECORATION_CHANGED_EVENT,
+  AD_EDITOR_READY_EVENT,
+  AD_MODES_READY_EVENT,
+} from "../../packages/events";
 import { registerModeControls } from "./commands/mode-command";
 import { configLoader } from "./config";
 import {
@@ -9,6 +14,7 @@ import {
 } from "./hooks";
 import { applyMode } from "./lib/mode-lifecycle";
 import { registerModeSwitchRenderer } from "./lib/mode-switch";
+import { getCurrentMode } from "./state";
 
 export default async function (pi: ExtensionAPI): Promise<void> {
   await configLoader.load();
@@ -22,6 +28,37 @@ export default async function (pi: ExtensionAPI): Promise<void> {
   setupSessionSyncHooks(pi);
   setupSystemPromptHook(pi);
 
+  const emitCurrentMode = () => {
+    const mode = getCurrentMode();
+    pi.events.emit(AD_EDITOR_BORDER_DECORATION_CHANGED_EVENT, {
+      source: "modes",
+      writes: [
+        {
+          kind: "slot",
+          slot: "top-start",
+          text: mode.label,
+        },
+        {
+          kind: "band",
+          band: "top",
+          color: mode.labelColor,
+        },
+        {
+          kind: "band",
+          band: "bottom",
+          color: mode.labelColor,
+        },
+      ],
+    });
+  };
+
+  pi.events.on(AD_EDITOR_READY_EVENT, () => {
+    emitCurrentMode();
+  });
+
   registerModeControls(pi, applyMode);
   registerModeSwitchRenderer(pi);
+
+  emitCurrentMode();
+  pi.events.emit(AD_MODES_READY_EVENT, {});
 }

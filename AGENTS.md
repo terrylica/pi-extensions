@@ -16,6 +16,7 @@ All packages in this repository use the `@aliou` scope where applicable, not `@a
 
 - `breadcrumbs` - Session history tools. Search past sessions, extract information, and hand off context to new sessions.
 - `defaults` - Personal sensible defaults and quality-of-life improvements.
+- `editor` - Owns the custom editor component and event-driven border decorations.
 - `modes` - Hardcoded execution modes with tool gating, model defaults, and branch-aware restore.
 - `planning` - Turn conversations into implementation plans and manage saved plans.
 - `providers` - Register custom providers and show unified rate-limit and usage dashboards.

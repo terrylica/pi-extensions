@@ -2,7 +2,7 @@ import type {
   ExtensionAPI,
   ExtensionContext,
 } from "@mariozechner/pi-coding-agent";
-import { ModeEditor } from "../components/mode-editor";
+import { AD_EDITOR_BORDER_DECORATION_CHANGED_EVENT } from "../../../packages/events";
 import { DEFAULT_MODE, MODE_ORDER, MODES, resolveToolPolicy } from "../modes";
 import {
   clearPreviousModel,
@@ -11,8 +11,6 @@ import {
   getPreviousModel,
   setCurrentMode,
   setPreviousModel,
-  setRequestRender,
-  triggerRender,
 } from "../state";
 import { sendModeSwitchMessage } from "./mode-switch";
 
@@ -91,6 +89,27 @@ export async function applyMode(
     );
   }
 
+  pi.events.emit(AD_EDITOR_BORDER_DECORATION_CHANGED_EVENT, {
+    source: "modes",
+    writes: [
+      {
+        kind: "slot",
+        slot: "top-start",
+        text: mode.label,
+      },
+      {
+        kind: "band",
+        band: "top",
+        color: mode.labelColor,
+      },
+      {
+        kind: "band",
+        band: "bottom",
+        color: mode.labelColor,
+      },
+    ],
+  });
+
   if (previousModeName !== "default" && modeName === "default") {
     const savedModel = getPreviousModel();
     if (savedModel) {
@@ -108,23 +127,6 @@ export async function applyMode(
       );
     }
   }
-
-  triggerRender();
-}
-
-export function setupEditor(ctx: ExtensionContext): void {
-  if (!ctx.hasUI) {
-    setRequestRender(undefined);
-    return;
-  }
-
-  ctx.ui.setEditorComponent((tui, theme, keybindings) => {
-    const editor = new ModeEditor(tui, theme, keybindings);
-    editor.modeProvider = () => getCurrentMode();
-    editor.appTheme = ctx.ui.theme;
-    setRequestRender(() => editor.requestRenderNow());
-    return editor;
-  });
 }
 
 export async function restoreModeForSession(
@@ -186,6 +188,4 @@ export async function restoreModeForSession(
       }
     }
   }
-
-  setupEditor(ctx);
 }

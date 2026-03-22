@@ -1,4 +1,4 @@
-import type { Theme } from "@mariozechner/pi-coding-agent";
+import type { ModeColor } from "../../packages/events";
 import { getModeToolOverride } from "./config";
 
 export type ToolAccess = "enabled" | "disabled" | "confirm";
@@ -18,7 +18,7 @@ export interface ModeToolPolicy {
 export interface ModeDefinition {
   name: string;
   label: string;
-  labelColor: (text: string, theme?: Theme) => string;
+  labelColor: ModeColor;
   toolPolicy: ModeToolPolicy;
   provider?: string;
   model?: string;
@@ -94,9 +94,8 @@ const RESEARCH_INSTRUCTIONS = [
 export const MODES: Record<string, ModeDefinition> = {
   default: {
     name: "default",
-    label: "",
-    labelColor: (text: string, theme?: Theme) =>
-      theme ? theme.fg("thinkingMinimal", text) : text,
+    label: "default",
+    labelColor: { source: "theme", color: "thinkingMinimal" },
     toolPolicy: {
       nativeDefault: { access: "disabled" },
       extensionDefault: { access: "enabled" },
@@ -112,8 +111,7 @@ export const MODES: Record<string, ModeDefinition> = {
   research: {
     name: "research",
     label: "research",
-    labelColor: (text: string, theme?: Theme) =>
-      theme ? theme.fg("accent", text) : `\u001b[36m${text}\u001b[0m`,
+    labelColor: { source: "theme", color: "accent" },
     toolPolicy: {
       nativeDefault: { access: "disabled" },
       extensionDefault: { access: "confirm", allowSession: true },

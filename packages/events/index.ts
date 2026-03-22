@@ -28,3 +28,44 @@ export const AD_PROVIDERS_CODEX_VERBOSITY_CHANGED_EVENT =
 export type AdProvidersCodexVerbosityChangedEvent = {
   verbosity?: "low" | "medium" | "high";
 };
+
+export const AD_MODES_READY_EVENT = "ad:modes:ready";
+
+export type ModeColor =
+  | { source: "theme"; color: string }
+  | { source: "raw"; color: string };
+
+export type BorderSlot =
+  | "top-start"
+  | "top-end"
+  | "bottom-start"
+  | "bottom-end";
+
+export type BorderBand = "top" | "bottom";
+
+export type EditorBorderWrite =
+  | {
+      kind: "slot";
+      slot: BorderSlot;
+      text: string;
+      color?: ModeColor;
+    }
+  | {
+      kind: "band";
+      band: BorderBand;
+      color: ModeColor;
+    };
+
+export type AdEditorBorderDecorationChangedEvent = {
+  source: string;
+  writes: EditorBorderWrite[];
+};
+
+export type AdEditorDraftChangedEvent = {
+  text: string;
+};
+
+export const AD_EDITOR_BORDER_DECORATION_CHANGED_EVENT =
+  "ad:editor:border-decoration:changed";
+export const AD_EDITOR_READY_EVENT = "ad:editor:ready";
+export const AD_EDITOR_DRAFT_CHANGED_EVENT = "ad:editor:draft:changed";

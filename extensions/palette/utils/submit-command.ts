@@ -1,6 +1,6 @@
 import type { ExtensionContext } from "@mariozechner/pi-coding-agent";
 import { CustomEditor } from "@mariozechner/pi-coding-agent";
-import { setupEditor as setupModesEditor } from "../../modes/lib/mode-lifecycle";
+import { restoreDefaultEditor } from "../../editor/hooks/editor";
 
 class SubmitBridgeEditor extends CustomEditor {}
 
@@ -9,7 +9,7 @@ class SubmitBridgeEditor extends CustomEditor {}
  *
  * This preserves the current editor draft, temporarily installs a custom
  * editor so we can access the wired onSubmit handler, submits the command,
- * then restores the modes editor and puts the draft back into the active
+ * then restores the default editor and puts the draft back into the active
  * editor (which may now belong to a newly-created session).
  */
 export async function submitSlashCommandViaEditor(
@@ -43,8 +43,7 @@ export async function submitSlashCommandViaEditor(
 
     await Promise.resolve(editor.onSubmit(commandText));
   } finally {
-    ctx.ui.setEditorComponent(undefined);
-    setupModesEditor(ctx);
+    restoreDefaultEditor(ctx);
     ctx.ui.setEditorText(draft);
   }
 }
