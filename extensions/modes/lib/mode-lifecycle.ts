@@ -56,6 +56,12 @@ export async function applyMode(
 
   const previousModeName = getCurrentMode().name;
   if (previousModeName === modeName) {
+    // Re-apply active tools even when mode is unchanged.
+    // On startup/restore we can already be in `default`, and returning early
+    // without this leaves previously active tools (e.g. custom `find`) enabled.
+    clearSessionAllowedTools();
+    const allToolNames = pi.getAllTools().map((tool) => tool.name);
+    pi.setActiveTools(computeActiveTools(modeName, allToolNames));
     return;
   }
 
