@@ -46,7 +46,7 @@ This repo uses conventional commits with scopes. Every commit must match:
 ```
 
 Common types: `feat`, `fix`, `chore`, `perf`, `refactor`, `docs`, `test`.
-Scopes match directory names: `scout`, `guardrails`, `scripts`, `breadcrumbs`, etc.
+Scopes match directory names: `scout`, `lookout`, `breadcrumbs`, `subagents`, `defaults`, `btw`, `glimpse`, `palette`, etc.
 
 If commits don't follow this format, amend them (keep original author, set yourself as committer).
 
@@ -57,9 +57,10 @@ Run locally before merging:
 ```bash
 pnpm typecheck
 pnpm lint
+pnpm test
 ```
 
-Both must pass.
+All checks must pass.
 
 ### 5. Merge
 

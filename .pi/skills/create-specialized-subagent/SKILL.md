@@ -14,7 +14,6 @@ Subagents are autonomous agents with their own tools, system prompt, and model. 
 ```
 extensions/subagents/subagents/<name>/
 ├── index.ts          # Main tool definition (createXxxTool, executeXxx, XXX_GUIDANCE)
-├── config.ts         # Model config, provider constants
 ├── system-prompt.ts  # System prompt string
 ├── types.ts          # XxxInput, XxxDetails interfaces
 ├── tool-formatter.ts # formatXxxToolCall() for display
@@ -22,6 +21,8 @@ extensions/subagents/subagents/<name>/
     ├── index.ts      # createXxxTools() aggregator
     └── <tool>.ts     # Individual tool definitions
 ```
+
+Note: Subagents do not use a separate `config.ts` file. Model configuration is handled in `index.ts` or imported from shared configuration.
 
 ## Files Overview
 

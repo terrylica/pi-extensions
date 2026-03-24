@@ -21,7 +21,7 @@ To install selectively, or disable specific extensions, edit your `settings.json
     {
       "source": "git:github.com/aliou/pi-harness",
       "extensions": [
-        "extensions/editor/index.ts",
+        "extensions/btw/index.ts",
         "extensions/defaults/index.ts",
         "extensions/providers/index.ts",
         "!extensions/the-dumb-zone/index.ts"
@@ -31,9 +31,12 @@ To install selectively, or disable specific extensions, edit your `settings.json
 }
 ```
 
+Extension paths should match the directory names in `extensions/` exactly.
+
 ## Integrations
 
-This repo also includes two integrations:
+This repo also includes integrations:
 
-- [Neovim](integrations/neovim/README.md) - Neovim integration for Pi.
 - [Chrome](integrations/chrome/README.md) - Chrome extension and native host bridge for browser automation and sidepanel chat.
+- [Linear](integrations/linear/README.md) - Hono HTTP server bridging Linear Agent Sessions to Pi SDK sessions.
+- [Neovim](integrations/neovim/README.md) - Neovim integration for Pi.
