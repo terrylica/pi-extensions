@@ -7,7 +7,7 @@
     ]
   },
   "peerDependencies": {
-    "@mariozechner/pi-coding-agent": "0.61.0"
+    "@mariozechner/pi-coding-agent": "0.62.0"
   },
   "peerDependenciesMeta": {
     "@mariozechner/pi-coding-agent": {
