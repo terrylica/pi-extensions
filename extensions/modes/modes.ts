@@ -105,7 +105,9 @@ export const MODES: Record<string, ModeDefinition> = {
         edit: { access: "enabled" },
         write: { access: "enabled" },
       },
-      extension: {},
+      extension: {
+        switch_mode: { access: "enabled" },
+      },
     },
   },
   research: {
@@ -127,6 +129,7 @@ export const MODES: Record<string, ModeDefinition> = {
       extension: {
         worker: { access: "disabled" },
         process: { access: "disabled" },
+        switch_mode: { access: "enabled" },
       },
     },
     provider: "anthropic",

@@ -7,7 +7,7 @@ Hardcoded mode system for Pi with tool policy, model switching, and per-branch r
 - `default`
   - Native built-ins enabled: `read`, `bash`, `edit`, `write`
   - Native built-ins disabled by default: `grep`, `find`, `ls`
-  - All extension tools enabled
+  - All extension tools enabled, including `switch_mode`
   - No provider/model override
 
 - `research`
@@ -16,12 +16,14 @@ Hardcoded mode system for Pi with tool policy, model switching, and per-branch r
   - Native `bash` requires explicit approval for every call
   - Extension tools require confirmation by default (can allow for session)
   - Side-effecting extension tools blocked by policy: `worker`, `process`
+  - `switch_mode` tool always enabled (self-confirmed inside tool execution)
   - Provider/model: `anthropic / claude-opus-4-6`
 
 ## Controls
 
 - `/mode` opens selector
 - `/mode <default|research>` switches directly
+- `switch_mode` tool switches between modes with explicit in-tool confirmation
 - `Ctrl+U` cycles modes
 - `--agent-mode <default|research>` sets startup mode
 

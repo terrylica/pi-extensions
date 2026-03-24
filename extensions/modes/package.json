@@ -8,13 +8,17 @@
   },
   "peerDependencies": {
     "@mariozechner/pi-coding-agent": "0.62.0",
-    "@mariozechner/pi-tui": "0.62.0"
+    "@mariozechner/pi-tui": "0.62.0",
+    "@sinclair/typebox": "^0.34.41"
   },
   "peerDependenciesMeta": {
     "@mariozechner/pi-coding-agent": {
       "optional": true
     },
     "@mariozechner/pi-tui": {
+      "optional": true
+    },
+    "@sinclair/typebox": {
       "optional": true
     }
   }

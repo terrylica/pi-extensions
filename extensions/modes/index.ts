@@ -15,6 +15,7 @@ import {
 import { applyMode } from "./lib/mode-lifecycle";
 import { registerModeSwitchRenderer } from "./lib/mode-switch";
 import { getCurrentMode } from "./state";
+import { setupSwitchModeTool } from "./tools/switch-mode";
 
 export default async function (pi: ExtensionAPI): Promise<void> {
   await configLoader.load();
@@ -57,6 +58,7 @@ export default async function (pi: ExtensionAPI): Promise<void> {
   });
 
   registerModeControls(pi, applyMode);
+  setupSwitchModeTool(pi, applyMode);
   registerModeSwitchRenderer(pi);
 
   emitCurrentMode();
