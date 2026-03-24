@@ -32,6 +32,33 @@ function isOpenAICodexProvider(ctx: ExtensionContext): boolean {
   return ctx.model?.provider === "openai-codex";
 }
 
+// Source: OpenAI Priority docs/pricing (2025/2026).
+// Keep explicit allowlist to avoid cross-provider/service-tier leaks.
+// Includes current GPT-5 line (incl. 5.4) and codex variants, plus 5.3 used in local sessions.
+const OPENAI_MODELS_WITH_PRIORITY_SERVICE_TIER = new Set([
+  "gpt-5.4",
+  "gpt-5.3",
+  "gpt-5.4-codex",
+  "gpt-5.3-codex",
+]);
+
+function isSupportedPriorityModel(model: string): boolean {
+  if (OPENAI_MODELS_WITH_PRIORITY_SERVICE_TIER.has(model)) return true;
+
+  // Allow dated snapshots for the same base IDs.
+  for (const base of OPENAI_MODELS_WITH_PRIORITY_SERVICE_TIER) {
+    if (model.startsWith(`${base}-`)) return true;
+  }
+
+  return false;
+}
+
+function isPayloadTargetingSupportedPriorityModel(payload: unknown): boolean {
+  if (!isRecord(payload)) return false;
+  const model = payload.model;
+  return typeof model === "string" && isSupportedPriorityModel(model);
+}
+
 function emitFastModeState(pi: ExtensionAPI, ctx: ExtensionContext): void {
   pi.events.emit(CODEX_FAST_MODE_CHANGED_EVENT, {
     enabled: isOpenAICodexProvider(ctx) ? fastModeEnabled : false,
@@ -151,11 +178,18 @@ export function setupCodexFastModeHooks(pi: ExtensionAPI): void {
   });
 
   pi.on("before_provider_request", (event, ctx) => {
-    if (
-      !fastModeEnabled ||
-      !isOpenAICodexProvider(ctx) ||
-      !isRecord(event.payload)
-    ) {
+    if (!fastModeEnabled || !isRecord(event.payload)) {
+      return;
+    }
+
+    // Guard on the actual serialized payload model first.
+    // ctx.model can be temporarily stale around model/provider transitions.
+    if (!isPayloadTargetingSupportedPriorityModel(event.payload)) {
+      return;
+    }
+
+    // Keep legacy provider check as a second safety gate.
+    if (!isOpenAICodexProvider(ctx)) {
       return;
     }
 

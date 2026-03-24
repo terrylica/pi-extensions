@@ -7,7 +7,7 @@ Rate limiting alerts, usage widgets, and dashboards for AI providers.
 - **Rate Limit Warnings**: Smart, time-aware alerts when approaching limits
 - **Usage Bar**: Compact widget showing current provider usage
 - **Usage Dashboard**: Interactive `/providers:usage` command for current provider rate limits
-- **Codex Fast Mode**: Session-local toggle for OpenAI Codex priority service tier, available from the palette
+- **Codex Fast Mode**: Session-local toggle for OpenAI Codex priority service tier, available from the palette (explicit allowlist of OpenAI priority-compatible GPT-5/Codex families, including `gpt-5.4` and dated snapshots)
 - **Codex Verbosity**: Conversation-local OpenAI Codex `text.verbosity` override from the palette, shown in the footer as `🔈`, `🔉`, or `🔊`
 
 ## Commands

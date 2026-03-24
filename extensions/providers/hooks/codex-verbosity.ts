@@ -30,6 +30,34 @@ function isOpenAICodexProvider(ctx: ExtensionContext): boolean {
   return ctx.model?.provider === "openai-codex";
 }
 
+// Source: OpenAI Priority docs/pricing (2025/2026).
+// Keep explicit allowlist to avoid cross-provider payload mutation.
+const OPENAI_CODEX_COMPAT_MODELS = new Set([
+  "gpt-5.4",
+  "gpt-5.3",
+  "gpt-5.4-codex",
+  "gpt-5.3-codex",
+]);
+
+function isSupportedCodexCompatModel(model: string): boolean {
+  if (OPENAI_CODEX_COMPAT_MODELS.has(model)) return true;
+
+  // Allow dated snapshots for the same base IDs.
+  for (const base of OPENAI_CODEX_COMPAT_MODELS) {
+    if (model.startsWith(`${base}-`)) return true;
+  }
+
+  return false;
+}
+
+function isPayloadTargetingSupportedCodexCompatModel(
+  payload: unknown,
+): boolean {
+  if (!isRecord(payload)) return false;
+  const model = payload.model;
+  return typeof model === "string" && isSupportedCodexCompatModel(model);
+}
+
 function emitCodexVerbosityState(pi: ExtensionAPI): void {
   const payload: AdProvidersCodexVerbosityChangedEvent = {
     verbosity: codexVerbosity,
@@ -176,11 +204,16 @@ export function setupCodexVerbosityHooks(pi: ExtensionAPI): void {
   });
 
   pi.on("before_provider_request", (event, ctx) => {
-    if (
-      !codexVerbosity ||
-      !isOpenAICodexProvider(ctx) ||
-      !isRecord(event.payload)
-    ) {
+    if (!codexVerbosity || !isRecord(event.payload)) {
+      return;
+    }
+
+    // Guard on actual payload model first to avoid cross-provider leaks.
+    if (!isPayloadTargetingSupportedCodexCompatModel(event.payload)) {
+      return;
+    }
+
+    if (!isOpenAICodexProvider(ctx)) {
       return;
     }
 
