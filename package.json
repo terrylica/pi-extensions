@@ -26,7 +26,7 @@
   },
   "dependencies": {
     "@aliou/pi-linkup": "^0.7.1",
-    "@aliou/pi-utils-settings": "^0.10.3",
+    "@aliou/pi-utils-settings": "^0.11.2",
     "@aliou/pi-utils-ui": "^0.1.4",
     "@aliou/sesame": "^0.4.0",
     "@aliou/sh": "^0.1.0",
