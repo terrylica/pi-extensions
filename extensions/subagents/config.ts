@@ -162,7 +162,7 @@ const DEFAULT_CONFIG: ResolvedSubagentsConfig = {
     reviewer: {
       candidates: [
         { provider: "anthropic", model: "claude-sonnet-4-6" },
-        { provider: "mistral", model: "mistral-large-2512" },
+        { provider: "openai-codex", model: "gpt-5.3-codex" },
       ],
       enabled: true,
     },
@@ -170,15 +170,13 @@ const DEFAULT_CONFIG: ResolvedSubagentsConfig = {
       candidates: [
         { provider: "zai", model: "glm-4.5-air" },
         { provider: "zai", model: "glm-4.7-flash" },
-        { provider: "mistral", model: "ministral-3b-2512" },
       ],
       enabled: true,
     },
     worker: {
       candidates: [
         { provider: "anthropic", model: "claude-sonnet-4-6" },
-        // { provider: "synthetic", model: "hf:MiniMaxAI/MiniMax-M2.5" },
-        { provider: "mistral", model: "devstral-2512" },
+        { provider: "synthetic", model: "hf:moonshotai/Kimi-K2.5" },
         { provider: "zai", model: "glm-5" },
       ],
       enabled: true,
