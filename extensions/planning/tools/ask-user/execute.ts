@@ -589,19 +589,35 @@ function updateAutocomplete(
   selectListTheme: SelectListTheme,
   setAutocompleteList: (list: SelectList | null) => void,
   setAutocompletePrefix: (prefix: string) => void,
+  tui: { requestRender: () => void },
 ): void {
-  const suggestions = autocompleteProvider.getSuggestions(
-    state.otherLines,
-    state.otherCursorLine,
-    state.otherCursorCol,
-  );
-  if (suggestions !== null && suggestions.items.length > 0) {
-    setAutocompleteList(new SelectList(suggestions.items, 6, selectListTheme));
-    setAutocompletePrefix(suggestions.prefix);
-  } else {
-    setAutocompleteList(null);
-    setAutocompletePrefix("");
-  }
+  const controller = new AbortController();
+  void autocompleteProvider
+    .getSuggestions(
+      state.otherLines,
+      state.otherCursorLine,
+      state.otherCursorCol,
+      {
+        signal: controller.signal,
+      },
+    )
+    .then((suggestions) => {
+      if (suggestions !== null && suggestions.items.length > 0) {
+        setAutocompleteList(
+          new SelectList(suggestions.items, 6, selectListTheme),
+        );
+        setAutocompletePrefix(suggestions.prefix);
+      } else {
+        setAutocompleteList(null);
+        setAutocompletePrefix("");
+      }
+      tui.requestRender();
+    })
+    .catch(() => {
+      setAutocompleteList(null);
+      setAutocompletePrefix("");
+      tui.requestRender();
+    });
 }
 
 function handleQuestionInput(
@@ -1007,34 +1023,47 @@ function handleOtherInput(
   // Tab (no autocomplete active): force file completion at cursor.
   // Mirrors the editor's forceFileAutocomplete: if exactly one match, apply immediately.
   if (matchesKey(data, Key.tab)) {
-    const forced = autocompleteProvider.getForceFileSuggestions(
-      state.otherLines,
-      state.otherCursorLine,
-      state.otherCursorCol,
-    );
-    if (forced !== null && forced.items.length > 0) {
-      if (forced.items.length === 1) {
-        // Single match: apply immediately and close
-        const result = autocompleteProvider.applyCompletion(
-          state.otherLines,
-          state.otherCursorLine,
-          state.otherCursorCol,
-          // biome-ignore lint/style/noNonNullAssertion: length checked above
-          forced.items[0]!,
-          forced.prefix,
-        );
-        state.otherLines = result.lines;
-        state.otherCursorLine = result.cursorLine;
-        state.otherCursorCol = result.cursorCol;
-        setAutocompleteList(null);
-        setAutocompletePrefix("");
-      } else {
-        // Multiple matches: open list
-        setAutocompleteList(new SelectList(forced.items, 6, selectListTheme));
-        setAutocompletePrefix(forced.prefix);
-      }
-    }
-    tui.requestRender();
+    const controller = new AbortController();
+    void autocompleteProvider
+      .getSuggestions(
+        state.otherLines,
+        state.otherCursorLine,
+        state.otherCursorCol,
+        {
+          signal: controller.signal,
+          force: true,
+        },
+      )
+      .then((forced) => {
+        if (forced !== null && forced.items.length > 0) {
+          if (forced.items.length === 1) {
+            // Single match: apply immediately and close
+            const result = autocompleteProvider.applyCompletion(
+              state.otherLines,
+              state.otherCursorLine,
+              state.otherCursorCol,
+              // biome-ignore lint/style/noNonNullAssertion: length checked above
+              forced.items[0]!,
+              forced.prefix,
+            );
+            state.otherLines = result.lines;
+            state.otherCursorLine = result.cursorLine;
+            state.otherCursorCol = result.cursorCol;
+            setAutocompleteList(null);
+            setAutocompletePrefix("");
+          } else {
+            // Multiple matches: open list
+            setAutocompleteList(
+              new SelectList(forced.items, 6, selectListTheme),
+            );
+            setAutocompletePrefix(forced.prefix);
+          }
+        }
+        tui.requestRender();
+      })
+      .catch(() => {
+        tui.requestRender();
+      });
     return;
   }
 
@@ -1064,7 +1093,9 @@ function handleOtherInput(
         selectListTheme,
         setAutocompleteList,
         setAutocompletePrefix,
+        tui,
       );
+      return;
     }
     tui.requestRender();
     return;
