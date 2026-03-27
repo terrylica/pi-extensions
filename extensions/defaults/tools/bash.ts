@@ -2,6 +2,7 @@ import { homedir as getHomedir } from "node:os";
 import { resolve } from "node:path";
 import type {
   AgentToolResult,
+  BashSpawnContext,
   ExtensionAPI,
   Theme,
   ToolRenderResultOptions,
@@ -19,6 +20,18 @@ import { Type } from "@sinclair/typebox";
 /** Lines to show when collapsed. Matches the native bash tool. */
 const BASH_PREVIEW_LINES = 5;
 
+const AD_BASH_SPAWN_HOOK_REQUEST_EVENT = "ad:bash:spawn-hook:request";
+
+type SpawnHookContributor = {
+  id: string;
+  priority?: number;
+  spawnHook: (ctx: BashSpawnContext) => BashSpawnContext;
+};
+
+type SpawnHookRequestPayload = {
+  register: (contributor: SpawnHookContributor) => void;
+};
+
 const homedir = getHomedir();
 /**
  * Override the built-in bash tool to add a cwd parameter.
@@ -30,6 +43,24 @@ const homedir = getHomedir();
 export function setupBashTool(pi: ExtensionAPI): void {
   const cwd = process.cwd();
   const nativeBash = createBashTool(cwd);
+
+  const contributors = new Map<string, SpawnHookContributor>();
+  const getContributors = () =>
+    Array.from(contributors.values()).sort(
+      (a, b) => (a.priority ?? 100) - (b.priority ?? 100),
+    );
+
+  const registerContributor = (contributor: SpawnHookContributor) => {
+    contributors.set(contributor.id, contributor);
+  };
+
+  const composedSpawnHook = (ctx: BashSpawnContext): BashSpawnContext => {
+    let next = ctx;
+    for (const contributor of getContributors()) {
+      next = contributor.spawnHook(next);
+    }
+    return next;
+  };
 
   const schema = Type.Object({
     command: Type.String({ description: "Bash command to execute" }),
@@ -171,7 +202,9 @@ export function setupBashTool(pi: ExtensionAPI): void {
     },
     async execute(toolCallId, params, signal, onUpdate, ctx) {
       const effectiveCwd = params.cwd ? resolve(ctx.cwd, params.cwd) : ctx.cwd;
-      const bashForCwd = createBashTool(effectiveCwd);
+      const bashForCwd = createBashTool(effectiveCwd, {
+        spawnHook: composedSpawnHook,
+      });
       const start = Date.now();
       const result = await bashForCwd.execute(
         toolCallId,
@@ -185,6 +218,11 @@ export function setupBashTool(pi: ExtensionAPI): void {
       return result;
     },
   });
+
+  // Request hook contributors from other extensions.
+  pi.events.emit(AD_BASH_SPAWN_HOOK_REQUEST_EVENT, {
+    register: registerContributor,
+  } satisfies SpawnHookRequestPayload);
 }
 
 const ESC = "\u001B";
