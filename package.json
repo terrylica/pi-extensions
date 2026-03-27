@@ -16,8 +16,6 @@
     ]
   },
   "scripts": {
-    "chrome:dev": "pnpm --dir integrations/chrome run dev",
-    "chrome:build": "pnpm --dir integrations/chrome run build",
     "lint": "biome check .",
     "format": "biome check --write .",
     "typecheck": "tsc --build",

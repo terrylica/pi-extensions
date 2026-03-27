@@ -42,4 +42,4 @@ This extension currently registers these direct tools: `scout`, `lookout`, `orac
 
 ## Creating New Subagents
 
-See the `create-specialized-subagent` skill and `subagents/scout/` for reference.
+See the `create-specialized-subagent` skill and `extensions/subagents/subagents/scout/` for reference.

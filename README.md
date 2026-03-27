@@ -33,10 +33,6 @@ To install selectively, or disable specific extensions, edit your `settings.json
 
 Extension paths should match the directory names in `extensions/` exactly.
 
-## Integrations
+## Scope
 
-This repo also includes integrations:
-
-- [Chrome](integrations/chrome/README.md) - Chrome extension and native host bridge for browser automation and sidepanel chat.
-- [Linear](integrations/linear/README.md) - Hono HTTP server bridging Linear Agent Sessions to Pi SDK sessions.
-- [Neovim](integrations/neovim/README.md) - Neovim integration for Pi.
+This repo contains my Pi harness extensions, shared package code, and test utilities.
