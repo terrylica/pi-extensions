@@ -49,6 +49,9 @@ Sends OS-level terminal notifications directly (OSC) with optional macOS sounds.
   - event payload shape: `{ command, description, pattern, toolName?, toolCallId? }`
   - `toolName`/`toolCallId` let title attention map to the exact triggering tool call
   - other extensions can emit this same event to reuse the same attention sound path
+- Includes an event compatibility bridge for external extension events
+  - currently maps `guardrails:dangerous` -> `ad:notify:dangerous`
+  - add future mappings in `extensions/defaults/hooks/event-compat.ts`
 
 ### Terminal title
 
