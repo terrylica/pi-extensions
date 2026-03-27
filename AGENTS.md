@@ -16,7 +16,6 @@ All packages in this repository use the `@aliou` scope where applicable, not `@a
 - `breadcrumbs` - Session history tools. Search past sessions, extract information, and hand off context to new sessions.
 - `btw` - Owns the custom editor component and event-driven border decorations.
 - `defaults` - Personal sensible defaults and quality-of-life improvements.
-- `glimpse` - Native macOS window tools for displaying HTML content, code diffs, and markdown.
 - `modes` - Hardcoded execution modes with tool gating, model defaults, and branch-aware restore.
 - `palette` - Command palette with keyboard-driven UI for running commands and shortcuts.
 - `planning` - Turn conversations into implementation plans and manage saved plans.

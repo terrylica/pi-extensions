@@ -32,7 +32,6 @@
     "@aliou/sh": "^0.1.0",
     "better-sqlite3": "^12.6.2",
     "diff": ">=8.0.0",
-    "glimpseui": "^0.5.1",
     "xxhash-wasm": "^1.1.0",
     "yaml": "^2.8.2"
   },
@@ -59,8 +58,7 @@
     },
     "onlyBuiltDependencies": [
       "@aliou/sh",
-      "better-sqlite3",
-      "glimpseui"
+      "better-sqlite3"
     ]
   },
   "packageManager": "pnpm@10.26.1"
