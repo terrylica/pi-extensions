@@ -17,9 +17,7 @@ import {
  * Walks backward through entries, finds the last "message" entry
  * with role "assistant", and returns its text content.
  */
-function getLastAssistantMessage(
-  entries: SessionEntry[],
-): { role: string; text: string } | undefined {
+function getLastAssistantMessage(entries: SessionEntry[]): string | undefined {
   for (let i = entries.length - 1; i >= 0; i--) {
     const entry = entries[i];
     if (entry?.type !== "message") continue;
@@ -29,7 +27,7 @@ function getLastAssistantMessage(
 
     const text = messageContentToText(msg.content).trim();
     if (text) {
-      return { role: msg.role, text };
+      return text;
     }
   }
   return undefined;
@@ -37,24 +35,21 @@ function getLastAssistantMessage(
 
 function buildSpawnSourceContent(params: {
   parentSessionId: string;
-  parentLastMessage?: { role: string; text: string };
+  parentLastMessage?: string;
 }): string {
   const { parentSessionId, parentLastMessage } = params;
-  let sourceContent = `Session spawned from ${parentSessionId}. Use \`read_session\` to access the parent session context:
-
-read_session({ sessionId: "${parentSessionId}", goal: "Get the last assistant message with context" })`;
 
   if (parentLastMessage) {
-    sourceContent += `
+    return `Session spawned from ${parentSessionId}.
 
 ## Last message in parent session
 
-Role: ${parentLastMessage.role}
-
-${parentLastMessage.text}`;
+${parentLastMessage}`;
   }
 
-  return sourceContent;
+  return `Session spawned from ${parentSessionId}. Use \`read_session\` to access the parent session context:
+
+read_session({ sessionId: "${parentSessionId}", goal: "Get the last assistant message with context" })`;
 }
 
 export function setupSpawnCommand(pi: ExtensionAPI) {
