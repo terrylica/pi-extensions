@@ -20,7 +20,9 @@
     "format": "biome check --write .",
     "typecheck": "tsc --build",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "build:native": "./scripts/build-native-tools.sh",
+    "postinstall": "./scripts/build-native-tools.sh"
   },
   "dependencies": {
     "@aliou/pi-linkup": "^0.7.1",

@@ -5,7 +5,8 @@
  * Uses terminal OSC sequences and optional macOS sounds.
  */
 
-import { exec } from "node:child_process";
+import { existsSync } from "node:fs";
+import { fileURLToPath } from "node:url";
 import type { ToolResultMessage } from "@mariozechner/pi-ai";
 import type {
   ExtensionAPI,
@@ -18,6 +19,11 @@ import {
   AD_NOTIFY_DONE_EVENT,
   AD_TERMINAL_TITLE_ATTENTION_EVENT,
 } from "../../../packages/events";
+
+// Path to the native binary (resolved relative to this file)
+const PLAY_ALERT_SOUND_BINARY = fileURLToPath(
+  new URL("../../../bin/play-alert-sound", import.meta.url),
+);
 
 // const DEFAULT_SOUND = "/System/Library/Sounds/Blow.aiff";
 const DEFAULT_SOUND = "/System/Library/Sounds/Funk.aiff";
@@ -122,22 +128,32 @@ function sendSystemNotification(message: string): void {
 }
 
 /**
- * Play notification sound (macOS only)
+ * Play notification sound (macOS only).
+ * Uses the play-alert-sound binary which respects system alert volume.
  */
-function playSound(soundPath: string): void {
+async function playSound(pi: ExtensionAPI, soundPath: string): Promise<void> {
   if (process.platform !== "darwin") return;
+  if (!existsSync(PLAY_ALERT_SOUND_BINARY)) return;
 
   try {
-    exec(`afplay "${soundPath}"`);
+    const result = await pi.exec(PLAY_ALERT_SOUND_BINARY, [soundPath]);
+    if (result.code !== 0) {
+      // Sound failed to play, but this is non-critical
+    }
   } catch {
     // Ignore sound playback errors
   }
 }
 
-function notify(ctx: ExtensionContext, message: string, sound?: string): void {
+async function notify(
+  pi: ExtensionAPI,
+  ctx: ExtensionContext,
+  message: string,
+  sound?: string,
+): Promise<void> {
   if (!shouldUseTerminalEffects(ctx)) return;
   sendSystemNotification(message);
-  if (sound) playSound(sound);
+  if (sound) await playSound(pi, sound);
 }
 
 function emitAttentionTitleEvent(
@@ -155,38 +171,39 @@ function emitAttentionTitleEvent(
   pi.events.emit(AD_TERMINAL_TITLE_ATTENTION_EVENT, payload);
 }
 
-function handleDangerousLikeEvent(
+async function handleDangerousLikeEvent(
   pi: ExtensionAPI,
   lastCtx: ExtensionContext | undefined,
   data: unknown,
-): void {
+): Promise<void> {
   if (!lastCtx) return;
   const event = data as DangerousEvent;
   const message = `Dangerous command detected: ${event.description}`;
   emitAttentionTitleEvent(pi, "start", event.toolCallId, event.toolName);
-  notify(lastCtx, message, ATTENTION_SOUND);
+  await notify(pi, lastCtx, message, ATTENTION_SOUND);
 }
 
-function handleAttentionEvent(
+async function handleAttentionEvent(
   pi: ExtensionAPI,
   lastCtx: ExtensionContext | undefined,
   data: unknown,
-): void {
+): Promise<void> {
   if (!lastCtx) return;
   const event = data as AttentionEvent;
   const message = event.description ?? event.reason ?? "Waiting for user input";
   emitAttentionTitleEvent(pi, "start", event.toolCallId, event.toolName);
-  notify(lastCtx, message, ATTENTION_SOUND);
+  await notify(pi, lastCtx, message, ATTENTION_SOUND);
 }
 
-function handleDoneEvent(
+async function handleDoneEvent(
+  pi: ExtensionAPI,
   lastCtx: ExtensionContext | undefined,
   data: unknown,
-): void {
+): Promise<void> {
   if (!lastCtx) return;
   const event = data as DoneEvent;
   const message = event.summary ?? "done";
-  notify(lastCtx, message, DEFAULT_SOUND);
+  await notify(pi, lastCtx, message, DEFAULT_SOUND);
 }
 
 export function setupNotificationHook(pi: ExtensionAPI) {
@@ -228,7 +245,7 @@ export function setupNotificationHook(pi: ExtensionAPI) {
             event.toolName,
           );
         }
-        notify(ctx, message, notification.sound);
+        await notify(pi, ctx, message, notification.sound);
       }
     }
 
@@ -255,7 +272,7 @@ export function setupNotificationHook(pi: ExtensionAPI) {
       if (notification) {
         const message = notification.handler(result, ctx);
         if (message) {
-          notify(ctx, message, notification.sound);
+          await notify(pi, ctx, message, notification.sound);
         }
       }
     }
@@ -285,14 +302,14 @@ export function setupNotificationHook(pi: ExtensionAPI) {
   });
 
   pi.events.on(AD_NOTIFY_DANGEROUS_EVENT, (data: unknown) => {
-    handleDangerousLikeEvent(pi, lastCtx, data);
+    void handleDangerousLikeEvent(pi, lastCtx, data);
   });
 
   pi.events.on(AD_NOTIFY_ATTENTION_EVENT, (data: unknown) => {
-    handleAttentionEvent(pi, lastCtx, data);
+    void handleAttentionEvent(pi, lastCtx, data);
   });
 
   pi.events.on(AD_NOTIFY_DONE_EVENT, (data: unknown) => {
-    handleDoneEvent(lastCtx, data);
+    void handleDoneEvent(pi, lastCtx, data);
   });
 }

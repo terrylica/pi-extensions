@@ -2,6 +2,7 @@ node_modules/
 .direnv/
 dist/
 tmp/
+bin/
 *.tsbuildinfo
 .DS_Store
 .osgrep
