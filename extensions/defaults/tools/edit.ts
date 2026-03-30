@@ -210,7 +210,9 @@ function normalizeReplaceEdit(
 function getMultiReplaceModeInput(
   input: EditInput,
 ): MultiReplaceModeInput | null {
-  if (input.edits === undefined) return null;
+  // Some model/provider pipelines normalize absent optional arrays to []
+  // which should still behave like "no edits provided".
+  if (input.edits === undefined || input.edits.length === 0) return null;
   if (
     input.oldText !== undefined ||
     input.newText !== undefined
@@ -219,11 +221,6 @@ function getMultiReplaceModeInput(
   ) {
     throw new Error(
       "Edit tool input is invalid. Use either edits or single replacement mode, not both.",
-    );
-  }
-  if (input.edits.length === 0) {
-    throw new Error(
-      "Edit tool input is invalid. edits must contain at least one replacement.",
     );
   }
   return {
@@ -238,7 +235,7 @@ function getReplaceModeInput(input: EditInput): ReplaceModeInput | null {
   const oldText = input.oldText; // ?? input.old_string;
   const newText = input.newText; // ?? input.new_string;
   if (oldText === undefined && newText === undefined) return null;
-  if (input.edits !== undefined) {
+  if (input.edits !== undefined && input.edits.length > 0) {
     throw new Error(
       "Edit tool input is invalid. Use either single replacement mode or edits mode, not both.",
     );
