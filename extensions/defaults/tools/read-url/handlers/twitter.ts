@@ -1,4 +1,4 @@
-import type { HandlerData, ReadUrlHandler } from "./types";
+import type { HandlerData, HandlerImage, ReadUrlHandler } from "./types";
 
 type UnknownRecord = Record<string, unknown>;
 
@@ -6,6 +6,19 @@ interface FxTwitterApiResponse {
   code?: number;
   message?: string;
   tweet?: UnknownRecord;
+}
+
+interface RenderTwitterPayloadOptions {
+  visitedStatusIds?: Set<string>;
+  fetchPayload?: (
+    statusId: string,
+    signal: AbortSignal | undefined,
+  ) => Promise<FxTwitterApiResponse>;
+}
+
+interface RenderTwitterPayloadResult {
+  markdown: string;
+  images: HandlerImage[];
 }
 
 export function createTwitterHandler(): ReadUrlHandler {
@@ -28,11 +41,10 @@ export function createTwitterHandler(): ReadUrlHandler {
       const visitedStatusIds = new Set<string>([statusId]);
       const payload = await fetchTwitterPayload(statusId, signal);
 
-      const markdown = await renderTwitterPayloadToMarkdown(
-        payload,
-        signal,
+      const rendered = await renderTwitterPayload(payload, signal, {
         visitedStatusIds,
-      );
+        fetchPayload: fetchTwitterPayload,
+      });
 
       const articleTitle = asString(getPath(payload.tweet, "article", "title"));
       const authorName = asString(
@@ -45,7 +57,8 @@ export function createTwitterHandler(): ReadUrlHandler {
       return {
         sourceUrl: url.toString(),
         title,
-        markdown,
+        markdown: rendered.markdown,
+        images: rendered.images,
         statusCode: 200,
         statusText: "OK",
       };
@@ -57,7 +70,7 @@ function normalizeHost(hostname: string): string {
   return hostname.toLowerCase().replace(/^www\./, "");
 }
 
-function extractStatusId(url: string): string {
+export function extractStatusId(url: string): string {
   const match = url.match(/\/status\/(\d+)/);
   if (!match?.[1]) {
     throw new Error(`Could not extract status ID from URL: ${url}`);
@@ -95,18 +108,39 @@ async function fetchTwitterPayload(
   return payload;
 }
 
-async function renderTwitterPayloadToMarkdown(
+export async function renderTwitterPayload(
   payload: FxTwitterApiResponse,
   signal: AbortSignal | undefined,
-  visitedStatusIds: Set<string>,
-): Promise<string> {
+  options: RenderTwitterPayloadOptions = {},
+): Promise<RenderTwitterPayloadResult> {
   const markdown: string[] = [];
+  const images: HandlerImage[] = [];
+  const seenImages = new Set<string>();
+  const visitedStatusIds = options.visitedStatusIds ?? new Set<string>();
+  const fetchPayload = options.fetchPayload ?? fetchTwitterPayload;
 
   const push = (line = "") => {
     markdown.push(line);
   };
 
+  const addImage = (image: HandlerImage) => {
+    const normalizedUrl = normalizeImageUrl(image.sourceUrl);
+    if (!normalizedUrl || seenImages.has(normalizedUrl)) return;
+    seenImages.add(normalizedUrl);
+    images.push({ ...image, sourceUrl: normalizedUrl });
+  };
+
+  const addImages = (items: HandlerImage[]) => {
+    for (const item of items) {
+      addImage(item);
+    }
+  };
+
   const article = asRecord(getPath(payload.tweet, "article"));
+  const currentTweetId =
+    asString(getPath(payload.tweet, "id_str")) ??
+    asString(getPath(payload.tweet, "id"));
+
   if (article) {
     push(`# ${asString(article.title) ?? "Untitled"}`);
     push("");
@@ -115,8 +149,12 @@ async function renderTwitterPayloadToMarkdown(
       getPath(article, "cover_media", "media_info", "original_img_url"),
     );
     if (coverUrl) {
-      push(formatMediaLine(coverUrl, "cover image"));
-      push("");
+      addImage({
+        sourceUrl: coverUrl,
+        tweetId: currentTweetId,
+        kind: "article_cover",
+        label: "cover image",
+      });
     }
 
     const entityMap = toArray(getPath(article, "content", "entityMap"));
@@ -150,8 +188,12 @@ async function renderTwitterPayloadToMarkdown(
             getPath(media, "media_info", "original_img_url"),
           );
           if (mediaUrl) {
-            push(formatMediaLine(mediaUrl, "inline image"));
-            push("");
+            addImage({
+              sourceUrl: mediaUrl,
+              tweetId: currentTweetId,
+              kind: "article_inline",
+              label: "inline image",
+            });
           }
         } else if (entityType === "DIVIDER" && blockType === "atomic") {
           push("---");
@@ -177,17 +219,23 @@ async function renderTwitterPayloadToMarkdown(
       if (!visitedStatusIds.has(quoteStatusId)) {
         visitedStatusIds.add(quoteStatusId);
 
-        const quotePayload = await fetchTwitterPayload(quoteStatusId, signal);
-        const quoteMarkdown = await renderTwitterPayloadToMarkdown(
-          quotePayload,
-          signal,
+        const quotePayload = await fetchPayload(quoteStatusId, signal);
+        const quoteRendered = await renderTwitterPayload(quotePayload, signal, {
           visitedStatusIds,
-        );
+          fetchPayload,
+        });
 
-        if (quoteMarkdown.trim()) {
-          push(...blockquoteLines(quoteMarkdown.trimEnd()));
+        if (quoteRendered.markdown.trim()) {
+          push(...blockquoteLines(quoteRendered.markdown.trimEnd()));
           push("");
         }
+
+        addImages(
+          quoteRendered.images.map((image) => ({
+            ...image,
+            kind: "quoted_tweet_media",
+          })),
+        );
 
         const quoteUsername =
           asString(getPath(quotePayload.tweet, "author", "screen_name")) ??
@@ -208,11 +256,19 @@ async function renderTwitterPayloadToMarkdown(
     for (const item of mediaItems) {
       const mediaUrl = asString(getPath(item, "url"));
       if (!mediaUrl) continue;
-      push(formatMediaLine(mediaUrl));
+      addImage({
+        sourceUrl: mediaUrl,
+        tweetId: currentTweetId,
+        kind: "tweet_media",
+        label: "tweet image",
+      });
     }
   }
 
-  return normalizeMarkdownOutput(markdown.join("\n"));
+  return {
+    markdown: normalizeMarkdownOutput(markdown.join("\n")),
+    images,
+  };
 }
 
 type Marker = {
@@ -220,10 +276,6 @@ type Marker = {
   close: string;
   order: number;
 };
-
-function formatMediaLine(url: string, label = "media"): string {
-  return `[${label}](${url})`;
-}
 
 function normalizeMarkdownOutput(text: string): string {
   return text.replace(/\n{3,}/g, "\n\n").trim();
@@ -234,6 +286,14 @@ function normalizeHeadingText(text: string): string {
     .replace(/^\*\*(.+?)\*\*(?=\S)/, "$1 ")
     .replace(/\s{2,}/g, " ")
     .trim();
+}
+
+function normalizeImageUrl(url: string): string | null {
+  try {
+    return new URL(url).toString();
+  } catch {
+    return null;
+  }
 }
 
 function renderArticleBlock(block: unknown, entityMap: unknown[]): string {
