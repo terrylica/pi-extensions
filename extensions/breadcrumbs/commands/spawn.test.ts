@@ -103,11 +103,12 @@ describe("breadcrumbs /spawn command", () => {
     const content =
       typeof sourceEntry?.content === "string" ? sourceEntry?.content : "";
     expect(content).toContain(
-      `read_session({ sessionId: "${parentSm.getSessionId()}", goal: "Get the last assistant message with context" })`,
+      `Session spawned from ${parentSm.getSessionId()}.`,
     );
     expect(content).toContain("## Last message in parent session");
-    expect(content).toContain("Role: assistant");
     expect(content).toContain("First part\nSecond part");
+    expect(content).not.toContain("read_session(");
+    expect(content).not.toContain("Role: assistant");
 
     expect(sourceEntry?.details).toEqual({
       parentSessionId: parentSm.getSessionId(),
