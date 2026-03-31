@@ -220,9 +220,17 @@ export function setupBashTool(pi: ExtensionAPI): void {
   });
 
   // Request hook contributors from other extensions.
-  pi.events.emit(AD_BASH_SPAWN_HOOK_REQUEST_EVENT, {
-    register: registerContributor,
-  } satisfies SpawnHookRequestPayload);
+  const requestContributors = () => {
+    pi.events.emit(AD_BASH_SPAWN_HOOK_REQUEST_EVENT, {
+      register: registerContributor,
+    } satisfies SpawnHookRequestPayload);
+  };
+
+  // Fire once at setup and once on session start to avoid load-order misses.
+  requestContributors();
+  pi.on("session_start", () => {
+    requestContributors();
+  });
 }
 
 const ESC = "\u001B";
