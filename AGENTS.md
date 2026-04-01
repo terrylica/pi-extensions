@@ -21,7 +21,6 @@ All packages in this repository use the `@aliou` scope where applicable, not `@a
 - `planning` - Turn conversations into implementation plans and manage saved plans.
 - `providers` - Register custom providers and show unified rate-limit and usage dashboards.
 - `subagents` - Framework for spawning specialized subagents with custom tools, consistent UI rendering, and logging.
-- `the-dumb-zone` - Detects when an AI session is degrading and shows a warning overlay.
 
 ## Development
 
