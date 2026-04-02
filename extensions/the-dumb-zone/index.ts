@@ -1,7 +1,10 @@
 import type { ExtensionAPI } from "@mariozechner/pi-coding-agent";
 
-export default function (_pi: ExtensionAPI) {
-  console.error(
-    "[the-dumb-zone] This extension has moved to https://github.com/aliou/pi-undercooked",
-  );
+export default function (pi: ExtensionAPI) {
+  pi.on("session_start", (_evt, ctx) => {
+    ctx.ui.notify(
+      "[the-dumb-zone] This extension has moved to https://github.com/aliou/pi-undercooked",
+      "error",
+    );
+  });
 }
