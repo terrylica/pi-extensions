@@ -24,6 +24,7 @@ import {
 } from "../../../packages/events";
 import { AD_DEFAULTS_STASH_CHANGED_EVENT } from "../hooks/editor-stash";
 import { stashCount } from "../lib/editor-stash";
+import { GitStatusWatcher } from "../lib/git-status";
 import { buildModelIdLine, buildModelLine } from "../lib/model";
 import { buildPathParts } from "../lib/path-parts";
 import {
@@ -43,6 +44,7 @@ export function createCustomFooter(pi: ExtensionAPI) {
   let requestRender: (() => void) | undefined;
   let codexFastModeEnabled = false;
   let codexVerbosity: "low" | "medium" | "high" | undefined;
+  let gitStatusWatcher: GitStatusWatcher | undefined;
 
   pi.events.on(AD_PROVIDERS_CODEX_FAST_MODE_READY_EVENT, () => {
     if (!ctx) return;
@@ -92,7 +94,8 @@ export function createCustomFooter(pi: ExtensionAPI) {
       stashN > 0 ? `${theme.fg("warning", `stash:${stashN}`)} ` : "";
     const stashPartWidth = stashN > 0 ? visibleWidth(`stash:${stashN}`) + 1 : 0;
 
-    const pathData = buildPathParts(theme, branch);
+    const gitStatus = gitStatusWatcher?.getStatus();
+    const pathData = buildPathParts(theme, branch, gitStatus);
 
     const statsParts = buildStatsParts(theme, usage, contextUsage, tpsStr);
     const statsLine = statsParts.join(" ");
@@ -248,6 +251,11 @@ export function createCustomFooter(pi: ExtensionAPI) {
       ctx.ui.setFooter((tui, theme, footerData) => {
         requestRender = () => tui.requestRender?.();
 
+        gitStatusWatcher?.dispose();
+        gitStatusWatcher = new GitStatusWatcher(process.cwd(), () => {
+          requestRender?.();
+        });
+
         const unsub = footerData.onBranchChange(() => {
           requestRender?.();
         });
@@ -255,6 +263,8 @@ export function createCustomFooter(pi: ExtensionAPI) {
         return {
           dispose: () => {
             requestRender = undefined;
+            gitStatusWatcher?.dispose();
+            gitStatusWatcher = undefined;
             unsub();
           },
           invalidate() {},
