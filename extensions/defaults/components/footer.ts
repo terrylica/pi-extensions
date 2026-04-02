@@ -92,40 +92,87 @@ export function createCustomFooter(pi: ExtensionAPI) {
       stashN > 0 ? `${theme.fg("warning", `stash:${stashN}`)} ` : "";
     const stashPartWidth = stashN > 0 ? visibleWidth(`stash:${stashN}`) + 1 : 0;
 
-    const { parts, width: leftWidth } = buildPathParts(theme, branch);
+    const pathData = buildPathParts(theme, branch);
 
     const statsParts = buildStatsParts(theme, usage, contextUsage, tpsStr);
     const statsLine = statsParts.join(" ");
     const statsWidth = visibleWidth(statsLine);
-    const minPadding = 4;
+    const minPadding = 2;
 
-    const paddingWidth1 = width - stashPartWidth - leftWidth - statsWidth;
-    const padding1 =
-      paddingWidth1 > 0
-        ? theme.fg("thinkingMinimal", " ".repeat(Math.max(0, paddingWidth1)))
-        : "";
-    let line1 =
-      stashPart +
-      parts.join("") +
-      padding1 +
-      theme.fg("thinkingMinimal", statsLine);
-
-    const line1Width = visibleWidth(line1);
+    // Build line 1 with progressive degradation:
+    // 1. Full: stash + path + branch + stats
+    // 2. Drop branch
+    // 3. Truncate path
+    let line1: string;
     let useMinimal = false;
 
-    if (line1Width > width) {
-      useMinimal = true;
-      const { parts: minimalParts } = buildPathParts(theme, branch, true);
-      line1 = minimalParts.join("");
+    const buildLine1 = (
+      leftStr: string,
+      leftWidth: number,
+      rightStr: string,
+      rightWidth: number,
+    ): string => {
+      const pad = Math.max(0, width - leftWidth - rightWidth);
+      return (
+        leftStr +
+        theme.fg("thinkingMinimal", " ".repeat(pad)) +
+        theme.fg("thinkingMinimal", rightStr)
+      );
+    };
+
+    // Full left side: stash + path + branch
+    const fullLeft =
+      stashPart +
+      pathData.path +
+      (pathData.branch ? ` ${pathData.branch}` : "");
+    const fullLeftWidth = stashPartWidth + pathData.width;
+
+    if (fullLeftWidth + minPadding + statsWidth <= width) {
+      // Everything fits
+      line1 = buildLine1(fullLeft, fullLeftWidth, statsLine, statsWidth);
+    } else {
+      // Drop branch, keep path + stats
+      const noBranchLeft = stashPart + pathData.path;
+      const noBranchLeftWidth = stashPartWidth + pathData.pathWidth;
+
+      if (noBranchLeftWidth + minPadding + statsWidth <= width) {
+        line1 = buildLine1(
+          noBranchLeft,
+          noBranchLeftWidth,
+          statsLine,
+          statsWidth,
+        );
+      } else {
+        // Drop stats too, switch to minimal mode
+        useMinimal = true;
+        const minimalStatsParts = buildMinimalStatsParts(
+          theme,
+          usage,
+          contextUsage,
+        );
+        const minimalStatsLine = minimalStatsParts.join(" ");
+        const minimalStatsWidth = visibleWidth(minimalStatsLine);
+
+        const availForPath = Math.max(
+          0,
+          width - stashPartWidth - minPadding - minimalStatsWidth,
+        );
+        const truncPath = truncateToWidth(pathData.path, availForPath, "...");
+        const truncPathWidth = visibleWidth(truncPath);
+        const truncLeft = stashPart + truncPath;
+        const truncLeftWidth = stashPartWidth + truncPathWidth;
+
+        line1 = buildLine1(
+          truncLeft,
+          truncLeftWidth,
+          minimalStatsLine,
+          minimalStatsWidth,
+        );
+      }
     }
 
     let line2: string;
     if (useMinimal) {
-      const minimalStatsParts = buildMinimalStatsParts(
-        theme,
-        usage,
-        contextUsage,
-      );
       const modelIdLine = buildModelIdLine(
         theme,
         ctx.model?.id,
@@ -133,24 +180,7 @@ export function createCustomFooter(pi: ExtensionAPI) {
         codexFastModeEnabled,
         codexVerbosity,
       );
-
-      const leftWidth2 = minimalStatsParts.reduce(
-        (sum, part) => sum + visibleWidth(part),
-        0,
-      );
-      const modelIdWidth = visibleWidth(modelIdLine);
-
-      const paddingWidth2 = width - leftWidth2 - modelIdWidth;
-      const padding2 =
-        paddingWidth2 > 0
-          ? theme.fg("thinkingMinimal", " ".repeat(Math.max(0, paddingWidth2)))
-          : "";
-
-      line2 = minimalStatsParts.join("") + padding2 + modelIdLine;
-
-      if (visibleWidth(line2) > width) {
-        line2 = truncateToWidth(modelIdLine, width, "...");
-      }
+      line2 = truncateToWidth(modelIdLine, width, "...");
     } else {
       const left_parts2: string[] = [sessionName ?? ""].filter(Boolean);
       const left_parts2_colored = left_parts2.map((s) =>
