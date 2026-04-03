@@ -223,10 +223,6 @@ export function setupNotificationHook(pi: ExtensionAPI) {
     lastCtx = ctx;
   });
 
-  pi.on("session_switch", async (_event, ctx) => {
-    lastCtx = ctx;
-  });
-
   pi.on("tool_call", async (event, ctx) => {
     lastCtx = ctx;
     toolCallCount++;

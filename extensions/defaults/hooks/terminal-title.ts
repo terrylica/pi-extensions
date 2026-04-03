@@ -154,10 +154,6 @@ export function setupTerminalTitleHook(pi: ExtensionAPI) {
     updateTitle(ctx, formatTerminalTitle(ctx.cwd));
   });
 
-  pi.on("session_switch", async (_event, ctx) => {
-    updateTitle(ctx, formatTerminalTitle(ctx.cwd));
-  });
-
   pi.on("agent_start", async (_event, ctx) => {
     updateTitle(ctx, formatTerminalTitle(ctx.cwd, "thinking..."));
   });

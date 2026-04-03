@@ -6,7 +6,7 @@ This extension owns `setEditorComponent` and renders editor border decorations f
 
 ## Responsibilities
 
-- Install the custom editor component on `session_start` and `session_switch`
+- Install the custom editor component on `session_start` for startup, reload, new, resume, and fork flows
 - Emit `ad:editor:ready` when the editor instance is created
 - Emit `ad:editor:draft:changed` when draft text changes
 - Parse native scroll markers from `super.render(...)` and publish right-side indicators

@@ -95,6 +95,7 @@ export function createCommandContext(
     cwd: overrides.cwd ?? process.cwd(),
     hasUI: overrides.hasUI ?? true,
     ui,
+    signal: undefined,
     sessionManager: overrides.sessionManager ?? stubSessionManager(),
     modelRegistry:
       overrides.modelRegistry ??
@@ -140,7 +141,10 @@ type ToolContext = NonNullable<
 export function createToolContext(
   overrides: ToolContextOverrides = {},
 ): ToolContext {
-  return { cwd: overrides.cwd ?? process.cwd() } as ToolContext;
+  return {
+    cwd: overrides.cwd ?? process.cwd(),
+    signal: undefined,
+  } as ToolContext;
 }
 
 // ---------------------------------------------------------------------------

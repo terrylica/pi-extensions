@@ -22,10 +22,6 @@ export function setupSessionNameHook(pi: ExtensionAPI) {
     state.hasAutoNamed = false;
   });
 
-  pi.on("session_switch", async () => {
-    state.hasAutoNamed = false;
-  });
-
   pi.on("turn_end", async (event, ctx) => {
     if (state.hasAutoNamed) return;
 

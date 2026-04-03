@@ -8,10 +8,6 @@ export function setupFooterHook(pi: ExtensionAPI) {
     footer.setup(ctx);
   });
 
-  pi.on("session_switch", async (_event, ctx) => {
-    footer.setup(ctx);
-  });
-
   pi.on("session_shutdown", async () => {
     footer.cleanup();
   });

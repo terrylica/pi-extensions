@@ -193,12 +193,6 @@ export function setupCodexVerbosityHooks(pi: ExtensionAPI): void {
     emitCodexVerbosityState(pi);
   });
 
-  pi.on("session_switch", async () => {
-    codexVerbosity = undefined;
-    pi.events.emit(CODEX_VERBOSITY_READY_EVENT, {});
-    emitCodexVerbosityState(pi);
-  });
-
   pi.on("model_select", async () => {
     emitCodexVerbosityState(pi);
   });

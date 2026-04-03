@@ -157,11 +157,6 @@ export function setupCodexFastModeHooks(pi: ExtensionAPI): void {
     pi.events.emit(CODEX_FAST_MODE_READY_EVENT, {});
   });
 
-  pi.on("session_switch", async (_event, ctx) => {
-    fastModeEnabled = readFastModeState(ctx);
-    pi.events.emit(CODEX_FAST_MODE_READY_EVENT, {});
-  });
-
   pi.on("model_select", async (event, ctx) => {
     emitFastModeState(pi, ctx);
 

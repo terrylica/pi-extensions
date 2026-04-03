@@ -22,11 +22,8 @@ export function setupSessionSyncHooks(pi: ExtensionAPI): void {
     }
   });
 
-  pi.on("session_start", async (_event, ctx) => {
-    await restoreModeForSession(pi, ctx, true);
-  });
-
-  pi.on("session_switch", async (_event, ctx) => {
-    await restoreModeForSession(pi, ctx, false);
+  pi.on("session_start", async (event, ctx) => {
+    const reason = (event as { reason?: string }).reason;
+    await restoreModeForSession(pi, ctx, reason === "startup");
   });
 }

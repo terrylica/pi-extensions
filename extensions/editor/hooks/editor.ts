@@ -151,10 +151,6 @@ export function setupEditorHook(pi: ExtensionAPI) {
     runtime.setup(ctx);
   });
 
-  pi.on("session_switch", async (_event, ctx) => {
-    runtime.setup(ctx);
-  });
-
   pi.on("session_shutdown", async () => {
     runtime.cleanup();
   });
