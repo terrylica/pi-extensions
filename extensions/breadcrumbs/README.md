@@ -15,6 +15,17 @@ Search past Pi sessions by keyword. Returns matching sessions with metadata.
 - `before`: Filter to sessions before a date
 - `limit`: Max results (default: 10, max: 100)
 
+### `list_sessions`
+
+List recent Pi sessions for a directory.
+
+**Parameters:**
+- `cwd` (required): Directory to list sessions for
+- `limit`: Max results
+- `depth`: How many child-directory levels to include
+
+Use this when you want recent sessions for a project without keyword search.
+
 ### `read_session`
 
 Extract information from a past session using a subagent.
@@ -55,6 +66,8 @@ Create `~/.pi/agent/extensions/breadcrumbs.json`:
 
 **Options:**
 - `handoffTool` (boolean, default: `false`): Enable the `handoff` tool for agent use
+
+Config is loaded from the global scope only.
 
 ## Session Protection
 

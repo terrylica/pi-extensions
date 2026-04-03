@@ -23,8 +23,7 @@ To install selectively, or disable specific extensions, edit your `settings.json
       "extensions": [
         "extensions/btw/index.ts",
         "extensions/defaults/index.ts",
-        "extensions/providers/index.ts",
-        "!extensions/the-dumb-zone/index.ts"
+        "extensions/providers/index.ts"
       ]
     }
   ]

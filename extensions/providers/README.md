@@ -7,8 +7,8 @@ Rate limiting alerts, usage widgets, and dashboards for AI providers.
 - **Rate Limit Warnings**: Smart, time-aware alerts when approaching limits
 - **Usage Bar**: Compact widget showing current provider usage
 - **Usage Dashboard**: Interactive `/providers:usage` command for current provider rate limits
-- **Codex Fast Mode**: Session-local toggle for OpenAI Codex priority service tier, available from the palette (explicit allowlist of OpenAI priority-compatible GPT-5/Codex families, including `gpt-5.4` and dated snapshots)
-- **Codex Verbosity**: Conversation-local OpenAI Codex `text.verbosity` override from the palette, shown in the footer as `🔈`, `🔉`, or `🔊`
+- **Codex Fast Mode**: Session-local toggle for OpenAI Codex priority service tier, available from the palette
+- **Codex Verbosity**: Conversation-local OpenAI Codex `text.verbosity` override from the palette
 
 ## Commands
 
@@ -70,7 +70,7 @@ The bar shows:
 
 ## Configuration
 
-Set per-provider in memory config:
+Set per-provider config in global or memory scope:
 
 ```json
 {
@@ -89,9 +89,17 @@ Set per-provider in memory config:
 
 ## Supported Providers
 
-- **Anthropic (Claude)**: Requires `anthropic` auth in Pi
-- **OpenAI Codex**: Requires `openai-codex` auth in Pi
-- **Synthetic**: Requires `SYNTHETIC_API_KEY` environment variable
+- **Anthropic**
+- **OpenAI Codex**
+- **Synthetic**
+- **z.ai**
+
+The extension knows these provider keys internally:
+
+- `anthropic`
+- `openai-codex`
+- `synthetic`
+- `zai`
 
 ## Architecture
 
@@ -114,5 +122,5 @@ Used by both warning hooks and UI rendering for consistent behavior.
 ### Usage Bar Hook
 
 - Caches rate limits with configurable refresh interval
-- Filters Claude windows by model family (Sonnet vs Opus)
+- Filters Claude windows by model family when applicable
 - Respects per-provider widget mode

@@ -6,6 +6,7 @@ Commands for turning conversations into implementation plans and managing saved 
 
 - **Command**: `/plan:save` - creates a structured plan from the current conversation
 - **Command**: `/plan:list` - lists saved plans with options to execute or edit; archiving is available from the picker UI
+- **Tool**: `ask_user` - structured multiple-choice questions during execution
 
 ## Tools
 
@@ -22,7 +23,7 @@ Run `/plan:save` to generate a plan from the current conversation. The agent wil
 ### Managing Plans
 
 Run `/plan:list` to see all saved plans. From there you can:
-- **Execute** - Run the plan (optionally in a new session)
+- **Execute** - Run the plan
 - **Edit** - Open the plan in your `$VISUAL/$EDITOR`
 - **Archive** - Use `Ctrl+A` in the interactive picker to move the selected plan to the archive directory
 
@@ -43,3 +44,5 @@ The `archiveDir` should point to a git repository. When archiving, the extension
 4. Push to remote (silently)
 
 If any git operation fails, you'll receive a notification but the plan will still be archived locally.
+
+Config is loaded from the global scope only.
