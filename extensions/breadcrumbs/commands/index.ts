@@ -1,11 +1,9 @@
 import type { ExtensionAPI } from "@mariozechner/pi-coding-agent";
 import { copyToClipboard } from "@mariozechner/pi-coding-agent";
 import { setupContinueCommand } from "./continue";
-import { setupHandoffCommand } from "./handoff";
 import { setupSpawnCommand } from "./spawn";
 
 export function setupSessionCommands(pi: ExtensionAPI) {
-  setupHandoffCommand(pi);
   setupContinueCommand(pi);
   setupSpawnCommand(pi);
 

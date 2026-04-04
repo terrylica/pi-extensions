@@ -2,13 +2,12 @@
 
 Framework for running specialized subagents behind first-class Pi tools.
 
-This extension registers six tools:
+This extension registers five tools:
 
 - `scout`
 - `lookout`
 - `oracle`
 - `reviewer`
-- `jester`
 - `worker`
 
 Each tool delegates to a subagent with its own system prompt, model selection, optional skills, logging, and UI rendering.
@@ -121,16 +120,6 @@ Reviewer uses:
 
 It is intended for review of staged changes, commits, or scoped diffs.
 
-### Jester
-
-Creative generation subagent.
-
-Input:
-
-- `question`
-
-Jester uses no tools. It is for random, creative, or unexpected output only.
-
 ### Worker
 
 Sandboxed implementation subagent for known files.
@@ -162,7 +151,6 @@ Configured subagents:
 - `lookout`
 - `oracle`
 - `reviewer`
-- `jester`
 - `worker`
 
 The extension resolves model candidates per subagent and resets per-session selections on session start.
@@ -172,8 +160,6 @@ The extension resolves model candidates per subagent and resets per-session sele
 `scout`, `lookout`, `oracle`, `reviewer`, and `worker` accept `skills`.
 
 Skill resolution is exact-name only and uses Pi skill discovery for the current cwd. Missing skill names are reported back to the subagent call.
-
-`jester` does not accept skills.
 
 ## Logging
 

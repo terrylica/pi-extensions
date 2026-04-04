@@ -33,10 +33,6 @@ const SUBAGENT_UI: Record<
     label: "Reviewer",
     description: "Code review feedback on diffs",
   },
-  jester: {
-    label: "Jester",
-    description: "Random data generator",
-  },
   worker: {
     label: "Worker",
     description:

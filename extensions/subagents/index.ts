@@ -7,7 +7,6 @@ import {
   type SubagentName,
 } from "./config";
 import { clearSubagentModelSelections } from "./lib/subagent-model-selection";
-import { createJesterTool } from "./subagents/jester";
 import { createLookoutTool } from "./subagents/lookout";
 import { createOracleTool } from "./subagents/oracle";
 import { createReviewerTool } from "./subagents/reviewer";
@@ -22,7 +21,6 @@ import { createWorkerTool } from "./subagents/worker";
  * - lookout: Local codebase search by functionality/concept (uses osgrep)
  * - oracle: Expert AI advisor for complex reasoning and planning
  * - reviewer: Code review feedback on diffs
- * - jester: Random data generator (no tools, high variance)
  * - worker: Focused implementation agent for well-defined tasks on specific files
  *
  */
@@ -64,7 +62,6 @@ export default async function (pi: ExtensionAPI) {
   pi.registerTool(createLookoutTool());
   pi.registerTool(createOracleTool());
   pi.registerTool(createReviewerTool());
-  pi.registerTool(createJesterTool());
   pi.registerTool(createWorkerTool());
 
   // Before each agent turn: sync active tools with current config.

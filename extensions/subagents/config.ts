@@ -26,7 +26,6 @@ export const SUBAGENT_NAMES = [
   "lookout",
   "oracle",
   "reviewer",
-  "jester",
   "worker",
 ] as const;
 export type SubagentName = (typeof SUBAGENT_NAMES)[number];
@@ -163,13 +162,6 @@ const DEFAULT_CONFIG: ResolvedSubagentsConfig = {
       candidates: [
         { provider: "anthropic", model: "claude-sonnet-4-6" },
         { provider: "openai-codex", model: "gpt-5.3-codex" },
-      ],
-      enabled: true,
-    },
-    jester: {
-      candidates: [
-        { provider: "zai", model: "glm-4.5-air" },
-        { provider: "zai", model: "glm-4.7-flash" },
       ],
       enabled: true,
     },
