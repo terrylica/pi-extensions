@@ -13,7 +13,6 @@ export function toProviderKey(
   if (normalized === "anthropic") return "anthropic";
   if (normalized === "openai-codex") return "openai-codex";
   if (normalized === "synthetic") return "synthetic";
-  if (normalized === "zai" || normalized === "z-ai") return "zai";
 
   return null;
 }

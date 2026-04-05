@@ -184,8 +184,7 @@ function formatWindowCap(
 ): string | null {
   const normalized = providerId.toLowerCase();
   const isSynthetic = normalized === "synthetic";
-  const isZai = normalized === "z-ai" || normalized === "zai";
-  if (!isSynthetic && !isZai) return null;
+  if (!isSynthetic) return null;
   if (!Number.isFinite(window.limitValue ?? NaN)) return null;
   return Math.round(window.limitValue as number).toLocaleString();
 }

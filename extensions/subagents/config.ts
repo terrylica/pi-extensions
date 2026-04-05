@@ -11,7 +11,6 @@ export const SUPPORTED_PROVIDERS = [
   "openai-codex",
   "mistral",
   "synthetic",
-  "zai",
 ] as const;
 export type SupportedProvider = (typeof SUPPORTED_PROVIDERS)[number];
 
@@ -169,7 +168,7 @@ const DEFAULT_CONFIG: ResolvedSubagentsConfig = {
       candidates: [
         { provider: "anthropic", model: "claude-sonnet-4-6" },
         { provider: "synthetic", model: "hf:moonshotai/Kimi-K2.5" },
-        { provider: "zai", model: "glm-5" },
+        { provider: "synthetic", model: "hf:zai-org/GLM-5" },
       ],
       enabled: true,
     },

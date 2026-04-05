@@ -79,10 +79,9 @@ function formatWindowUsedLabel(
   const percent = Math.round(window.usedPercent);
   const normalized = (providerId ?? "").toLowerCase();
   const isSynthetic = normalized === "synthetic";
-  const isZai = normalized === "z-ai" || normalized === "zai";
   const limit = window.limitValue;
 
-  if ((isSynthetic || isZai) && Number.isFinite(limit ?? NaN)) {
+  if (isSynthetic && Number.isFinite(limit ?? NaN)) {
     return `${percent}%/${Math.round(limit as number).toLocaleString()}`;
   }
 

@@ -4,7 +4,6 @@ import type { ProviderRateLimits } from "../types";
 import { fetchClaudeRateLimits } from "./claude";
 import { fetchCodexRateLimits } from "./codex";
 import { fetchSyntheticRateLimits } from "./synthetic";
-import { fetchZaiRateLimits } from "./zai";
 
 export async function fetchProviderRateLimits(
   providerKey: ProviderKey,
@@ -18,8 +17,6 @@ export async function fetchProviderRateLimits(
       return fetchCodexRateLimits(authStorage, signal);
     case "synthetic":
       return fetchSyntheticRateLimits(signal);
-    case "zai":
-      return fetchZaiRateLimits(signal);
     default:
       return null;
   }

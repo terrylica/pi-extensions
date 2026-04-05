@@ -92,14 +92,12 @@ Set per-provider config in global or memory scope:
 - **Anthropic**
 - **OpenAI Codex**
 - **Synthetic**
-- **z.ai**
 
 The extension knows these provider keys internally:
 
 - `anthropic`
 - `openai-codex`
 - `synthetic`
-- `zai`
 
 ## Architecture
 

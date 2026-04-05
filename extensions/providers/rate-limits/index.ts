@@ -3,20 +3,18 @@ import type { ProviderRateLimits } from "../types";
 import { fetchClaudeRateLimits } from "./claude";
 import { fetchCodexRateLimits } from "./codex";
 import { fetchSyntheticRateLimits } from "./synthetic";
-import { fetchZaiRateLimits } from "./zai";
 
 export async function fetchAllProviderRateLimits(
   authStorage: AuthStorage,
   signal?: AbortSignal,
 ): Promise<ProviderRateLimits[]> {
-  const [claude, codex, synthetic, zai] = await Promise.all([
+  const [claude, codex, synthetic] = await Promise.all([
     fetchClaudeRateLimits(authStorage, signal),
     fetchCodexRateLimits(authStorage, signal),
     fetchSyntheticRateLimits(signal),
-    fetchZaiRateLimits(signal),
   ]);
 
-  return [claude, codex, synthetic, zai];
+  return [claude, codex, synthetic];
 }
 
 export type {

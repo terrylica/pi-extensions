@@ -34,20 +34,18 @@ export interface ResolvedConfig {
 
 // --- Provider keys (shared with hooks) ---
 
-export type ProviderKey = "anthropic" | "openai-codex" | "synthetic" | "zai";
+export type ProviderKey = "anthropic" | "openai-codex" | "synthetic";
 
 export const PROVIDER_KEYS: ProviderKey[] = [
   "anthropic",
   "openai-codex",
   "synthetic",
-  "zai",
 ];
 
 export const PROVIDER_DISPLAY_NAMES: Record<ProviderKey, string> = {
   anthropic: "Claude Plan",
   "openai-codex": "Codex Plan",
   synthetic: "Synthetic",
-  zai: "z.ai Plan",
 };
 
 // --- Defaults ---
