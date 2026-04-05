@@ -32,6 +32,10 @@ pnpm typecheck
 pnpm lint
 ```
 
+## Custom header
+
+The startup header (`extensions/defaults/components/header.ts`) shows a curated list of harness shortcuts and commands. When adding a new `registerShortcut` or `registerCommand`, ask the user whether it should be added to the header.
+
 ## Notes
 
 - This repo is my private Pi harness infrastructure first. Not every package here is intended to be published as a standalone package.

@@ -3,6 +3,7 @@ import { setupEditorShellIndicatorHook } from "./editor-shell-indicator";
 import { setupEditorStashHook } from "./editor-stash";
 import { setupEventCompatHook } from "./event-compat";
 import { setupFooterHook } from "./footer";
+import { setupHeaderHook } from "./header";
 import { setupNotificationHook } from "./notification";
 import { setupPaletteRegistration } from "./palette";
 import { setupSessionNameHook } from "./session-name";
@@ -14,6 +15,7 @@ export function setupHooks(pi: ExtensionAPI) {
   setupEventCompatHook(pi);
   setupNotificationHook(pi);
   setupFooterHook(pi);
+  setupHeaderHook(pi);
   setupEditorShellIndicatorHook(pi);
   setupEditorStashHook(pi);
   setupPaletteRegistration(pi);
