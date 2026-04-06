@@ -146,8 +146,15 @@ export class BorderEditor extends CustomEditor {
     }
 
     if (color.source === "raw") {
-      const prefix = color.color;
-      return (text: string) => `${prefix}${text}${RESET}`;
+      const hex = color.color;
+      if (hex.startsWith("#") && (hex.length === 7 || hex.length === 4)) {
+        const r = Number.parseInt(hex.slice(1, 3), 16);
+        const g = Number.parseInt(hex.slice(3, 5), 16);
+        const b = Number.parseInt(hex.slice(5, 7), 16);
+        const prefix = `${ESC}[38;2;${r};${g};${b}m`;
+        return (text: string) => `${prefix}${text}${RESET}`;
+      }
+      return (text: string) => `${hex}${text}${RESET}`;
     }
 
     return (text: string) =>

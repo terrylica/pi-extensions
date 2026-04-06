@@ -8,7 +8,6 @@ import {
   clearPreviousModel,
   clearSessionAllowedTools,
   getCurrentMode,
-  getPreviousModel,
   setCurrentMode,
   setPreviousModel,
 } from "../state";
@@ -67,13 +66,10 @@ export async function applyMode(
 
   let targetModelId: string | undefined;
 
-  if (previousModeName === "default" && modeName !== "default" && ctx.model) {
-    setPreviousModel(ctx.model);
-  }
+  // Save the current model so we can show it in the switch message.
+  setPreviousModel(ctx.model);
 
-  if (previousModeName !== "default" && modeName === "default") {
-    targetModelId = getPreviousModel()?.id;
-  } else if (mode.provider && mode.model) {
+  if (mode.provider && mode.model) {
     targetModelId =
       ctx.modelRegistry.find(mode.provider, mode.model)?.id ?? mode.model;
   } else {
@@ -85,6 +81,10 @@ export async function applyMode(
 
   const allToolNames = pi.getAllTools().map((tool) => tool.name);
   pi.setActiveTools(computeActiveTools(modeName, allToolNames));
+
+  if (mode.thinkingLevel) {
+    pi.setThinkingLevel(mode.thinkingLevel);
+  }
 
   if (!options?.silent) {
     pi.appendEntry("mode-state", { mode: modeName });
@@ -116,13 +116,7 @@ export async function applyMode(
     ],
   });
 
-  if (previousModeName !== "default" && modeName === "default") {
-    const savedModel = getPreviousModel();
-    if (savedModel) {
-      await pi.setModel(savedModel);
-      clearPreviousModel();
-    }
-  } else if (mode.provider && mode.model) {
+  if (mode.provider && mode.model) {
     const found = ctx.modelRegistry.find(mode.provider, mode.model);
     if (found) {
       await pi.setModel(found);
@@ -148,17 +142,11 @@ export async function restoreModeForSession(
   const from = getCurrentMode().name;
   await applyMode(pi, ctx, baseMode, { silent: true });
   if (from !== baseMode && restored) {
-    let targetModelId: string | undefined;
-    if (baseMode === DEFAULT_MODE.name) {
-      targetModelId = getPreviousModel()?.id ?? ctx.model?.id;
-    } else {
-      const mode = MODES[baseMode];
-      targetModelId =
-        mode?.provider && mode.model
-          ? (ctx.modelRegistry.find(mode.provider, mode.model)?.id ??
-            mode.model)
-          : ctx.model?.id;
-    }
+    const mode = MODES[baseMode];
+    const targetModelId =
+      mode?.provider && mode.model
+        ? (ctx.modelRegistry.find(mode.provider, mode.model)?.id ?? mode.model)
+        : ctx.model?.id;
 
     sendModeSwitchMessage(
       pi,
@@ -174,17 +162,12 @@ export async function restoreModeForSession(
       const fromFlag = getCurrentMode().name;
       await applyMode(pi, ctx, requested, { silent: true });
       if (fromFlag !== requested) {
-        let targetModelId: string | undefined;
-        if (requested === DEFAULT_MODE.name) {
-          targetModelId = getPreviousModel()?.id ?? ctx.model?.id;
-        } else {
-          const mode = MODES[requested];
-          targetModelId =
-            mode?.provider && mode.model
-              ? (ctx.modelRegistry.find(mode.provider, mode.model)?.id ??
-                mode.model)
-              : ctx.model?.id;
-        }
+        const mode = MODES[requested];
+        const targetModelId =
+          mode?.provider && mode.model
+            ? (ctx.modelRegistry.find(mode.provider, mode.model)?.id ??
+              mode.model)
+            : ctx.model?.id;
 
         sendModeSwitchMessage(
           pi,

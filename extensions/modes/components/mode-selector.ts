@@ -14,12 +14,14 @@ import {
 import { MODE_ORDER, MODES } from "../modes";
 import { getCurrentMode } from "../state";
 
-function modeDescription(name: string): string {
-  if (name === "default") {
-    return "Native baseline + all extension tools";
-  }
+const MODE_DESCRIPTIONS: Record<string, string> = {
+  balanced: "All tools, low thinking (Kimi K2.5)",
+  plan: "Read-only + research, high thinking (GPT-5.4)",
+  implement: "All tools, low thinking (Sonnet 4.6)",
+};
 
-  return "Research policy: read tools on, side effects blocked or confirmed";
+function modeDescription(name: string): string {
+  return MODE_DESCRIPTIONS[name] ?? name;
 }
 
 export async function showModeSelector(

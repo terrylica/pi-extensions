@@ -25,8 +25,8 @@ export function registerModeSwitchRenderer(pi: ExtensionAPI): void {
     "mode-switch",
     (message, _options, theme) => {
       const details = message.details;
-      const fromRaw = details?.from ?? "default";
-      const toRaw = details?.mode ?? "default";
+      const fromRaw = details?.from ?? DEFAULT_MODE.name;
+      const toRaw = details?.mode ?? DEFAULT_MODE.name;
 
       const from = MODES[fromRaw]?.name ?? DEFAULT_MODE.name;
       const to = MODES[toRaw]?.name ?? DEFAULT_MODE.name;

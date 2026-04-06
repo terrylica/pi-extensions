@@ -14,6 +14,7 @@ import {
 } from "./hooks";
 import { applyMode } from "./lib/mode-lifecycle";
 import { registerModeSwitchRenderer } from "./lib/mode-switch";
+import { setupAppendSystemMdCheck } from "./lib/system-md-check";
 import { getCurrentMode } from "./state";
 import { setupSwitchModeTool } from "./tools/switch-mode";
 
@@ -28,6 +29,7 @@ export default async function (pi: ExtensionAPI): Promise<void> {
   setupContextFilterHook(pi);
   setupSessionSyncHooks(pi);
   setupSystemPromptHook(pi);
+  setupAppendSystemMdCheck(pi);
 
   const emitCurrentMode = () => {
     const mode = getCurrentMode();

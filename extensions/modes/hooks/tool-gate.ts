@@ -77,10 +77,6 @@ export function setupToolGateHook(pi: ExtensionAPI): void {
   pi.on("tool_call", async (event, ctx) => {
     const mode = getCurrentMode();
 
-    if (mode.name === "default") {
-      return;
-    }
-
     const rule = resolveToolPolicy(mode, event.toolName);
 
     if (rule.access === "disabled") {
