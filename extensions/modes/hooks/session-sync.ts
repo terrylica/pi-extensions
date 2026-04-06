@@ -24,6 +24,6 @@ export function setupSessionSyncHooks(pi: ExtensionAPI): void {
 
   pi.on("session_start", async (event, ctx) => {
     const reason = (event as { reason?: string }).reason;
-    await restoreModeForSession(pi, ctx, reason === "startup");
+    await restoreModeForSession(pi, ctx, reason === "startup", reason);
   });
 }

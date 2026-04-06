@@ -25,6 +25,7 @@ import type {
   Extension,
   ExtensionCommandContext,
   ExtensionFactory,
+  ExtensionRuntime,
   RegisteredCommand,
   SessionManager,
   ToolDefinition,
@@ -47,6 +48,12 @@ export interface PiTestHarness {
   cwd: string;
   /** The real Extension object produced by the factory. */
   extension: Extension;
+  /**
+   * The shared ExtensionRuntime. Action methods (setModel, setThinkingLevel,
+   * etc.) are throwing stubs until replaced. Tests can assign vi.fn() spies
+   * directly to patch them before emitting events.
+   */
+  runtime: ExtensionRuntime;
   /**
    * Built-in `newSession` spy. When a command calls `ctx.newSession()`,
    * this spy creates a real `SessionManager.inMemory()`, runs the
@@ -186,6 +193,7 @@ export async function createPiTestHarness(
   return {
     cwd,
     extension,
+    runtime,
     newSession,
     getChildSessionManager: () => childSm,
     command,

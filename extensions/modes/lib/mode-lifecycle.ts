@@ -129,10 +129,20 @@ export async function applyMode(
   }
 }
 
+function isNewSession(
+  reason: string | undefined,
+  ctx: ExtensionContext,
+): boolean {
+  if (reason !== "startup" && reason !== "new") return false;
+  const branch = ctx.sessionManager.getBranch() as Array<{ type?: string }>;
+  return !branch.some((e) => e.type === "message");
+}
+
 export async function restoreModeForSession(
   pi: ExtensionAPI,
   ctx: ExtensionContext,
   includeFlag: boolean,
+  reason?: string,
 ): Promise<void> {
   clearPreviousModel();
 
@@ -140,7 +150,28 @@ export async function restoreModeForSession(
   const baseMode = restored ?? DEFAULT_MODE.name;
 
   const from = getCurrentMode().name;
-  await applyMode(pi, ctx, baseMode, { silent: true });
+
+  if (isNewSession(reason, ctx) && from === baseMode) {
+    // Brand-new session: force the mode's configured model and thinking level
+    // even if in-memory mode already matches, bypassing the same-mode fast path.
+    const mode = MODES[baseMode];
+    if (mode?.thinkingLevel) {
+      pi.setThinkingLevel(mode.thinkingLevel);
+    }
+    if (mode?.provider && mode.model) {
+      const found = ctx.modelRegistry.find(mode.provider, mode.model);
+      if (found) {
+        await pi.setModel(found);
+      }
+    }
+    // Still apply active tools via normal path.
+    clearSessionAllowedTools();
+    const allToolNames = pi.getAllTools().map((tool) => tool.name);
+    pi.setActiveTools(computeActiveTools(baseMode, allToolNames));
+  } else {
+    await applyMode(pi, ctx, baseMode, { silent: true });
+  }
+
   if (from !== baseMode && restored) {
     const mode = MODES[baseMode];
     const targetModelId =
