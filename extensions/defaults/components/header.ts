@@ -11,6 +11,7 @@ import type {
   Theme,
 } from "@mariozechner/pi-coding-agent";
 import { rawKeyHint } from "@mariozechner/pi-coding-agent";
+import { Container, Text } from "@mariozechner/pi-tui";
 
 // Custom shortcuts defined in harness extensions.
 const SHORTCUTS: { key: string; description: string }[] = [
@@ -30,22 +31,25 @@ const COMMANDS: { name: string; description: string }[] = [
   { name: "providers:usage", description: "usage dashboard" },
 ];
 
-function renderHeader(_width: number, theme: Theme): string[] {
-  const shortcuts = SHORTCUTS.map((s) => rawKeyHint(s.key, s.description)).join(
-    "\n",
-  );
+function createHeaderComponent(theme: Theme): Container {
+  const container = new Container();
 
-  const commands = COMMANDS.map((c) =>
-    rawKeyHint(`/${c.name}`, c.description),
-  ).join("\n");
+  container.addChild(new Text(theme.fg("muted", "Shortcuts"), 0, 0));
+  for (const shortcut of SHORTCUTS) {
+    container.addChild(
+      new Text(rawKeyHint(shortcut.key, shortcut.description), 0, 0),
+    );
+  }
 
-  return [
-    theme.fg("muted", "Shortcuts"),
-    shortcuts,
-    "",
-    theme.fg("muted", "Commands"),
-    commands,
-  ];
+  container.addChild(new Text("", 0, 0));
+  container.addChild(new Text(theme.fg("muted", "Commands"), 0, 0));
+  for (const command of COMMANDS) {
+    container.addChild(
+      new Text(rawKeyHint(`/${command.name}`, command.description), 0, 0),
+    );
+  }
+
+  return container;
 }
 
 export function createCustomHeader(_pi: ExtensionAPI) {
@@ -53,12 +57,9 @@ export function createCustomHeader(_pi: ExtensionAPI) {
     setup: (ctx: ExtensionContext) => {
       if (!ctx.hasUI) return;
 
-      ctx.ui.setHeader((_tui: unknown, theme: Theme) => ({
-        render(width: number): string[] {
-          return renderHeader(width, theme);
-        },
-        invalidate() {},
-      }));
+      ctx.ui.setHeader((_tui: unknown, theme: Theme) =>
+        createHeaderComponent(theme),
+      );
     },
     cleanup: (ctx?: ExtensionContext) => {
       ctx?.ui.setHeader(undefined);
