@@ -13,7 +13,8 @@ Hardcoded mode system for Pi with prompt families, tool policy, model switching,
   - Native read-only tools enabled: `read`, `ls`, `find`, `grep`
   - Native `bash` requires explicit approval per call
   - Native `write`, `edit` blocked
-  - Research extension tools enabled: `scout`, `lookout`, `oracle`, `reviewer`
+  - Read-only/helper extension tools enabled: `get_current_time`, `read_url`, `find_sessions`, `list_sessions`, `read_session`, `ask_user`
+  - Research/review extension tools enabled: `scout`, `lookout`, `oracle`, `reviewer`
   - Side-effecting extension tools blocked: `worker`, `process`
   - Other extension tools confirmation-gated (can allow for session)
   - Provider/model: `openai-codex / gpt-5.4`

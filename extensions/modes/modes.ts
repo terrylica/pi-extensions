@@ -171,6 +171,12 @@ const PLAN_TOOL_POLICY: ModeToolPolicy = {
   },
   extension: {
     switch_mode: { access: "enabled" },
+    get_current_time: { access: "enabled" },
+    read_url: { access: "enabled" },
+    find_sessions: { access: "enabled" },
+    list_sessions: { access: "enabled" },
+    read_session: { access: "enabled" },
+    ask_user: { access: "enabled" },
     scout: { access: "enabled" },
     lookout: { access: "enabled" },
     oracle: { access: "enabled" },
