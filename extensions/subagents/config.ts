@@ -115,38 +115,30 @@ const DEFAULT_CONFIG: ResolvedSubagentsConfig = {
   subagents: {
     scout: {
       candidates: [
-        // Tested 2026-03-15: 100% tool-use reliability, sorted by latency.
-        // Added 2026-03-17: GPT-5.4 mini as a higher-quality shared candidate
-        // for scout/lookout subagent work, at higher cost than the cheapest pool.
-        // gpt-oss-20b: 173ms avg, $0.03/M input
-        // mistral-small-3.2: 632ms avg, $0.06/M input
-        // GLM-4.7-Flash (synthetic): $0.06/M input, $0.40/M output
-        // gemini-3-flash-preview: 1146ms avg, ~$0.10/M input
-        // gpt-5.4-mini: strong coding/tool-use/subagent candidate, $0.75/M input
-        { provider: "openrouter", model: "openai/gpt-oss-20b" },
-        {
-          provider: "openrouter",
-          model: "mistralai/mistral-small-3.2-24b-instruct",
-        },
-        { provider: "synthetic", model: "hf:zai-org/GLM-4.7-Flash" },
-        { provider: "openrouter", model: "google/gemini-3-flash-preview" },
-        { provider: "openrouter", model: "openai/gpt-5.4-mini" },
+        // { provider: "openrouter", model: "openai/gpt-oss-20b" },
+        // {
+        //   provider: "openrouter",
+        //   model: "mistralai/mistral-small-3.2-24b-instruct",
+        // },
+        // { provider: "synthetic", model: "hf:zai-org/GLM-4.7-Flash" },
+        // { provider: "openrouter", model: "google/gemini-3-flash-preview" },
+        // { provider: "openrouter", model: "openai/gpt-5.4-mini" },
+        { provider: "openai-codex", model: "gpt-5.3-codex-spark" },
       ],
       enabled: true,
       web: DEFAULT_SCOUT_WEB_CONFIG,
     },
     lookout: {
       candidates: [
-        // Same pool as scout -- cheap, fast, reliable tool-callers, plus
-        // GPT-5.4 mini as a stronger but more expensive shared candidate.
-        { provider: "openrouter", model: "openai/gpt-oss-20b" },
-        {
-          provider: "openrouter",
-          model: "mistralai/mistral-small-3.2-24b-instruct",
-        },
-        { provider: "synthetic", model: "hf:zai-org/GLM-4.7-Flash" },
-        { provider: "openrouter", model: "google/gemini-3-flash-preview" },
-        { provider: "openrouter", model: "openai/gpt-5.4-mini" },
+        // { provider: "openrouter", model: "openai/gpt-oss-20b" },
+        // {
+        //   provider: "openrouter",
+        //   model: "mistralai/mistral-small-3.2-24b-instruct",
+        // },
+        // { provider: "synthetic", model: "hf:zai-org/GLM-4.7-Flash" },
+        // { provider: "openrouter", model: "google/gemini-3-flash-preview" },
+        // { provider: "openrouter", model: "openai/gpt-5.4-mini" },
+        { provider: "openai-codex", model: "gpt-5.3-codex-spark" },
       ],
       enabled: true,
     },
