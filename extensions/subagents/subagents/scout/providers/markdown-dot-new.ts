@@ -5,6 +5,15 @@ import type {
   ScoutFetchProvider,
 } from "./types";
 
+function createTimeoutSignal(
+  timeoutMs: number,
+  signal?: AbortSignal,
+): AbortSignal {
+  const timeoutSignal = AbortSignal.timeout(timeoutMs);
+  if (!signal) return timeoutSignal;
+  return AbortSignal.any([signal, timeoutSignal]);
+}
+
 const MARKDOWNNEW_BASE_URL = "https://markdown.new";
 
 /**
@@ -25,7 +34,7 @@ export class MarkdownNewProvider implements ScoutFetchProvider {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ url: input.url, retain_images: true }),
-      signal,
+      signal: createTimeoutSignal(5000, signal),
     });
 
     const text = await response.text();

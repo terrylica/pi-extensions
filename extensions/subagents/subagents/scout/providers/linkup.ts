@@ -9,6 +9,15 @@ import type {
   SearchResult,
 } from "./types";
 
+function createTimeoutSignal(
+  timeoutMs: number,
+  signal?: AbortSignal,
+): AbortSignal {
+  const timeoutSignal = AbortSignal.timeout(timeoutMs);
+  if (!signal) return timeoutSignal;
+  return AbortSignal.any([signal, timeoutSignal]);
+}
+
 const LINKUP_BASE_URL = "https://api.linkup.so/v1";
 
 export class LinkupProvider implements ScoutSearchProvider, ScoutFetchProvider {
@@ -39,7 +48,7 @@ export class LinkupProvider implements ScoutSearchProvider, ScoutFetchProvider {
         query: input.query,
         depth: config.providers.linkup.searchDepth,
       }),
-      signal,
+      signal: createTimeoutSignal(5000, signal),
     });
 
     const data = (await this.parseJson(response)) as {
@@ -99,7 +108,7 @@ export class LinkupProvider implements ScoutSearchProvider, ScoutFetchProvider {
         url,
         renderJs,
       }),
-      signal,
+      signal: createTimeoutSignal(5000, signal),
     });
 
     const data = (await this.parseJson(response)) as {

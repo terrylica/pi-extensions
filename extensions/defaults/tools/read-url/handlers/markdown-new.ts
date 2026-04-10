@@ -1,5 +1,14 @@
 import type { HandlerData, ReadUrlHandler } from "./types";
 
+function createTimeoutSignal(
+  timeoutMs: number,
+  signal?: AbortSignal,
+): AbortSignal {
+  const timeoutSignal = AbortSignal.timeout(timeoutMs);
+  if (!signal) return timeoutSignal;
+  return AbortSignal.any([signal, timeoutSignal]);
+}
+
 export function createMarkdownNewHandler(): ReadUrlHandler {
   return {
     name: "markdown.new",
@@ -9,7 +18,9 @@ export function createMarkdownNewHandler(): ReadUrlHandler {
       signal: AbortSignal | undefined,
     ): Promise<HandlerData> {
       const markdownUrl = `https://markdown.new/${url.toString()}`;
-      const response = await fetch(markdownUrl, { signal });
+      const response = await fetch(markdownUrl, {
+        signal: createTimeoutSignal(5000, signal),
+      });
 
       const body = await response.text();
       if (!response.ok) {

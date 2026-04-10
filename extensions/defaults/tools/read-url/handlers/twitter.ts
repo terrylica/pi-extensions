@@ -1,5 +1,14 @@
 import type { HandlerData, HandlerImage, ReadUrlHandler } from "./types";
 
+function createTimeoutSignal(
+  timeoutMs: number,
+  signal?: AbortSignal,
+): AbortSignal {
+  const timeoutSignal = AbortSignal.timeout(timeoutMs);
+  if (!signal) return timeoutSignal;
+  return AbortSignal.any([signal, timeoutSignal]);
+}
+
 type UnknownRecord = Record<string, unknown>;
 
 interface FxTwitterApiResponse {
@@ -83,7 +92,9 @@ async function fetchTwitterPayload(
   signal: AbortSignal | undefined,
 ): Promise<FxTwitterApiResponse> {
   const apiUrl = `https://api.fxtwitter.com/status/${statusId}`;
-  const response = await fetch(apiUrl, { signal });
+  const response = await fetch(apiUrl, {
+    signal: createTimeoutSignal(5000, signal),
+  });
   const bodyText = await response.text();
 
   if (!response.ok) {

@@ -31,22 +31,9 @@ function createTimeoutSignal(
   timeoutMs: number,
   signal?: AbortSignal,
 ): AbortSignal {
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), timeoutMs);
-  if (signal) {
-    if (signal.aborted) controller.abort();
-    signal.addEventListener(
-      "abort",
-      () => {
-        controller.abort();
-      },
-      { once: true },
-    );
-  }
-  controller.signal.addEventListener("abort", () => clearTimeout(timeout), {
-    once: true,
-  });
-  return controller.signal;
+  const timeoutSignal = AbortSignal.timeout(timeoutMs);
+  if (!signal) return timeoutSignal;
+  return AbortSignal.any([signal, timeoutSignal]);
 }
 
 async function getClaudeUsageError(response: Response): Promise<string> {
@@ -118,7 +105,7 @@ export async function fetchClaudeRateLimits(
   }
 
   return withProviderCache("claude", async () => {
-    const timeoutSignal = createTimeoutSignal(5000, signal);
+    const combinedSignal = createTimeoutSignal(5000, signal);
     const headers = {
       Authorization: `Bearer ${token}`,
       "anthropic-beta": "oauth-2025-04-20",
@@ -132,8 +119,8 @@ export async function fetchClaudeRateLimits(
 
     try {
       const [usageResponse, statusResponse] = await Promise.all([
-        fetch(USAGE_URL, { headers, signal: timeoutSignal }),
-        fetch(STATUS_URL, { signal: timeoutSignal }),
+        fetch(USAGE_URL, { headers, signal: combinedSignal }),
+        fetch(STATUS_URL, { signal: combinedSignal }),
       ]);
 
       if (!statusResponse.ok) {
@@ -195,7 +182,7 @@ export async function fetchClaudeRateLimits(
         }
       }
     } catch (_err) {
-      if (timeoutSignal.aborted || signal?.aborted) {
+      if (combinedSignal.aborted || signal?.aborted) {
         error = "Fetch failed";
       } else {
         error = "Network error";

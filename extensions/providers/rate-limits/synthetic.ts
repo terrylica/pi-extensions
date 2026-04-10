@@ -1,6 +1,15 @@
 import type { ProviderRateLimits } from "../types";
 import { withProviderCache } from "./provider-cache";
 
+function createTimeoutSignal(
+  timeoutMs: number,
+  signal?: AbortSignal,
+): AbortSignal {
+  const timeoutSignal = AbortSignal.timeout(timeoutMs);
+  if (!signal) return timeoutSignal;
+  return AbortSignal.any([signal, timeoutSignal]);
+}
+
 const API_URL = "https://api.synthetic.new/v2/quotas";
 
 interface SyntheticQuotasResponse {
@@ -95,7 +104,7 @@ export async function fetchSyntheticRateLimits(
     try {
       const response = await fetch(API_URL, {
         headers: { Authorization: `Bearer ${apiKey}` },
-        signal,
+        signal: createTimeoutSignal(5000, signal),
       });
 
       if (!response.ok) {

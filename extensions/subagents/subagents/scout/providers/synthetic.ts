@@ -5,6 +5,15 @@ import type {
   SearchResult,
 } from "./types";
 
+function createTimeoutSignal(
+  timeoutMs: number,
+  signal?: AbortSignal,
+): AbortSignal {
+  const timeoutSignal = AbortSignal.timeout(timeoutMs);
+  if (!signal) return timeoutSignal;
+  return AbortSignal.any([signal, timeoutSignal]);
+}
+
 const SYNTHETIC_BASE_URL = "https://api.synthetic.new/v2";
 
 export class SyntheticProvider implements ScoutSearchProvider {
@@ -31,7 +40,7 @@ export class SyntheticProvider implements ScoutSearchProvider {
       method: "POST",
       headers: this.headers,
       body: JSON.stringify({ query: input.query }),
-      signal,
+      signal: createTimeoutSignal(5000, signal),
     });
 
     const data = (await this.parseJson(response)) as {

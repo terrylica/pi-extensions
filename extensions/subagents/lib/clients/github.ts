@@ -2,6 +2,15 @@
  * Lightweight GitHub API client.
  */
 
+function createTimeoutSignal(
+  timeoutMs: number,
+  signal?: AbortSignal,
+): AbortSignal {
+  const timeoutSignal = AbortSignal.timeout(timeoutMs);
+  if (!signal) return timeoutSignal;
+  return AbortSignal.any([signal, timeoutSignal]);
+}
+
 const GITHUB_BASE_URL = "https://api.github.com";
 
 /** GitHub repository info */
@@ -318,7 +327,7 @@ export class GitHubClient {
         "X-GitHub-Api-Version": "2022-11-28",
         Authorization: `Bearer ${this.token}`,
       },
-      signal,
+      signal: createTimeoutSignal(5000, signal),
     });
 
     if (!response.ok) {

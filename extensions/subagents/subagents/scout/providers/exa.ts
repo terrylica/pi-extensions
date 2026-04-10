@@ -9,6 +9,15 @@ import type {
   SearchResult,
 } from "./types";
 
+function createTimeoutSignal(
+  timeoutMs: number,
+  signal?: AbortSignal,
+): AbortSignal {
+  const timeoutSignal = AbortSignal.timeout(timeoutMs);
+  if (!signal) return timeoutSignal;
+  return AbortSignal.any([signal, timeoutSignal]);
+}
+
 const EXA_BASE_URL = "https://api.exa.ai";
 
 export class ExaProvider implements ScoutSearchProvider, ScoutFetchProvider {
@@ -40,7 +49,7 @@ export class ExaProvider implements ScoutSearchProvider, ScoutFetchProvider {
         type: config.providers.exa.searchMode,
         numResults: 10,
       }),
-      signal,
+      signal: createTimeoutSignal(5000, signal),
     });
 
     const data = (await this.parseJson(response)) as {
@@ -84,7 +93,7 @@ export class ExaProvider implements ScoutSearchProvider, ScoutFetchProvider {
         urls: [input.url],
         text: true,
       }),
-      signal,
+      signal: createTimeoutSignal(5000, signal),
     });
 
     const data = (await this.parseJson(response)) as {

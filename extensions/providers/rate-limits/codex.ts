@@ -20,22 +20,9 @@ function createTimeoutSignal(
   timeoutMs: number,
   signal?: AbortSignal,
 ): AbortSignal {
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), timeoutMs);
-  if (signal) {
-    if (signal.aborted) controller.abort();
-    signal.addEventListener(
-      "abort",
-      () => {
-        controller.abort();
-      },
-      { once: true },
-    );
-  }
-  controller.signal.addEventListener("abort", () => clearTimeout(timeout), {
-    once: true,
-  });
-  return controller.signal;
+  const timeoutSignal = AbortSignal.timeout(timeoutMs);
+  if (!signal) return timeoutSignal;
+  return AbortSignal.any([signal, timeoutSignal]);
 }
 
 function formatWindowLabel(seconds: number, fallback: string): string {
@@ -75,7 +62,7 @@ export async function fetchCodexRateLimits(
       | undefined;
     const accountId = credential?.accountId ?? credential?.account_id;
 
-    const timeoutSignal = createTimeoutSignal(5000, signal);
+    const combinedSignal = createTimeoutSignal(5000, signal);
     const headers: Record<string, string> = {
       Authorization: `Bearer ${token}`,
       "User-Agent": "PiUsage",
@@ -93,8 +80,8 @@ export async function fetchCodexRateLimits(
 
     try {
       const [usageResponse, statusResponse] = await Promise.all([
-        fetch(USAGE_URL, { headers, signal: timeoutSignal }),
-        fetch(STATUS_URL, { signal: timeoutSignal }),
+        fetch(USAGE_URL, { headers, signal: combinedSignal }),
+        fetch(STATUS_URL, { signal: combinedSignal }),
       ]);
 
       if (!statusResponse.ok) {
@@ -174,7 +161,7 @@ export async function fetchCodexRateLimits(
         }
       }
     } catch {
-      if (timeoutSignal.aborted || signal?.aborted) {
+      if (combinedSignal.aborted || signal?.aborted) {
         error = "Fetch failed";
       } else {
         error = "Network error";
