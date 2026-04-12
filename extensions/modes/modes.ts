@@ -201,8 +201,8 @@ export const MODES: Record<string, ModeDefinition> = {
     labelColor: { source: "raw", color: "#777777" },
     toolPolicy: ALL_TOOLS_POLICY,
     provider: "synthetic",
-    model: "hf:nvidia/Kimi-K2.5-NVFP4",
-    thinkingLevel: "low",
+    model: "hf:zai-org/GLM-5.1",
+    thinkingLevel: "medium",
     instructions: BALANCED_INSTRUCTIONS,
   },
   plan: {
@@ -221,8 +221,8 @@ export const MODES: Record<string, ModeDefinition> = {
     labelColor: { source: "raw", color: "#99ad6a" },
     toolPolicy: ALL_TOOLS_POLICY,
     provider: "anthropic",
-    model: "claude-sonnet-4-6",
-    thinkingLevel: "low",
+    model: "hf:nvidia/Kimi-K2.5-NVFP4",
+    thinkingLevel: "medium",
     instructions: IMPLEMENT_INSTRUCTIONS,
   },
 };
