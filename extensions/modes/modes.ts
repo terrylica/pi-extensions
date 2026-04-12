@@ -220,7 +220,7 @@ export const MODES: Record<string, ModeDefinition> = {
     label: "implement",
     labelColor: { source: "raw", color: "#99ad6a" },
     toolPolicy: ALL_TOOLS_POLICY,
-    provider: "anthropic",
+    provider: "synthetic",
     model: "hf:nvidia/Kimi-K2.5-NVFP4",
     thinkingLevel: "medium",
     instructions: IMPLEMENT_INSTRUCTIONS,
