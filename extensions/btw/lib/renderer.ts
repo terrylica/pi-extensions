@@ -1,6 +1,6 @@
 import { ToolCallHeader } from "@aliou/pi-utils-ui";
 import type { ExtensionAPI } from "@mariozechner/pi-coding-agent";
-import { getMarkdownTheme } from "@mariozechner/pi-coding-agent";
+import { getMarkdownTheme, keyHint } from "@mariozechner/pi-coding-agent";
 import type { MarkdownTheme } from "@mariozechner/pi-tui";
 import {
   Markdown,
@@ -72,10 +72,11 @@ function wrapInRoundedBorder(
 export function registerBtwRenderer(pi: ExtensionAPI): void {
   pi.registerMessageRenderer<BtwDetails>(
     BTW_MESSAGE_TYPE,
-    (message, _options, theme) => {
+    (message, options, theme) => {
       const details = message.details;
       const question = details?.question ?? "";
       const answer = details?.answer ?? "";
+      const expanded = options.expanded ?? false;
 
       const header = new ToolCallHeader(
         { toolName: "btw", showColon: true, mainArg: question },
@@ -96,21 +97,55 @@ export function registerBtwRenderer(pi: ExtensionAPI): void {
 
           content.push(...header.render(contentWidth));
 
-          if (answer) {
-            content.push("");
-            try {
-              if (!mdTheme) mdTheme = getMarkdownTheme();
-              if (!md) md = new Markdown(answer, 0, 0, mdTheme);
-              content.push(...md.render(contentWidth));
-            } catch {
-              content.push(...new Text(answer, 0, 0).render(contentWidth));
+          if (expanded) {
+            // Expanded: show full answer
+            if (answer) {
+              content.push("");
+              try {
+                if (!mdTheme) mdTheme = getMarkdownTheme();
+                if (!md) md = new Markdown(answer, 0, 0, mdTheme);
+                content.push(...md.render(contentWidth));
+              } catch {
+                content.push(...new Text(answer, 0, 0).render(contentWidth));
+              }
             }
-          }
 
-          if (footerLine) {
+            // Footer on its own line in expanded mode
+            if (footerLine) {
+              content.push("");
+              content.push(
+                theme.fg("muted", truncateToWidth(footerLine, contentWidth)),
+              );
+            }
+          } else {
+            // Collapsed: show first paragraph of answer
+            const paragraphs = answer.split(/\n\n/).filter((p) => p.trim());
+            const firstParagraph = paragraphs[0] ?? "";
+            const remainingParagraphs = paragraphs.length - 1;
+
+            if (firstParagraph) {
+              content.push("");
+              try {
+                if (!mdTheme) mdTheme = getMarkdownTheme();
+                if (!md) md = new Markdown(firstParagraph, 0, 0, mdTheme);
+                content.push(...md.render(contentWidth));
+              } catch {
+                content.push(
+                  ...new Text(firstParagraph, 0, 0).render(contentWidth),
+                );
+              }
+            }
+
+            // Footer line with more paragraphs hint and token/cost/model info
+            const hint = keyHint("app.tools.expand", "to expand");
+            const moreParagraphsHint =
+              remainingParagraphs > 0
+                ? `(${remainingParagraphs} more paragraphs, ${hint}) `
+                : `(${hint}) `;
+            const collapsedLine = moreParagraphsHint + (footerLine ?? "");
             content.push("");
             content.push(
-              truncateToWidth(theme.fg("muted", footerLine), contentWidth),
+              theme.fg("dim", truncateToWidth(collapsedLine, contentWidth)),
             );
           }
 
