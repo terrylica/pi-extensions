@@ -22,7 +22,7 @@ const SHORTCUTS: { key: string; description: string }[] = [
 
 // Custom commands defined in harness extensions.
 const COMMANDS: { name: string; description: string }[] = [
-  { name: "btw", description: "side question" },
+  { name: "qq", description: "quick question" },
   { name: "spawn", description: "new linked session" },
   { name: "continue", description: "resume recent session" },
   { name: "plan:save", description: "save plan from conversation" },

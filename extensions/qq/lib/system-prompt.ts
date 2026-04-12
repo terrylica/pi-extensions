@@ -1,4 +1,4 @@
-export const BTW_SYSTEM_REMINDER = `
+export const QQ_SYSTEM_REMINDER = `
 
 This is a side question from the user. You must answer this question directly in a single response.
 

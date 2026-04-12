@@ -6,10 +6,10 @@ import {
 } from "@mariozechner/pi-coding-agent";
 import { Loader, visibleWidth } from "@mariozechner/pi-tui";
 import { executeSubagent } from "../../subagents/lib";
-import { BTW_SYSTEM_REMINDER } from "../lib/system-prompt";
-import { BTW_MESSAGE_TYPE, type BtwDetails } from "../lib/types";
+import { QQ_SYSTEM_REMINDER } from "../lib/system-prompt";
+import { QQ_MESSAGE_TYPE, type QqDetails } from "../lib/types";
 
-const WIDGET_ID = "btw";
+const WIDGET_ID = "qq";
 
 /**
  * Wrap content lines in a rounded border with 1-char inner padding.
@@ -35,12 +35,12 @@ function wrapInRoundedBorder(
   return [top, ...wrapped, bottom];
 }
 
-export function registerBtwCommand(pi: ExtensionAPI): void {
-  pi.registerCommand("btw", {
-    description: "Ask a quick side question without interrupting the agent",
+export function registerQqCommand(pi: ExtensionAPI): void {
+  pi.registerCommand("qq", {
+    description: "Ask a quick question without interrupting the agent",
     handler: async (args, ctx) => {
       if (!ctx.hasUI) {
-        ctx.ui.notify("/btw requires interactive mode", "error");
+        ctx.ui.notify("/qq requires interactive mode", "error");
         return;
       }
 
@@ -51,7 +51,7 @@ export function registerBtwCommand(pi: ExtensionAPI): void {
 
       const question = args?.trim();
       if (!question) {
-        ctx.ui.notify("Usage: /btw <question>", "warning");
+        ctx.ui.notify("Usage: /qq <question>", "warning");
         return;
       }
 
@@ -63,10 +63,10 @@ export function registerBtwCommand(pi: ExtensionAPI): void {
       );
       const llmMessages = convertToLlm(sessionContext.messages);
 
-      // Filter out btw messages and in-progress assistant messages
+      // Filter out qq messages and in-progress assistant messages
       const filtered = llmMessages.filter((msg) => {
         const maybeCustom = msg as { customType?: unknown };
-        if (maybeCustom.customType === BTW_MESSAGE_TYPE) return false;
+        if (maybeCustom.customType === QQ_MESSAGE_TYPE) return false;
         if (
           msg.role === "assistant" &&
           (msg.stopReason === undefined || msg.stopReason === null)
@@ -78,7 +78,7 @@ export function registerBtwCommand(pi: ExtensionAPI): void {
 
       const serialized = serializeConversation(filtered);
       const userMessage = `${serialized}\n\n---\n\nSide question: ${question}`;
-      const systemPrompt = ctx.getSystemPrompt() + BTW_SYSTEM_REMINDER;
+      const systemPrompt = ctx.getSystemPrompt() + QQ_SYSTEM_REMINDER;
       const model = ctx.model;
 
       // Show loading widget with rounded border
@@ -90,7 +90,7 @@ export function registerBtwCommand(pi: ExtensionAPI): void {
             tui,
             (s) => theme.fg("accent", s),
             (s) => theme.fg("muted", s),
-            `btw: ${question}`,
+            `qq: ${question}`,
           );
           loader.start();
 
@@ -116,7 +116,7 @@ export function registerBtwCommand(pi: ExtensionAPI): void {
       try {
         const result = await executeSubagent(
           {
-            name: "btw",
+            name: "qq",
             model,
             systemPrompt,
             tools: [],
@@ -134,7 +134,7 @@ export function registerBtwCommand(pi: ExtensionAPI): void {
         if (result.aborted) return;
 
         if (result.error) {
-          ctx.ui.notify(`btw error: ${result.error}`, "error");
+          ctx.ui.notify(`qq error: ${result.error}`, "error");
           return;
         }
 
@@ -143,9 +143,9 @@ export function registerBtwCommand(pi: ExtensionAPI): void {
           return;
         }
 
-        pi.sendMessage<BtwDetails>(
+        pi.sendMessage<QqDetails>(
           {
-            customType: BTW_MESSAGE_TYPE,
+            customType: QQ_MESSAGE_TYPE,
             content: result.content,
             display: true,
             details: {
@@ -164,7 +164,7 @@ export function registerBtwCommand(pi: ExtensionAPI): void {
       } catch (err) {
         ctx.ui.setWidget(WIDGET_ID, undefined);
         ctx.ui.notify(
-          `btw error: ${err instanceof Error ? err.message : String(err)}`,
+          `qq error: ${err instanceof Error ? err.message : String(err)}`,
           "error",
         );
       }

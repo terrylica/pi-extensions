@@ -8,7 +8,7 @@ import {
   truncateToWidth,
   visibleWidth,
 } from "@mariozechner/pi-tui";
-import { BTW_MESSAGE_TYPE, type BtwDetails } from "./types";
+import { QQ_MESSAGE_TYPE, type QqDetails } from "./types";
 
 function formatTokenCount(n: number): string {
   if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
@@ -16,7 +16,7 @@ function formatTokenCount(n: number): string {
   return String(n);
 }
 
-function buildFooterLine(details: BtwDetails): string {
+function buildFooterLine(details: QqDetails): string {
   const parts: string[] = [];
   const u = details.usage;
 
@@ -69,9 +69,9 @@ function wrapInRoundedBorder(
   return [top, ...wrapped, bottom];
 }
 
-export function registerBtwRenderer(pi: ExtensionAPI): void {
-  pi.registerMessageRenderer<BtwDetails>(
-    BTW_MESSAGE_TYPE,
+export function registerQqRenderer(pi: ExtensionAPI): void {
+  pi.registerMessageRenderer<QqDetails>(
+    QQ_MESSAGE_TYPE,
     (message, options, theme) => {
       const details = message.details;
       const question = details?.question ?? "";
@@ -79,7 +79,7 @@ export function registerBtwRenderer(pi: ExtensionAPI): void {
       const expanded = options.expanded ?? false;
 
       const header = new ToolCallHeader(
-        { toolName: "btw", showColon: true, mainArg: question },
+        { toolName: "qq", showColon: true, mainArg: question },
         theme,
       );
 

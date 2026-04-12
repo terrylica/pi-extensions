@@ -21,7 +21,7 @@ To install selectively, or disable specific extensions, edit your `settings.json
     {
       "source": "git:github.com/aliou/pi-harness",
       "extensions": [
-        "extensions/btw/index.ts",
+        "extensions/qq/index.ts",
         "extensions/defaults/index.ts",
         "extensions/providers/index.ts"
       ]
