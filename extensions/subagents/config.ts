@@ -160,7 +160,7 @@ const DEFAULT_CONFIG: ResolvedSubagentsConfig = {
       candidates: [
         { provider: "anthropic", model: "claude-sonnet-4-6" },
         { provider: "synthetic", model: "hf:moonshotai/Kimi-K2.5" },
-        { provider: "synthetic", model: "hf:zai-org/GLM-5" },
+        { provider: "synthetic", model: "hf:zai-org/GLM-5.1" },
       ],
       enabled: true,
     },
