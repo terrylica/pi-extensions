@@ -33,14 +33,12 @@ import {
   getContextUsage,
   getCumulativeUsage,
 } from "../lib/stats";
-import { getTPS, setupTPSTracking } from "../lib/tps";
 
 /**
  * Create a footer component with 2-line layout.
  */
 export function createCustomFooter(pi: ExtensionAPI) {
   let ctx: ExtensionContext | undefined;
-  setupTPSTracking(pi);
   let requestRender: (() => void) | undefined;
   let codexFastModeEnabled = false;
   let codexVerbosity: "low" | "medium" | "high" | undefined;
@@ -86,7 +84,6 @@ export function createCustomFooter(pi: ExtensionAPI) {
 
     const usage = getCumulativeUsage(ctx);
     const contextUsage = getContextUsage(ctx);
-    const tpsStr = getTPS();
 
     // Stash indicator (before path)
     const stashN = stashCount();
@@ -97,7 +94,7 @@ export function createCustomFooter(pi: ExtensionAPI) {
     const gitStatus = gitStatusWatcher?.getStatus();
     const pathData = buildPathParts(theme, branch, gitStatus);
 
-    const statsParts = buildStatsParts(theme, usage, contextUsage, tpsStr);
+    const statsParts = buildStatsParts(theme, usage, contextUsage);
     const statsLine = statsParts.join(" ");
     const statsWidth = visibleWidth(statsLine);
     const minPadding = 2;
