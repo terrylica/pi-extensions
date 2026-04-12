@@ -11,7 +11,7 @@ import type {
   Theme,
 } from "@mariozechner/pi-coding-agent";
 import { rawKeyHint } from "@mariozechner/pi-coding-agent";
-import { Container, Text } from "@mariozechner/pi-tui";
+import { Container, Spacer, Text } from "@mariozechner/pi-tui";
 
 // Custom shortcuts defined in harness extensions.
 const SHORTCUTS: { key: string; description: string }[] = [
@@ -34,6 +34,10 @@ const COMMANDS: { name: string; description: string }[] = [
 function createHeaderComponent(theme: Theme): Container {
   const container = new Container();
 
+  container.addChild(new Text(theme.fg("accent", "pi"), 0, 0));
+
+  container.addChild(new Spacer(1));
+
   container.addChild(new Text(theme.fg("muted", "Shortcuts"), 0, 0));
   for (const shortcut of SHORTCUTS) {
     container.addChild(
@@ -41,7 +45,8 @@ function createHeaderComponent(theme: Theme): Container {
     );
   }
 
-  container.addChild(new Text("", 0, 0));
+  container.addChild(new Spacer(1));
+
   container.addChild(new Text(theme.fg("muted", "Commands"), 0, 0));
   for (const command of COMMANDS) {
     container.addChild(
