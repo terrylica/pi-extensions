@@ -83,14 +83,14 @@ describe("restoreModeForSession - new session defaults", () => {
   it("forces balanced model+thinking on brand-new startup session (no messages)", async () => {
     const sm = makeSessionManager({ withMessages: false });
     await emitSessionStart(pi, "startup", sm, makeModelRegistry());
-    expect(setThinkingLevel).toHaveBeenCalledWith("low");
+    expect(setThinkingLevel).toHaveBeenCalledWith("medium");
     expect(setModel).toHaveBeenCalledTimes(1);
   });
 
   it("forces balanced model+thinking on /spawn session (reason=new, no messages)", async () => {
     const sm = makeSessionManager({ withMessages: false });
     await emitSessionStart(pi, "new", sm, makeModelRegistry());
-    expect(setThinkingLevel).toHaveBeenCalledWith("low");
+    expect(setThinkingLevel).toHaveBeenCalledWith("medium");
     expect(setModel).toHaveBeenCalledTimes(1);
   });
 
