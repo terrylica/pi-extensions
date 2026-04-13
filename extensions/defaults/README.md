@@ -21,20 +21,6 @@ Returns the current date and time with structured fields: formatted string, date
 ### `read_url` tool
 
 Fetches pages as Markdown through a handler pipeline. It uses domain-specific handlers when available (for example, `x.com`/`twitter.com` status URLs via the `api.fxtwitter.com` rendering flow, `github.com` URLs via the GitHub CLI, and `gist.github.com` URLs via the Gist API) and falls back to `https://markdown.new/<url>` for everything else.
-### Subdirectory AGENTS.md discovery
-
-Pi's built-in discovery only loads AGENTS.md files from the cwd and its ancestors. This hook fills the gap: when the agent reads a file, it checks for AGENTS.md files in the directories between cwd and the file being read, and sends a custom message for each discovered file.
-
-- Only triggers on `read` tool results (not bash, etc.)
-- Sends messages that are visible in the session history (persisted through compaction)
-- Collapsed display: "[AGENTS] ~/path/to/AGENTS.md" (accent/bold label, muted path)
-- Expanded display: markdown-rendered content of the AGENTS.md file below the header
-- Message content is wrapped in `<agents_md>` XML tags with "Automated AGENTS.md file read" prefix
-- Deduplicates per session (each AGENTS.md injected at most once)
-- Resets on session start/switch
-- Skips cwd's own AGENTS.md (already loaded by Pi)
-- Falls back to home directory as boundary if file is outside cwd
-- Supports global ignore list (`agentsIgnorePaths`) to skip selected AGENTS.md files/directories
 
 ### Notifications
 
@@ -64,7 +50,6 @@ Updates the terminal title with a project breadcrumb (e.g. `pi: project > subdir
 
 Breadcrumbs are built from the project root (detected via `.git`, `.root`, `pnpm-workspace.yaml`) to the current directory, truncated to 2 levels.
 
-
 ### Auto session naming
 
 Automatically names sessions after the first agent loop whose assistant `stopReason` is `stop`, using both the triggering user message and the assistant response.
@@ -74,10 +59,6 @@ Uses `google/gemini-2.5-flash-lite` to generate a 3-7 word title in sentence cas
 ### Bash with `cwd` parameter
 
 Overrides the built-in `bash` tool to add an optional `cwd` parameter. This avoids fragile `cd dir && command` patterns and fails explicitly when the target directory does not exist.
-
-### System prompt additions
-
-Appends tool usage guidance to the system prompt at agent start. This nudges the model toward better tool choices, such as using `write` instead of `echo` or heredocs, using `read`/`find` instead of shell exploration, and parallelizing independent read-only operations.
 
 ### `/theme` command
 
@@ -90,7 +71,6 @@ Multi-step wizard to configure packages, skills, and AGENTS.md for the current p
 ### `/defaults:settings` command
 
 Interactive editor for the extension's config (catalog paths, ignore paths, etc.).
-
 
 ### Editor stash
 

@@ -12,14 +12,3 @@ export function formatTokens(count: number): string {
   if (count < 10000000) return `${(count / 1000000).toFixed(1)}M`;
   return `${Math.round(count / 1000000)}k`;
 }
-
-/**
- * Sanitize text for display in a single-line status.
- * Removes newlines, tabs, and other control characters.
- */
-export function sanitizeStatusText(text: string): string {
-  return text
-    .replace(/[\r\n\t]/g, " ")
-    .replace(/ +/g, " ")
-    .trim();
-}
