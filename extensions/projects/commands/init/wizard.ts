@@ -1,5 +1,5 @@
 /**
- * TUI wizard for /project:init.
+ * TUI wizard for /projects:init.
  *
  * Four-step wizard using the Wizard component from @aliou/pi-utils-settings:
  * 1. Packages — multi-select packages from the catalog

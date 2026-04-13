@@ -163,7 +163,7 @@ function emitAttentionTitleEvent(
   toolName?: string,
 ): void {
   const payload: AttentionTitleEvent = {
-    source: "defaults:notification",
+    source: "chrome:notification",
     action,
   };
   if (toolCallId) payload.toolCallId = toolCallId;
@@ -283,7 +283,7 @@ export function setupNotificationHook(pi: ExtensionAPI) {
       const status = hadError ? "error" : "ok";
       const summary = `${hadError ? "with errors" : "done"} - ${loopCount} loops, ${toolCallCount} tools`;
       pi.events.emit(AD_NOTIFY_DONE_EVENT, {
-        source: "defaults:notification",
+        source: "chrome:notification",
         status,
         loops: loopCount,
         toolCalls: toolCallCount,

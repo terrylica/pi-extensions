@@ -27,7 +27,7 @@ const COMMANDS: { name: string; description: string }[] = [
   { name: "continue", description: "resume recent session" },
   { name: "plan:save", description: "save plan from conversation" },
   { name: "plan:list", description: "list/manage plans" },
-  { name: "project:init", description: "init project config" },
+  { name: "projects:init", description: "init project config" },
   { name: "providers:usage", description: "usage dashboard" },
 ];
 

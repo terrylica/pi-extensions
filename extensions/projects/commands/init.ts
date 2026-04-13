@@ -1,5 +1,5 @@
 /**
- * /project:init command.
+ * /projects:init command.
  *
  * Shows a multi-step wizard to configure packages, skills, and AGENTS.md
  * for the current project.
@@ -7,21 +7,17 @@
 
 import type { ExtensionAPI } from "@mariozechner/pi-coding-agent";
 import { configLoader } from "../config";
-import { buildAgentsPrompt } from "./project-init/agents-prompt";
-import {
-  applySelections,
-  getInstalled,
-  readSettings,
-} from "./project-init/installer";
-import { buildNixPrompt } from "./project-init/nix";
-import { showWizard } from "./project-init/wizard";
+import { buildAgentsPrompt } from "./init/agents-prompt";
+import { applySelections, getInstalled, readSettings } from "./init/installer";
+import { buildNixPrompt } from "./init/nix";
+import { showWizard } from "./init/wizard";
 
 export function registerProjectInitCommand(pi: ExtensionAPI): void {
-  pi.registerCommand("project:init", {
+  pi.registerCommand("projects:init", {
     description: "Initialize project with skills, packages, and AGENTS.md",
     handler: async (_args, ctx) => {
       if (!ctx.hasUI) {
-        ctx.ui.notify("project:init requires interactive mode", "error");
+        ctx.ui.notify("projects:init requires interactive mode", "error");
         return;
       }
 

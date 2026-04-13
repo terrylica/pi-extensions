@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 #
-# Build native tools for the defaults extension.
+# Build native tools for the chrome extension.
 # Currently only builds the play-alert-sound Swift binary.
 #
 # This script must be run outside the nix shell to access system Swift.
@@ -24,7 +24,7 @@ if ! command -v swiftc &> /dev/null; then
     exit 0
 fi
 
-TOOLS_DIR="extensions/defaults/tools"
+TOOLS_DIR="extensions/chrome/bin"
 OUTPUT_DIR="bin"
 
 # Create output directory

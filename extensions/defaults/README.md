@@ -22,40 +22,6 @@ Returns the current date and time with structured fields: formatted string, date
 
 Fetches pages as Markdown through a handler pipeline. It uses domain-specific handlers when available (for example, `x.com`/`twitter.com` status URLs via the `api.fxtwitter.com` rendering flow, `github.com` URLs via the GitHub CLI, and `gist.github.com` URLs via the Gist API) and falls back to `https://markdown.new/<url>` for everything else.
 
-### Notifications
-
-Sends OS-level terminal notifications directly (OSC) with optional macOS sounds.
-
-- Plays attention sound when `ask_user` tool is invoked
-- For attention/dangerous events, appends ` [!]` to the current terminal title (no emoji)
-  - For attention-triggering tool calls (e.g. `ask_user`), marker clears when that tool call finishes
-- Sends summary notification when agent finishes (loop count, tool count, error status)
-  - Skips done notification when the run ends with assistant `stopReason: "aborted"`
-- Listens for `ad:notify:dangerous` events and alerts with attention sound
-  - event payload shape: `{ command, description, pattern, toolName?, toolCallId? }`
-  - `toolName`/`toolCallId` let title attention map to the exact triggering tool call
-  - other extensions can emit this same event to reuse the same attention sound path
-- Includes an event compatibility bridge for external extension events
-  - currently maps `guardrails:dangerous` -> `ad:notify:dangerous`
-  - add future mappings in `extensions/defaults/hooks/event-compat.ts`
-
-### Terminal title
-
-Updates the terminal title with a project breadcrumb (e.g. `pi: project > subdir`) and appends the current activity:
-
-- Session start/switch: `pi: <project breadcrumb>`
-- Agent running: `pi: <project breadcrumb> (thinking...)`
-- Tool call: `pi: <project breadcrumb> (<tool name>)`
-- Session shutdown: resets to "Terminal"
-
-Breadcrumbs are built from the project root (detected via `.git`, `.root`, `pnpm-workspace.yaml`) to the current directory, truncated to 2 levels.
-
-### Auto session naming
-
-Automatically names sessions after the first agent loop whose assistant `stopReason` is `stop`, using both the triggering user message and the assistant response.
-
-Uses `google/gemini-2.5-flash-lite` to generate a 3-7 word title in sentence case.
-
 ### Bash with `cwd` parameter
 
 Overrides the built-in `bash` tool to add an optional `cwd` parameter. This avoids fragile `cd dir && command` patterns and fails explicitly when the target directory does not exist.
@@ -64,21 +30,6 @@ Overrides the built-in `bash` tool to add an optional `cwd` parameter. This avoi
 
 Theme selector with live preview. Browse all available themes (built-in and custom), preview each one in real-time, and apply with Enter or cancel with Escape to restore the original.
 
-### `/project:init` command
+### Event compatibility bridge
 
-Multi-step wizard to configure packages, skills, and AGENTS.md for the current project.
-
-### `/defaults:settings` command
-
-Interactive editor for the extension's config (catalog paths, ignore paths, etc.).
-
-### Editor stash
-
-In-memory LIFO stack for editor content, modeled after `git stash`. Stash the current editor text to save it for later, then pop it back when needed.
-
-- `ctrl+shift+s` stashes editor content and clears the editor
-- `ctrl+shift+r` pops the last stashed content into the editor
-- Pop swaps when the editor has content: current text is pushed onto the stash before restoring
-- Stash count shown in the footer (warning color) when non-empty
-- Also available as `/stash` and `/unstash` palette commands
-- Ephemeral: stash is cleared when the session ends
+Bridges external extension events into harness-native events for backwards compatibility. Currently maps `guardrails:dangerous` -> `ad:notify:dangerous`.

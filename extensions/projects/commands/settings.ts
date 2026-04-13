@@ -1,6 +1,6 @@
 /**
- * Settings command for the defaults extension.
- * Provides /ad:settings to edit the catalog array.
+ * Settings command for the project extension.
+ * Provides /projects:settings to edit catalog paths and scan depths.
  */
 
 import {
@@ -11,15 +11,15 @@ import type { ExtensionAPI } from "@mariozechner/pi-coding-agent";
 import { getSettingsListTheme } from "@mariozechner/pi-coding-agent";
 import {
   configLoader,
-  type DefaultsConfig,
-  type ResolvedDefaultsConfig,
+  type ProjectConfig,
+  type ResolvedProjectConfig,
 } from "../config";
 
-export function registerDefaultsSettings(pi: ExtensionAPI): void {
-  registerSettingsCommand<DefaultsConfig, ResolvedDefaultsConfig>(pi, {
-    commandName: "defaults:settings",
-    commandDescription: "Configure defaults extension settings",
-    title: "Defaults Settings",
+export function registerProjectSettings(pi: ExtensionAPI): void {
+  registerSettingsCommand<ProjectConfig, ResolvedProjectConfig>(pi, {
+    commandName: "projects:settings",
+    commandDescription: "Configure project extension settings",
+    title: "Project Settings",
     configStore: configLoader,
     onSettingChange: (id, newValue, config) => {
       const updated = structuredClone(config);
@@ -30,8 +30,8 @@ export function registerDefaultsSettings(pi: ExtensionAPI): void {
     },
     buildSections: (tabConfig, resolved, ctx) => {
       const catalog = tabConfig?.catalog ?? resolved.catalog;
-
       const catalogDepth = tabConfig?.catalogDepth ?? resolved.catalogDepth;
+
       return [
         {
           label: "Catalog",
@@ -46,7 +46,7 @@ export function registerDefaultsSettings(pi: ExtensionAPI): void {
               description:
                 "Directories to scan for skills and packages. Each directory is searched for subdirectories containing SKILL.md (skills) or package.json with a pi key (packages).",
               submenu: (_current, done) => {
-                const currentConfig = tabConfig ?? ({} as DefaultsConfig);
+                const currentConfig = tabConfig ?? ({} as ProjectConfig);
                 const currentArray = currentConfig.catalog ?? resolved.catalog;
 
                 return new PathArrayEditor({

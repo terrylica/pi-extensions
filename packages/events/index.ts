@@ -65,6 +65,14 @@ export type AdEditorDraftChangedEvent = {
   text: string;
 };
 
+export const AD_EDITOR_STASH_CHANGED_EVENT = "ad:editor:stash-changed";
+export const AD_EDITOR_STASH_READY_EVENT = "ad:editor:stash:ready";
+export const AD_EDITOR_STASH_REQUEST_EVENT = "ad:editor:stash:request";
+
+export type AdEditorStashChangedEvent = {
+  count: number;
+};
+
 export const AD_EDITOR_BORDER_DECORATION_CHANGED_EVENT =
   "ad:editor:border-decoration:changed";
 export const AD_EDITOR_READY_EVENT = "ad:editor:ready";

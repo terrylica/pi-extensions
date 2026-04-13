@@ -1,5 +1,5 @@
 /**
- * Register defaults commands with the palette extension via EventBus.
+ * Register editor stash commands with the palette extension via EventBus.
  *
  * Emits "ad:palette:register" events immediately and re-emits when
  * the palette signals readiness (handles load-order differences).
@@ -10,11 +10,11 @@ import type {
   ExtensionContext,
 } from "@mariozechner/pi-coding-agent";
 import {
+  AD_EDITOR_STASH_CHANGED_EVENT,
   AD_PALETTE_READY_EVENT,
   AD_PALETTE_REGISTER_EVENT,
 } from "../../../packages/events";
-import { stashCount, stashPop, stashPush } from "../lib/editor-stash";
-import { AD_DEFAULTS_STASH_CHANGED_EVENT } from "./editor-stash";
+import { stashCount, stashPop, stashPush } from "../lib/stash";
 
 function emitRegistrations(pi: ExtensionAPI): void {
   pi.events.emit(AD_PALETTE_REGISTER_EVENT, {
@@ -30,7 +30,9 @@ function emitRegistrations(pi: ExtensionAPI): void {
       stashPush(text);
       ctx.ui.setEditorText("");
       ctx.ui.notify("stash: editor content stashed. ctrl+shift+r to restore");
-      pi.events.emit(AD_DEFAULTS_STASH_CHANGED_EVENT, {});
+      pi.events.emit(AD_EDITOR_STASH_CHANGED_EVENT, {
+        count: stashCount(),
+      });
     },
   });
 
@@ -55,7 +57,9 @@ function emitRegistrations(pi: ExtensionAPI): void {
         ctx.ui.notify("stash: swapped current editor content into stash");
       }
       ctx.ui.setEditorText(popped);
-      pi.events.emit(AD_DEFAULTS_STASH_CHANGED_EVENT, {});
+      pi.events.emit(AD_EDITOR_STASH_CHANGED_EVENT, {
+        count: stashCount(),
+      });
     },
   });
 }

@@ -8,7 +8,7 @@ import {
   type EditorBorderWrite,
 } from "../../../packages/events";
 
-const SOURCE = "defaults:shell-indicator";
+const SOURCE = "editor:shell-indicator";
 
 function isShellDraft(text: string): boolean {
   const trimmed = text.trimStart();
@@ -41,7 +41,7 @@ function writesForText(text: string): EditorBorderWrite[] {
   ];
 }
 
-export function setupEditorShellIndicatorHook(pi: ExtensionAPI) {
+export function setupShellIndicatorHook(pi: ExtensionAPI) {
   let lastText = "";
 
   const publish = () => {

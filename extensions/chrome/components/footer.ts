@@ -13,17 +13,19 @@ import type {
 } from "@mariozechner/pi-coding-agent";
 import { truncateToWidth, visibleWidth } from "@mariozechner/pi-tui";
 import {
+  AD_EDITOR_STASH_CHANGED_EVENT,
+  AD_EDITOR_STASH_READY_EVENT,
+  AD_EDITOR_STASH_REQUEST_EVENT,
   AD_PROVIDERS_CODEX_FAST_MODE_CHANGED_EVENT,
   AD_PROVIDERS_CODEX_FAST_MODE_READY_EVENT,
   AD_PROVIDERS_CODEX_FAST_MODE_REQUEST_EVENT,
   AD_PROVIDERS_CODEX_VERBOSITY_CHANGED_EVENT,
   AD_PROVIDERS_CODEX_VERBOSITY_READY_EVENT,
   AD_PROVIDERS_CODEX_VERBOSITY_REQUEST_EVENT,
+  type AdEditorStashChangedEvent,
   type AdProvidersCodexFastModeChangedEvent,
   type AdProvidersCodexVerbosityChangedEvent,
 } from "../../../packages/events";
-import { AD_DEFAULTS_STASH_CHANGED_EVENT } from "../hooks/editor-stash";
-import { stashCount } from "../lib/editor-stash";
 import { GitStatusWatcher } from "../lib/git-status";
 import { buildModelIdLine, buildModelLine } from "../lib/model";
 import { buildPathParts } from "../lib/path-parts";
@@ -68,8 +70,17 @@ export function createCustomFooter(pi: ExtensionAPI) {
     requestRender?.();
   });
 
-  pi.events.on(AD_DEFAULTS_STASH_CHANGED_EVENT, () => {
+  let currentStashCount = 0;
+
+  pi.events.on(AD_EDITOR_STASH_CHANGED_EVENT, (data: unknown) => {
+    const event = (data ?? {}) as Partial<AdEditorStashChangedEvent>;
+    currentStashCount = event.count ?? currentStashCount;
     requestRender?.();
+  });
+
+  // Request current stash state when editor signals readiness
+  pi.events.on(AD_EDITOR_STASH_READY_EVENT, () => {
+    pi.events.emit(AD_EDITOR_STASH_REQUEST_EVENT, {});
   });
 
   const renderFooter = (
@@ -86,7 +97,7 @@ export function createCustomFooter(pi: ExtensionAPI) {
     const contextUsage = getContextUsage(ctx);
 
     // Stash indicator (before path)
-    const stashN = stashCount();
+    const stashN = currentStashCount;
     const stashPart =
       stashN > 0 ? `${theme.fg("warning", `stash:${stashN}`)} ` : "";
     const stashPartWidth = stashN > 0 ? visibleWidth(`stash:${stashN}`) + 1 : 0;
@@ -244,6 +255,7 @@ export function createCustomFooter(pi: ExtensionAPI) {
       ctx = context;
       pi.events.emit(AD_PROVIDERS_CODEX_FAST_MODE_REQUEST_EVENT, { ctx });
       pi.events.emit(AD_PROVIDERS_CODEX_VERBOSITY_REQUEST_EVENT, {});
+      pi.events.emit(AD_EDITOR_STASH_REQUEST_EVENT, {});
 
       ctx.ui.setFooter((tui, theme, footerData) => {
         requestRender = () => tui.requestRender?.();

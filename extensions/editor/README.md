@@ -11,6 +11,10 @@ This extension owns `setEditorComponent` and renders editor border decorations f
 - Emit `ad:editor:draft:changed` when draft text changes
 - Parse native scroll markers from `super.render(...)` and publish right-side indicators
 - Render top and bottom border lines from resolved decoration state
+- Shell indicator: publishes `$` + `bashMode` band colors when draft starts with `!` or `!!`
+- Editor stash: in-memory LIFO stack for editor text stashing (`ctrl+shift+s` / `ctrl+shift+r`)
+- Palette registration: registers stash/unstash commands with the palette extension
+- Commands: `/stash` and `/unstash`
 
 ## Decoration model
 
@@ -25,5 +29,5 @@ This keeps producers decoupled from layout. Extensions publish intent (text and 
 ## Producers in this repo
 
 - `modes`: publishes mode label and mode band colors
-- `defaults` shell hook: publishes `$` + `bashMode` band colors when draft starts with `!` or `!!`
+- `editor` shell indicator: publishes `$` + `bashMode` band colors when draft starts with `!` or `!!`
 - `editor` itself: publishes scroll indicators (`↑ N more ───`, `↓ N more ───`) to end slots
