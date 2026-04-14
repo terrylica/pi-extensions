@@ -131,17 +131,30 @@ function sendSystemNotification(message: string): void {
  * Play notification sound (macOS only).
  * Uses the play-alert-sound binary which respects system alert volume.
  */
-async function playSound(pi: ExtensionAPI, soundPath: string): Promise<void> {
+async function playSound(
+  pi: ExtensionAPI,
+  ctx: ExtensionContext,
+  soundPath: string,
+): Promise<void> {
   if (process.platform !== "darwin") return;
-  if (!existsSync(PLAY_ALERT_SOUND_BINARY)) return;
+  if (!existsSync(PLAY_ALERT_SOUND_BINARY)) {
+    ctx.ui.notify(
+      `play-alert-sound binary not found at ${PLAY_ALERT_SOUND_BINARY}. Run scripts/build-native-tools.sh`,
+      "warning",
+    );
+    return;
+  }
 
   try {
     const result = await pi.exec(PLAY_ALERT_SOUND_BINARY, [soundPath]);
     if (result.code !== 0) {
-      // Sound failed to play, but this is non-critical
+      ctx.ui.notify(
+        `play-alert-sound exited with code ${result.code}: ${result.stderr?.trim() || "unknown error"}`,
+        "error",
+      );
     }
-  } catch {
-    // Ignore sound playback errors
+  } catch (err) {
+    ctx.ui.notify(`play-alert-sound failed: ${err}`, "error");
   }
 }
 
@@ -153,7 +166,7 @@ async function notify(
 ): Promise<void> {
   if (!shouldUseTerminalEffects(ctx)) return;
   sendSystemNotification(message);
-  if (sound) await playSound(pi, sound);
+  if (sound) await playSound(pi, ctx, sound);
 }
 
 function emitAttentionTitleEvent(
