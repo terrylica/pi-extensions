@@ -46,7 +46,7 @@ import {
 import { getSessionsDir } from "../lib/session-search";
 import type { ReadSessionDetails } from "./read-session-types";
 
-const MODEL = "google/gemini-2.0-flash-001";
+const MODEL = "gpt-5.3-codex-spark";
 
 const SYSTEM_PROMPT = `You are a session analyzer. Your task is to extract specific information from a Pi coding agent session.
 
@@ -374,7 +374,7 @@ Input the session ID (UUID or path) and what you want to learn about it.`,
       );
 
       try {
-        const model = resolveModel("openrouter", MODEL, ctx);
+        const model = resolveModel("openai-codex", MODEL, ctx);
         resolvedModel = { provider: model.provider, id: model.id };
 
         // Publish resolved model early
