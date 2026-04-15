@@ -1,6 +1,6 @@
 import { existsSync, lstatSync, readFileSync } from "node:fs";
 import { homedir } from "node:os";
-import { resolve } from "node:path";
+import { relative, resolve } from "node:path";
 import { ToolBody, ToolCallHeader, ToolFooter } from "@aliou/pi-utils-ui";
 import type {
   AgentToolResult,
@@ -137,10 +137,7 @@ export function setupGrepTool(pi: ExtensionAPI): void {
 
       // Handle abort signal
       if (signal?.aborted) {
-        return {
-          content: [{ type: "text" as const, text: "Operation aborted" }],
-          details: undefined,
-        };
+        throw new Error("Operation aborted");
       }
 
       // Resolve the search path, expanding ~ to home directory
@@ -152,28 +149,14 @@ export function setupGrepTool(pi: ExtensionAPI): void {
 
       // Block searching in overly broad directories
       if (BLOCKED_PATHS.has(absoluteSearchPath)) {
-        return {
-          content: [
-            {
-              type: "text" as const,
-              text: `Searching '${absoluteSearchPath}' is not allowed — too broad. Narrow the search to a specific project or subdirectory.`,
-            },
-          ],
-          details: undefined,
-        };
+        throw new Error(
+          `Searching '${absoluteSearchPath}' is not allowed — too broad. Narrow the search to a specific project or subdirectory.`,
+        );
       }
 
       // Check if path exists
       if (!existsSync(absoluteSearchPath)) {
-        return {
-          content: [
-            {
-              type: "text" as const,
-              text: `Error: Path not found: ${absoluteSearchPath}`,
-            },
-          ],
-          details: undefined,
-        };
+        throw new Error(`Path not found: ${absoluteSearchPath}`);
       }
 
       // Determine if searching a directory
@@ -181,15 +164,7 @@ export function setupGrepTool(pi: ExtensionAPI): void {
       try {
         isDirectory = lstatSync(absoluteSearchPath).isDirectory();
       } catch {
-        return {
-          content: [
-            {
-              type: "text" as const,
-              text: `Error: Cannot stat path: ${absoluteSearchPath}`,
-            },
-          ],
-          details: undefined,
-        };
+        throw new Error(`Cannot stat path: ${absoluteSearchPath}`);
       }
 
       const contextValue = context && context > 0 ? context : 0;
@@ -210,23 +185,14 @@ export function setupGrepTool(pi: ExtensionAPI): void {
 
       // Handle abort
       if (result.killed && signal?.aborted) {
-        return {
-          content: [{ type: "text" as const, text: "Operation aborted" }],
-          details: undefined,
-        };
+        throw new Error("Operation aborted");
       }
 
       // Handle non-zero exit (code 1 means no matches, which is fine)
       if (result.code !== 0 && result.code !== 1) {
-        return {
-          content: [
-            {
-              type: "text" as const,
-              text: `Error running rg: ${result.stderr || `ripgrep exited with code ${result.code}`}`,
-            },
-          ],
-          details: undefined,
-        };
+        throw new Error(
+          result.stderr || `ripgrep exited with code ${result.code}`,
+        );
       }
 
       // Parse rg JSON output to collect matches
@@ -345,7 +311,7 @@ export function setupGrepTool(pi: ExtensionAPI): void {
         matchCount,
         relativeTo:
           isDirectory && searchDir && searchDir !== "." && searchDir !== "./"
-            ? searchDir
+            ? relative(ctx.cwd, absoluteSearchPath) || "."
             : undefined,
       };
       if (matchLimitReached) details.matchLimitReached = effectiveLimit;
@@ -403,13 +369,8 @@ export function setupGrepTool(pi: ExtensionAPI): void {
         textContent?.type === "text" ? textContent.text : ""
       ).trim();
 
-      // Simple one-line body for empty/error results
-      if (
-        !output ||
-        output === "No matches found" ||
-        output.startsWith("Error") ||
-        output === "Operation aborted"
-      ) {
+      // Simple one-line body for empty results
+      if (!output || output === "No matches found") {
         return new Text(theme.fg("muted", output || "No result"), 0, 0);
       }
 

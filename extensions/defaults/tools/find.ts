@@ -1,6 +1,6 @@
 import { existsSync } from "node:fs";
 import { homedir } from "node:os";
-import { resolve } from "node:path";
+import { relative, resolve } from "node:path";
 import { ToolBody, ToolCallHeader, ToolFooter } from "@aliou/pi-utils-ui";
 import type {
   AgentToolResult,
@@ -93,15 +93,7 @@ export function setupFindTool(pi: ExtensionAPI): void {
 
       // Handle abort signal
       if (signal?.aborted) {
-        return {
-          content: [
-            {
-              type: "text" as const,
-              text: "Search was aborted",
-            },
-          ],
-          details: {},
-        };
+        throw new Error("Search was aborted");
       }
 
       // Resolve the search path, expanding ~ to home directory
@@ -114,28 +106,14 @@ export function setupFindTool(pi: ExtensionAPI): void {
 
       // Block searching in overly broad directories
       if (BLOCKED_PATHS.has(absoluteSearchPath)) {
-        return {
-          content: [
-            {
-              type: "text" as const,
-              text: `Searching '${absoluteSearchPath}' is not allowed — too broad. Narrow the search to a specific project or subdirectory.`,
-            },
-          ],
-          details: {},
-        };
+        throw new Error(
+          `Searching '${absoluteSearchPath}' is not allowed — too broad. Narrow the search to a specific project or subdirectory.`,
+        );
       }
 
       // Check if path exists
       if (!existsSync(absoluteSearchPath)) {
-        return {
-          content: [
-            {
-              type: "text" as const,
-              text: `Error: Path not found: ${absoluteSearchPath}`,
-            },
-          ],
-          details: {},
-        };
+        throw new Error(`Path not found: ${absoluteSearchPath}`);
       }
 
       // Build fd arguments - NOTE: We intentionally omit --ignore-file flags
@@ -160,28 +138,12 @@ export function setupFindTool(pi: ExtensionAPI): void {
 
       // Handle abort
       if (result.killed && signal?.aborted) {
-        return {
-          content: [
-            {
-              type: "text" as const,
-              text: "Search was aborted",
-            },
-          ],
-          details: {},
-        };
+        throw new Error("Search was aborted");
       }
 
       // Handle non-zero exit with no stdout
       if (result.code !== 0 && !result.stdout) {
-        return {
-          content: [
-            {
-              type: "text" as const,
-              text: `Error running fd: ${result.stderr || "Unknown error"}`,
-            },
-          ],
-          details: {},
-        };
+        throw new Error(result.stderr || "Unknown error");
       }
 
       // Process results - relativize paths to searchPath
@@ -223,7 +185,7 @@ export function setupFindTool(pi: ExtensionAPI): void {
         totalResults: results.length,
         relativeTo:
           searchPath && searchPath !== "." && searchPath !== "./"
-            ? searchPath
+            ? relative(ctx.cwd, absoluteSearchPath) || "."
             : undefined,
       };
 
@@ -271,13 +233,8 @@ export function setupFindTool(pi: ExtensionAPI): void {
         textContent?.type === "text" ? textContent.text : ""
       ).trim();
 
-      // Simple one-line body for empty/error results
-      if (
-        !output ||
-        output === "No files found matching the pattern." ||
-        output.startsWith("Error") ||
-        output === "Search was aborted"
-      ) {
+      // Simple one-line body for empty results
+      if (!output || output === "No files found matching the pattern.") {
         return new Text(theme.fg("muted", output || "No result"), 0, 0);
       }
 
