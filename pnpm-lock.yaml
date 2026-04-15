@@ -9,6 +9,7 @@ overrides:
   '@mariozechner/pi-agent-core': 0.65.0
   '@mariozechner/pi-ai': 0.65.0
   '@mariozechner/pi-tui': 0.65.0
+  '@aliou/pi-utils-ui': link:../pi-utils-ui
 
 importers:
 
@@ -21,8 +22,8 @@ importers:
         specifier: ^0.11.2
         version: 0.11.2(@mariozechner/pi-coding-agent@0.65.0(ws@8.19.0)(zod@3.25.76))
       '@aliou/pi-utils-ui':
-        specifier: ^0.1.4
-        version: 0.1.4(@mariozechner/pi-coding-agent@0.65.0(ws@8.19.0)(zod@3.25.76))(@mariozechner/pi-tui@0.65.0)
+        specifier: link:../pi-utils-ui
+        version: link:../pi-utils-ui
       '@aliou/sesame':
         specifier: ^0.4.0
         version: 0.4.0(@mariozechner/pi-coding-agent@0.65.0(ws@8.19.0)(zod@3.25.76))
@@ -104,17 +105,6 @@ packages:
     resolution: {integrity: sha512-+yJqraBFUUmekA3P6B/nJLIQLetaz9UCsowOaCt35IUZmOar2y2Tg8If+KbTqrwWib9ljsi3F+wQxV8suB9Eww==}
     peerDependencies:
       '@mariozechner/pi-coding-agent': 0.65.0
-
-  '@aliou/pi-utils-ui@0.1.4':
-    resolution: {integrity: sha512-mdUBMCuxP4wHVtIWorPm6fcntz7GbIWwxf5a7tljpfxvH9TjYHC2DsDVfGTfZSbDbiY1Bw2LVWJJ4Q1yBZtEKA==}
-    peerDependencies:
-      '@mariozechner/pi-coding-agent': 0.65.0
-      '@mariozechner/pi-tui': 0.65.0
-    peerDependenciesMeta:
-      '@mariozechner/pi-coding-agent':
-        optional: true
-      '@mariozechner/pi-tui':
-        optional: true
 
   '@aliou/sesame@0.4.0':
     resolution: {integrity: sha512-r3xKC+6kIW9Q/ECjgzscerJcmhc8zJ4wfAF+U1m2iS/h5uQLUz8/bpmNR46jFmyfa75MRe0qxlYIW+NfLuohcQ==}
@@ -2026,11 +2016,6 @@ snapshots:
   '@aliou/pi-utils-settings@0.2.1(@mariozechner/pi-coding-agent@0.65.0(ws@8.19.0)(zod@3.25.76))':
     dependencies:
       '@mariozechner/pi-coding-agent': 0.65.0(ws@8.19.0)(zod@3.25.76)
-
-  '@aliou/pi-utils-ui@0.1.4(@mariozechner/pi-coding-agent@0.65.0(ws@8.19.0)(zod@3.25.76))(@mariozechner/pi-tui@0.65.0)':
-    optionalDependencies:
-      '@mariozechner/pi-coding-agent': 0.65.0(ws@8.19.0)(zod@3.25.76)
-      '@mariozechner/pi-tui': 0.65.0
 
   '@aliou/sesame@0.4.0(@mariozechner/pi-coding-agent@0.65.0(ws@8.19.0)(zod@3.25.76))':
     dependencies:
