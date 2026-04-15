@@ -11,16 +11,16 @@ import type {
 } from "@mariozechner/pi-coding-agent";
 import {
   DEFAULT_MAX_BYTES,
-  formatSize,
   keyHint,
-  truncateHead,
   truncateLine,
 } from "@mariozechner/pi-coding-agent";
 import { type Component, Spacer, Text } from "@mariozechner/pi-tui";
 import { Type } from "@sinclair/typebox";
+import { Tree, type TreeNode, type TreeTone } from "../lib/tree";
 
 const DEFAULT_LIMIT = 100;
 const GREP_MAX_LINE_LENGTH = 500;
+const COLLAPSED_MATCH_LIMIT = 30;
 
 const BLOCKED_PATHS = new Set([
   homedir(),
@@ -52,9 +52,16 @@ interface RgMatch {
   lineNumber: number;
 }
 
+interface GrepMatchData {
+  path: string;
+  line: number;
+  text: string;
+}
+
 interface HarnessGrepDetails extends GrepToolDetails {
   relativeTo?: string;
   matchCount?: number;
+  matches?: GrepMatchData[];
 }
 
 export function setupGrepTool(pi: ExtensionAPI): void {
@@ -135,31 +142,26 @@ export function setupGrepTool(pi: ExtensionAPI): void {
         limit,
       } = params;
 
-      // Handle abort signal
       if (signal?.aborted) {
         throw new Error("Operation aborted");
       }
 
-      // Resolve the search path, expanding ~ to home directory
       let resolvedPath = searchDir || ".";
       if (resolvedPath === "~" || resolvedPath.startsWith("~/")) {
         resolvedPath = resolvedPath.replace(/^~/, homedir());
       }
       const absoluteSearchPath = resolve(ctx.cwd, resolvedPath);
 
-      // Block searching in overly broad directories
       if (BLOCKED_PATHS.has(absoluteSearchPath)) {
         throw new Error(
           `Searching '${absoluteSearchPath}' is not allowed — too broad. Narrow the search to a specific project or subdirectory.`,
         );
       }
 
-      // Check if path exists
       if (!existsSync(absoluteSearchPath)) {
         throw new Error(`Path not found: ${absoluteSearchPath}`);
       }
 
-      // Determine if searching a directory
       let isDirectory = false;
       try {
         isDirectory = lstatSync(absoluteSearchPath).isDirectory();
@@ -170,25 +172,21 @@ export function setupGrepTool(pi: ExtensionAPI): void {
       const contextValue = context && context > 0 ? context : 0;
       const effectiveLimit = Math.max(1, limit ?? DEFAULT_LIMIT);
 
-      // Build rg arguments
       const rgArgs = ["--json", "--line-number", "--color=never", "--hidden"];
       if (ignoreCase) rgArgs.push("--ignore-case");
       if (literal) rgArgs.push("--fixed-strings");
       if (glob) rgArgs.push("--glob", glob);
       rgArgs.push(pattern, absoluteSearchPath);
 
-      // Run rg using pi.exec
       const result = await pi.exec("rg", rgArgs, {
         signal: signal ?? undefined,
         cwd: ctx.cwd,
       });
 
-      // Handle abort
       if (result.killed && signal?.aborted) {
         throw new Error("Operation aborted");
       }
 
-      // Handle non-zero exit (code 1 means no matches, which is fine)
       if (result.code !== 0 && result.code !== 1) {
         throw new Error(
           result.stderr || `ripgrep exited with code ${result.code}`,
@@ -226,7 +224,6 @@ export function setupGrepTool(pi: ExtensionAPI): void {
         }
       }
 
-      // No matches found
       if (matches.length === 0) {
         return {
           content: [{ type: "text", text: "No matches found" }],
@@ -237,15 +234,15 @@ export function setupGrepTool(pi: ExtensionAPI): void {
       // Format path relative to search directory
       const formatPath = (filePath: string): string => {
         if (isDirectory) {
-          const relative = filePath
+          const rel = filePath
             .slice(absoluteSearchPath.length)
             .replace(/^[/\\]/, "");
-          if (relative) return relative.replace(/\\/g, "/");
+          if (rel) return rel.replace(/\\/g, "/");
         }
         return filePath.replace(/\\/g, "/").split("/").pop() ?? filePath;
       };
 
-      // File cache for reading context lines
+      // Read match text from files
       const fileCache = new Map<string, string[]>();
       const getFileLines = (filePath: string): string[] => {
         let lines = fileCache.get(filePath);
@@ -264,18 +261,19 @@ export function setupGrepTool(pi: ExtensionAPI): void {
         return lines;
       };
 
-      // Format each match with optional context
       let linesTruncated = false;
-      const outputLines: string[] = [];
+      const matchData: GrepMatchData[] = [];
 
       for (const match of matches) {
         const relativePath = formatPath(match.filePath);
         const lines = getFileLines(match.filePath);
 
         if (!lines.length) {
-          outputLines.push(
-            `${relativePath}:${match.lineNumber}: (unable to read file)`,
-          );
+          matchData.push({
+            path: relativePath,
+            line: match.lineNumber,
+            text: "(unable to read file)",
+          });
           continue;
         }
 
@@ -293,34 +291,42 @@ export function setupGrepTool(pi: ExtensionAPI): void {
           const isMatchLine = current === match.lineNumber;
           const { text: truncatedText, wasTruncated } = truncateLine(lineText);
           if (wasTruncated) linesTruncated = true;
-          if (isMatchLine)
-            outputLines.push(`${relativePath}:${current}: ${truncatedText}`);
-          else outputLines.push(`${relativePath}-${current}- ${truncatedText}`);
+
+          if (contextValue > 0 && !isMatchLine) {
+            matchData.push({
+              path: relativePath,
+              line: current,
+              text: `  ${truncatedText.trim()}`,
+            });
+          } else {
+            matchData.push({
+              path: relativePath,
+              line: current,
+              text: truncatedText.trim(),
+            });
+          }
         }
       }
 
-      // Apply byte truncation
-      const rawOutput = outputLines.join("\n");
-      const truncation = truncateHead(rawOutput, {
-        maxLines: Number.MAX_SAFE_INTEGER,
-      });
-      const output = truncation.content;
-
-      // Build details — notices go here, not in content.text
       const details: HarnessGrepDetails = {
         matchCount,
+        matches: matchData,
         relativeTo:
           isDirectory && searchDir && searchDir !== "." && searchDir !== "./"
             ? relative(ctx.cwd, absoluteSearchPath) || "."
             : undefined,
       };
       if (matchLimitReached) details.matchLimitReached = effectiveLimit;
-      if (truncation.truncated) details.truncation = truncation;
       if (linesTruncated) details.linesTruncated = true;
 
+      // Text content for LLM consumption (flat format)
+      const textContent = matchData
+        .map((m) => `${m.path}:${m.line}: ${m.text}`)
+        .join("\n");
+
       return {
-        content: [{ type: "text", text: output }],
-        details: Object.keys(details).length > 0 ? details : undefined,
+        content: [{ type: "text", text: textContent }],
+        details,
       };
     },
 
@@ -371,7 +377,6 @@ export function setupGrepTool(pi: ExtensionAPI): void {
         textContent?.type === "text" ? textContent.text : ""
       ).trim();
 
-      // Simple one-line body for empty results
       if (!output || output === "No matches found") {
         return new Text(theme.fg("muted", output || "No result"), 0, 0);
       }
@@ -384,27 +389,32 @@ export function setupGrepTool(pi: ExtensionAPI): void {
       spacer.showCollapsed = true;
       fields.push(spacer as unknown as Text);
 
-      const matchLines = output.split("\n");
-      const maxLines = options.expanded ? matchLines.length : 15;
-      const displayLines = matchLines.slice(0, maxLines);
-      const remaining = matchLines.length - maxLines;
-
-      const lines = displayLines.map((line) => theme.fg("toolOutput", line));
-      const resultField = new Text(lines.join("\n"), 0, 0);
-      (resultField as Component & { showCollapsed?: boolean }).showCollapsed =
-        true;
-      fields.push(resultField);
-
+      // Build tree from structured match data
       const details = result.details;
+      const allMatches = details?.matches ?? [];
+
+      // Collapse by slicing matches, not rendered lines
+      const maxMatches = options.expanded
+        ? allMatches.length
+        : COLLAPSED_MATCH_LIMIT;
+      const displayMatches = allMatches.slice(0, maxMatches);
+      const remainingMatches = allMatches.length - maxMatches;
+
+      const tree = buildGrepTree(displayMatches);
+      const treeComponent = new Tree(tree, { theme, dirSuffix: ":" });
+      (treeComponent as Component & { showCollapsed?: boolean }).showCollapsed =
+        true;
+      fields.push(treeComponent as unknown as Text);
+
       const footerItems: Array<{
         label?: string;
         value: string;
         tone?: "muted" | "accent" | "success" | "warning" | "error";
       }> = [];
 
-      if (remaining > 0) {
+      if (remainingMatches > 0) {
         footerItems.push({
-          value: `${remaining} more lines, ${keyHint("app.tools.expand", "to expand")}`,
+          value: `${remainingMatches} more matches, ${keyHint("app.tools.expand", "to expand")}`,
           tone: "muted",
         });
       }
@@ -419,12 +429,6 @@ export function setupGrepTool(pi: ExtensionAPI): void {
         footerItems.push({
           label: "limit",
           value: String(details.matchLimitReached),
-          tone: "warning",
-        });
-      }
-      if (details?.truncation?.truncated) {
-        footerItems.push({
-          value: `${formatSize(DEFAULT_MAX_BYTES)} limit`,
           tone: "warning",
         });
       }
@@ -450,4 +454,33 @@ export function setupGrepTool(pi: ExtensionAPI): void {
       return new ToolBody({ fields, footer }, options, theme);
     },
   });
+}
+
+/** Group match data by file path and build a TreeNode tree. */
+function buildGrepTree(matches: GrepMatchData[]): TreeNode[] {
+  const byPath = new Map<string, GrepMatchData[]>();
+  for (const m of matches) {
+    let group = byPath.get(m.path);
+    if (!group) {
+      group = [];
+      byPath.set(m.path, group);
+    }
+    group.push(m);
+  }
+
+  const roots: TreeNode[] = [];
+  const entries = [...byPath.entries()].sort(([a], [b]) => a.localeCompare(b));
+
+  for (const [path, fileMatches] of entries) {
+    roots.push({
+      label: path,
+      tone: "accent",
+      children: fileMatches.map((m) => ({
+        label: `${m.line}: ${m.text}`,
+        tone: "toolOutput" as TreeTone,
+      })),
+    });
+  }
+
+  return roots;
 }

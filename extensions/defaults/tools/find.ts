@@ -12,8 +12,10 @@ import type {
 import { keyHint } from "@mariozechner/pi-coding-agent";
 import { type Component, Spacer, Text } from "@mariozechner/pi-tui";
 import { Type } from "@sinclair/typebox";
+import { Tree, type TreeNode, type TreeTone } from "../lib/tree";
 
 const DEFAULT_LIMIT = 1000;
+const COLLAPSED_RESULT_LIMIT = 40;
 
 const BLOCKED_PATHS = new Set([
   homedir(),
@@ -43,6 +45,7 @@ const BLOCKED_PATHS = new Set([
 interface HarnessFindDetails extends FindToolDetails {
   relativeTo?: string;
   totalResults?: number;
+  paths?: string[];
 }
 
 export function setupFindTool(pi: ExtensionAPI): void {
@@ -91,35 +94,26 @@ export function setupFindTool(pi: ExtensionAPI): void {
       const searchPath = params.path;
       const limit = params.limit ?? DEFAULT_LIMIT;
 
-      // Handle abort signal
       if (signal?.aborted) {
         throw new Error("Search was aborted");
       }
 
-      // Resolve the search path, expanding ~ to home directory
       let resolvedPath = searchPath || ".";
-      // Expand ~ to home directory if path starts with ~ (but not ~something else like ~/foo)
       if (resolvedPath === "~" || resolvedPath.startsWith("~/")) {
         resolvedPath = resolvedPath.replace(/^~/, homedir());
       }
       const absoluteSearchPath = resolve(ctx.cwd, resolvedPath);
 
-      // Block searching in overly broad directories
       if (BLOCKED_PATHS.has(absoluteSearchPath)) {
         throw new Error(
           `Searching '${absoluteSearchPath}' is not allowed — too broad. Narrow the search to a specific project or subdirectory.`,
         );
       }
 
-      // Check if path exists
       if (!existsSync(absoluteSearchPath)) {
         throw new Error(`Path not found: ${absoluteSearchPath}`);
       }
 
-      // Build fd arguments - NOTE: We intentionally omit --ignore-file flags
-      // because fd natively discovers .gitignore files with correct directory scoping.
-      // The native find tool had a bug where nested .gitignore files were passed via
-      // --ignore-file, applying patterns globally instead of scoped to each directory.
       const fdArgs = [
         "--glob",
         "--color=never",
@@ -130,29 +124,24 @@ export function setupFindTool(pi: ExtensionAPI): void {
         absoluteSearchPath,
       ];
 
-      // Run fd command using pi.exec
       const result = await pi.exec("fd", fdArgs, {
         signal: signal ?? undefined,
         cwd: ctx.cwd,
       });
 
-      // Handle abort
       if (result.killed && signal?.aborted) {
         throw new Error("Search was aborted");
       }
 
-      // Handle non-zero exit with no stdout
       if (result.code !== 0 && !result.stdout) {
         throw new Error(result.stderr || "Unknown error");
       }
 
-      // Process results - relativize paths to searchPath
       const allResults = result.stdout
         .trim()
         .split("\n")
         .filter((line) => line.trim());
 
-      // Handle empty results
       if (allResults.length === 0) {
         return {
           content: [
@@ -166,36 +155,28 @@ export function setupFindTool(pi: ExtensionAPI): void {
       }
 
       const results = allResults.map((absolutePath) => {
-        // Make path relative to searchPath
         if (absolutePath.startsWith(absoluteSearchPath)) {
           return absolutePath.slice(absoluteSearchPath.length + 1);
         }
         return absolutePath;
       });
 
-      // Apply the limit
-      const truncatedResults = results.slice(0, limit);
-      const wasTruncated = results.length > truncatedResults.length;
-
-      // Output is just the file paths — no inline notices
-      const outputText = truncatedResults.join("\n");
+      const wasTruncated = results.length >= limit;
 
       const details: HarnessFindDetails = {
         resultLimitReached: wasTruncated ? results.length : undefined,
         totalResults: results.length,
+        paths: results,
         relativeTo:
           searchPath && searchPath !== "." && searchPath !== "./"
             ? relative(ctx.cwd, absoluteSearchPath) || "."
             : undefined,
       };
 
+      const outputText = results.join("\n");
+
       return {
-        content: [
-          {
-            type: "text",
-            text: outputText,
-          },
-        ],
+        content: [{ type: "text", text: outputText }],
         details,
       };
     },
@@ -233,7 +214,6 @@ export function setupFindTool(pi: ExtensionAPI): void {
         textContent?.type === "text" ? textContent.text : ""
       ).trim();
 
-      // Simple one-line body for empty results
       if (!output || output === "No files found matching the pattern.") {
         return new Text(theme.fg("muted", output || "No result"), 0, 0);
       }
@@ -246,27 +226,32 @@ export function setupFindTool(pi: ExtensionAPI): void {
       spacer.showCollapsed = true;
       fields.push(spacer as unknown as Text);
 
-      const filePaths = output.split("\n");
-      const maxLines = options.expanded ? filePaths.length : 20;
-      const displayLines = filePaths.slice(0, maxLines);
-      const remaining = filePaths.length - maxLines;
-
-      const lines = displayLines.map((line) => theme.fg("toolOutput", line));
-      const resultField = new Text(lines.join("\n"), 0, 0);
-      (resultField as Component & { showCollapsed?: boolean }).showCollapsed =
-        true;
-      fields.push(resultField);
-
+      // Build tree from structured path data
       const details = result.details;
+      const allPaths = details?.paths ?? [];
+
+      // Collapse by slicing paths, not rendered lines
+      const maxPaths = options.expanded
+        ? allPaths.length
+        : COLLAPSED_RESULT_LIMIT;
+      const displayPaths = allPaths.slice(0, maxPaths);
+      const remainingPaths = allPaths.length - maxPaths;
+
+      const tree = buildFindTree(displayPaths);
+      const treeComponent = new Tree(tree, { theme, dirSuffix: "/" });
+      (treeComponent as Component & { showCollapsed?: boolean }).showCollapsed =
+        true;
+      fields.push(treeComponent as unknown as Text);
+
       const footerItems: Array<{
         label?: string;
         value: string;
         tone?: "muted" | "accent" | "success" | "warning" | "error";
       }> = [];
 
-      if (remaining > 0) {
+      if (remainingPaths > 0) {
         footerItems.push({
-          value: `${remaining} more lines, ${keyHint("app.tools.expand", "to expand")}`,
+          value: `${remainingPaths} more results, ${keyHint("app.tools.expand", "to expand")}`,
           tone: "muted",
         });
       }
@@ -300,4 +285,57 @@ export function setupFindTool(pi: ExtensionAPI): void {
       return new ToolBody({ fields, footer }, options, theme);
     },
   });
+}
+
+/**
+ * Build a TreeNode tree from a flat list of relative file paths.
+ * Creates a trie from the path segments, then converts to TreeNode format.
+ * Directories are sorted before files, both alphabetically.
+ */
+function buildFindTree(paths: string[]): TreeNode[] {
+  const root: TrieNode = { name: "", children: new Map(), isFile: false };
+
+  for (const path of paths) {
+    const clean = path.replace(/^\.\/?/, "");
+    if (!clean) continue;
+    const segments = clean.split("/");
+    insertPath(root, segments);
+  }
+
+  return trieToTreeNodes(root);
+}
+
+interface TrieNode {
+  name: string;
+  children: Map<string, TrieNode>;
+  isFile: boolean;
+}
+
+function insertPath(root: TrieNode, segments: string[]): void {
+  let current = root;
+  for (const [i, segment] of segments.entries()) {
+    const isFile = i === segments.length - 1;
+    const existing = current.children.get(segment);
+    if (!existing) {
+      const child: TrieNode = { name: segment, children: new Map(), isFile };
+      current.children.set(segment, child);
+      current = child;
+    } else {
+      if (isFile) existing.isFile = true;
+      current = existing;
+    }
+  }
+}
+
+function trieToTreeNodes(node: TrieNode): TreeNode[] {
+  const children = [...node.children.values()].sort((a, b) => {
+    if (a.isFile !== b.isFile) return a.isFile ? 1 : -1;
+    return a.name.localeCompare(b.name);
+  });
+
+  return children.map((child) => ({
+    label: child.name,
+    tone: (child.isFile ? "toolOutput" : "accent") as TreeTone,
+    children: child.children.size > 0 ? trieToTreeNodes(child) : undefined,
+  }));
 }
