@@ -67,7 +67,8 @@ export function setupBashTool(pi: ExtensionAPI): void {
     timeout: Type.Optional(Type.Number({ description: "Timeout in seconds" })),
     cwd: Type.Optional(
       Type.String({
-        description: "Working directory. Use instead of 'cd dir && command'.",
+        description:
+          "Working directory for the command. Prefer this over shell wrappers like 'cd dir && command', 'pushd', or 'cd ../..; ...'.",
       }),
     ),
   });
@@ -76,6 +77,8 @@ export function setupBashTool(pi: ExtensionAPI): void {
     ...nativeBash,
     parameters: schema,
     promptGuidelines: [
+      "When a command should run in another directory, set cwd and keep command free of leading 'cd', 'pushd', or similar directory-changing shell wrappers.",
+      "Do not use patterns like 'cd dir && command', 'cd dir; command', or 'pushd dir && command'.",
       "Use the cwd parameter instead of 'cd dir && command'.",
       "Reserve bash for git, build/test, package managers, ssh, curl, and process management.",
       "Prefer native tools like read, find, grep, edit, and write over shell commands when available.",
