@@ -10,7 +10,7 @@ import type {
   ToolRenderResultOptions,
 } from "@mariozechner/pi-coding-agent";
 import { keyHint } from "@mariozechner/pi-coding-agent";
-import { type Component, Text } from "@mariozechner/pi-tui";
+import { type Component, Spacer, Text } from "@mariozechner/pi-tui";
 import { Type } from "@sinclair/typebox";
 
 const DEFAULT_LIMIT = 1000;
@@ -210,7 +210,7 @@ export function setupFindTool(pi: ExtensionAPI): void {
     ) {
       return new ToolCallHeader(
         {
-          toolName: "find",
+          toolName: "Find",
           mainArg: args.pattern,
           optionArgs: [
             ...(args.path ? [{ label: "in", value: args.path }] : []),
@@ -241,6 +241,10 @@ export function setupFindTool(pi: ExtensionAPI): void {
       const fields: Array<
         { label: string; value: string; showCollapsed?: boolean } | Text
       > = [];
+
+      const spacer = new Spacer(1) as Component & { showCollapsed?: boolean };
+      spacer.showCollapsed = true;
+      fields.push(spacer as unknown as Text);
 
       const filePaths = output.split("\n");
       const maxLines = options.expanded ? filePaths.length : 20;
