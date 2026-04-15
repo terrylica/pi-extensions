@@ -269,13 +269,6 @@ export function setupFindTool(pi: ExtensionAPI): void {
           tone: "warning",
         });
       }
-      if (details?.relativeTo) {
-        footerItems.push({
-          label: "relative to",
-          value: details.relativeTo,
-          tone: "accent",
-        });
-      }
 
       const footer =
         footerItems.length > 0

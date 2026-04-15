@@ -1,6 +1,6 @@
 import type { Theme } from "@mariozechner/pi-coding-agent";
 import type { Component } from "@mariozechner/pi-tui";
-import { truncateToWidth, visibleWidth } from "@mariozechner/pi-tui";
+import { visibleWidth, wrapTextWithAnsi } from "@mariozechner/pi-tui";
 
 export type TreeTone =
   | "muted"
@@ -34,6 +34,8 @@ export interface TreeOptions {
  *
  * Tree chars (├──, └──, │) are always rendered in the "muted" tone.
  * Each node's label is rendered in its own tone (default: "toolOutput").
+ * Long labels are word-wrapped, with continuation lines indented to
+ * align with the label start (after the tree prefix).
  *
  * Collapse/expand is handled outside this component — callers slice
  * their data before constructing the tree.
@@ -83,8 +85,11 @@ function renderRoot(
   const hasChildren = node.children && node.children.length > 0;
   const label = hasChildren ? `${node.label}${dirSuffix}` : node.label;
   const tone = node.tone ?? "toolOutput";
-  const truncated = truncateToWidth(label, width);
-  lines.push(theme.fg(tone, truncated));
+
+  const wrapped = wrapTextWithAnsi(label, width);
+  for (const line of wrapped) {
+    lines.push(theme.fg(tone, line));
+  }
 
   if (!node.children || node.children.length === 0) return;
 
@@ -119,9 +124,18 @@ function renderChild(
 
   const prefixVisible = visibleWidth(prefix);
   const available = Math.max(1, width - prefixVisible);
-  const truncated = truncateToWidth(label, available);
 
-  lines.push(`${theme.fg("muted", prefix)}${theme.fg(tone, truncated)}`);
+  // Wrap the label, then indent continuation lines to align with label start
+  const wrapIndent = " ".repeat(prefixVisible);
+  const wrapped = wrapTextWithAnsi(label, available);
+
+  for (const [i, line] of wrapped.entries()) {
+    if (i === 0) {
+      lines.push(`${theme.fg("muted", prefix)}${theme.fg(tone, line)}`);
+    } else {
+      lines.push(`${wrapIndent}${theme.fg(tone, line)}`);
+    }
+  }
 
   if (!node.children || node.children.length === 0) return;
 
