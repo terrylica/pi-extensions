@@ -1,10 +1,16 @@
 import { existsSync } from "node:fs";
 import { homedir } from "node:os";
 import { resolve } from "node:path";
+import { ToolBody, ToolCallHeader, ToolFooter } from "@aliou/pi-utils-ui";
 import type {
+  AgentToolResult,
   ExtensionAPI,
   FindToolDetails,
+  Theme,
+  ToolRenderResultOptions,
 } from "@mariozechner/pi-coding-agent";
+import { keyHint } from "@mariozechner/pi-coding-agent";
+import { type Component, Text } from "@mariozechner/pi-tui";
 import { Type } from "@sinclair/typebox";
 
 const DEFAULT_LIMIT = 1000;
@@ -34,6 +40,11 @@ const BLOCKED_PATHS = new Set([
   "/bin",
 ]);
 
+interface HarnessFindDetails extends FindToolDetails {
+  relativeTo?: string;
+  totalResults?: number;
+}
+
 export function setupFindTool(pi: ExtensionAPI): void {
   const wrappedSchema = Type.Object({
     pattern: Type.String({
@@ -51,7 +62,7 @@ export function setupFindTool(pi: ExtensionAPI): void {
     ),
   });
 
-  pi.registerTool<typeof wrappedSchema, FindToolDetails>({
+  pi.registerTool<typeof wrappedSchema, HarnessFindDetails>({
     name: "find",
     label: "Find Files",
     description: `Find files by name using the \`fd\` command-line tool. Supports glob patterns and regex. Searches recursively from the specified path. Respects .gitignore. Results are truncated to ${DEFAULT_LIMIT} entries.`,
@@ -74,7 +85,7 @@ export function setupFindTool(pi: ExtensionAPI): void {
       },
     ): Promise<{
       content: Array<{ type: "text"; text: string }>;
-      details: FindToolDetails;
+      details: HarnessFindDetails;
     }> {
       const pattern = params.pattern;
       const searchPath = params.path;
@@ -188,9 +199,7 @@ export function setupFindTool(pi: ExtensionAPI): void {
               text: "No files found matching the pattern.",
             },
           ],
-          details: {
-            resultLimitReached: 0,
-          },
+          details: {},
         };
       }
 
@@ -206,14 +215,16 @@ export function setupFindTool(pi: ExtensionAPI): void {
       const truncatedResults = results.slice(0, limit);
       const wasTruncated = results.length > truncatedResults.length;
 
-      let outputText = truncatedResults.join("\n");
+      // Output is just the file paths — no inline notices
+      const outputText = truncatedResults.join("\n");
 
-      if (wasTruncated) {
-        outputText += `\n\n(Showing ${truncatedResults.length} of ${results.length} results. Increase limit to see more.)`;
-      }
-
-      const details: FindToolDetails = {
+      const details: HarnessFindDetails = {
         resultLimitReached: wasTruncated ? results.length : undefined,
+        totalResults: results.length,
+        relativeTo:
+          searchPath && searchPath !== "." && searchPath !== "./"
+            ? searchPath
+            : undefined,
       };
 
       return {
@@ -225,6 +236,107 @@ export function setupFindTool(pi: ExtensionAPI): void {
         ],
         details,
       };
+    },
+
+    renderCall(
+      args: {
+        pattern: string;
+        path?: string;
+        limit?: number;
+      },
+      theme: Theme,
+    ) {
+      return new ToolCallHeader(
+        {
+          toolName: "find",
+          mainArg: args.pattern,
+          optionArgs: [
+            ...(args.path ? [{ label: "in", value: args.path }] : []),
+            ...(args.limit
+              ? [{ label: "limit", value: String(args.limit) }]
+              : []),
+          ],
+        },
+        theme,
+      );
+    },
+
+    renderResult(
+      result: AgentToolResult<HarnessFindDetails>,
+      options: ToolRenderResultOptions,
+      theme: Theme,
+    ) {
+      const textContent = result.content[0];
+      const output = (
+        textContent?.type === "text" ? textContent.text : ""
+      ).trim();
+
+      // Simple one-line body for empty/error results
+      if (
+        !output ||
+        output === "No files found matching the pattern." ||
+        output.startsWith("Error") ||
+        output === "Search was aborted"
+      ) {
+        return new Text(theme.fg("muted", output || "No result"), 0, 0);
+      }
+
+      const fields: Array<
+        { label: string; value: string; showCollapsed?: boolean } | Text
+      > = [];
+
+      const filePaths = output.split("\n");
+      const maxLines = options.expanded ? filePaths.length : 20;
+      const displayLines = filePaths.slice(0, maxLines);
+      const remaining = filePaths.length - maxLines;
+
+      const lines = displayLines.map((line) => theme.fg("toolOutput", line));
+      const resultField = new Text(lines.join("\n"), 0, 0);
+      (resultField as Component & { showCollapsed?: boolean }).showCollapsed =
+        true;
+      fields.push(resultField);
+
+      const details = result.details;
+      const footerItems: Array<{
+        label?: string;
+        value: string;
+        tone?: "muted" | "accent" | "success" | "warning" | "error";
+      }> = [];
+
+      if (remaining > 0) {
+        footerItems.push({
+          value: `${remaining} more lines, ${keyHint("app.tools.expand", "to expand")}`,
+          tone: "muted",
+        });
+      }
+      if (details?.totalResults) {
+        footerItems.push({
+          label: "results",
+          value: String(details.totalResults),
+          tone: "success",
+        });
+      }
+      if (details?.resultLimitReached) {
+        footerItems.push({
+          label: "limit",
+          value: String(details.resultLimitReached),
+          tone: "warning",
+        });
+      }
+      if (details?.relativeTo) {
+        footerItems.push({
+          label: "relative to",
+          value: details.relativeTo,
+          tone: "accent",
+        });
+      }
+
+      const footer =
+        footerItems.length > 0
+          ? new ToolFooter(theme, { items: footerItems })
+          : undefined;
+
+      return new ToolBody({ fields, footer }, options, theme);
     },
   });
 }
