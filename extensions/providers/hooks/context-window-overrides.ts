@@ -9,6 +9,7 @@ import { AD_NOTIFY_ATTENTION_EVENT } from "../../../packages/events";
  */
 const CONTEXT_WINDOW_OVERRIDES: Record<string, number> = {
   "anthropic/claude-opus-4-6": 272_000,
+  "anthropic/claude-opus-4-7": 272_000,
   "anthropic/claude-sonnet-4-6": 272_000,
 };
 
