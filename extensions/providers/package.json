@@ -32,7 +32,7 @@
     "@aliou/pi-utils-settings": "^0.11.0"
   },
   "peerDependencies": {
-    "@mariozechner/pi-coding-agent": "0.65.0"
+    "@mariozechner/pi-coding-agent": "0.67.4"
   },
   "peerDependenciesMeta": {
     "@mariozechner/pi-coding-agent": {
