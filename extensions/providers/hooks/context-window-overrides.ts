@@ -32,7 +32,9 @@ interface ModelsJsonConfig {
 export function setupContextWindowOverrides(pi: ExtensionAPI): void {
   if (Object.keys(CONTEXT_WINDOW_OVERRIDES).length === 0) return;
 
-  pi.on("session_start", async (_event, ctx) => {
+  pi.on("session_start", async (event, ctx) => {
+    // Only prompt on fresh starts, not resumes/switches
+    if (event.reason !== "startup" && event.reason !== "new") return;
     const modelsJsonPath = join(getAgentDir(), "models.json");
 
     let config: ModelsJsonConfig = { providers: {} };
