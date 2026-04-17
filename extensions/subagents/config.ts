@@ -115,30 +115,18 @@ const DEFAULT_CONFIG: ResolvedSubagentsConfig = {
   subagents: {
     scout: {
       candidates: [
-        // { provider: "openrouter", model: "openai/gpt-oss-20b" },
-        // {
-        //   provider: "openrouter",
-        //   model: "mistralai/mistral-small-3.2-24b-instruct",
-        // },
-        // { provider: "synthetic", model: "hf:zai-org/GLM-4.7-Flash" },
-        // { provider: "openrouter", model: "google/gemini-3-flash-preview" },
-        // { provider: "openrouter", model: "openai/gpt-5.4-mini" },
-        { provider: "openai-codex", model: "gpt-5.3-codex-spark" },
+        { provider: "synthetic", model: "hf:zai-org/GLM-4.7-Flash" },
+        { provider: "openai-codex", model: "gpt-5.4-mini" },
+        // { provider: "openai-codex", model: "gpt-5.3-codex-spark" },
       ],
       enabled: true,
       web: DEFAULT_SCOUT_WEB_CONFIG,
     },
     lookout: {
       candidates: [
-        // { provider: "openrouter", model: "openai/gpt-oss-20b" },
-        // {
-        //   provider: "openrouter",
-        //   model: "mistralai/mistral-small-3.2-24b-instruct",
-        // },
-        // { provider: "synthetic", model: "hf:zai-org/GLM-4.7-Flash" },
-        // { provider: "openrouter", model: "google/gemini-3-flash-preview" },
-        // { provider: "openrouter", model: "openai/gpt-5.4-mini" },
-        { provider: "openai-codex", model: "gpt-5.3-codex-spark" },
+        { provider: "synthetic", model: "hf:zai-org/GLM-4.7-Flash" },
+        { provider: "openai-codex", model: "gpt-5.4-mini" },
+        // { provider: "openai-codex", model: "gpt-5.3-codex-spark" },
       ],
       enabled: true,
     },
